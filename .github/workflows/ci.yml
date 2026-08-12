@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-and-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Verify source and release contracts
+        run: |
+          python3 scripts/verify-source-boundary.py
+          python3 scripts/generate-license-inventory.py --check
+          python3 scripts/verify-provenance.py
+          python3 scripts/verify-public-test-fixtures.py
+          python3 scripts/generate-source-manifest.py --check
+          python3 -m unittest tests.test_release_contract
+          bash -n entrypoint.sh scripts/*.sh testbed/*.sh
+
+      - name: Verify Ratio1 overrides against exact upstream source
+        run: |
+          set -euo pipefail
+          upstream_root="$(mktemp -d)"
+          trap 'rm -rf "$upstream_root"' EXIT
+          git -C "$upstream_root" init --quiet
+          git -C "$upstream_root" remote add origin https://github.com/cockroachdb/cockroach.git
+          git -C "$upstream_root" config core.sparseCheckout true
+          printf '%s\n' pkg/cli/cli.go pkg/ui/ui.go > "$upstream_root/.git/info/sparse-checkout"
+          git -C "$upstream_root" fetch --quiet --depth=1 --filter=blob:none origin \
+            76e598c9b1c100fd9280b979140b5e377c330a20
+          git -C "$upstream_root" checkout --quiet --detach FETCH_HEAD
+          python3 scripts/verify-provenance.py --upstream-root "$upstream_root"
+
+      - name: Verify the offline OSS runtime closure
+        run: |
+          docker run --rm \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            --entrypoint python3 \
+            golang:1.19.13-bookworm@sha256:da9da58d86d106a5dda2ce249b00cf3b31cdd626ea41597e476de7b4eebad8c4 \
+            scripts/verify-runtime-closure.py
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+
+      - name: Build candidate image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: .
+          load: true
+          push: false
+          platforms: linux/amd64
+          tags: r1-distributed-sql:ci
+          build-args: |
+            BUILD_DATE=2024-10-01T22:15:37Z
+            RATIO1_REVISION=${{ github.sha }}
+            RATIO1_VERSION=v23.1.28-r1.0.0-ci.${{ github.run_number }}
+            SOURCE_DATE_EPOCH=1727820937
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify OSS binary and image contract
+        run: |
+          set -euo pipefail
+          container_id="$(docker create r1-distributed-sql:ci)"
+          trap 'docker rm "$container_id" >/dev/null 2>&1 || true' EXIT
+          docker cp "$container_id:/cockroach/cockroach" ./cockroach
+          chmod 755 ./cockroach
+          ./cockroach version | grep -F 'Distribution:     OSS'
+          ./cockroach version | grep -F 'Build Tag:        v23.1.28-r1.0.0-ci.${{ github.run_number }}'
+          docker run --rm --entrypoint /usr/bin/test r1-distributed-sql:ci \
+            -x /usr/local/bin/deeploy-crdb-entrypoint
+          docker run --rm --entrypoint /usr/local/bin/cloudflared \
+            r1-distributed-sql:ci --version
+          docker image inspect r1-distributed-sql:ci \
+            --format '{{json .Config.Labels}}' \
+            | grep -F 'https://github.com/Ratio1/r1-distributed-sql'
+
+      - name: Generate image SPDX SBOM
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
+        with:
+          image: r1-distributed-sql:ci
+          format: spdx-json
+          artifact-name: r1-distributed-sql-image.spdx.json
+          output-file: r1-distributed-sql-image.spdx.json
+
+      - name: Generate image CycloneDX SBOM
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
+        with:
+          image: r1-distributed-sql:ci
+          format: cyclonedx-json
+          artifact-name: r1-distributed-sql-image.cdx.json
+          output-file: r1-distributed-sql-image.cdx.json
+
+      - name: Verify image SBOM component coverage
+        run: |
+          grep -Fqi 'cloudflared' r1-distributed-sql-image.spdx.json
+          grep -Fqi 'cockroach' r1-distributed-sql-image.spdx.json
+          grep -Fqi 'cloudflared' r1-distributed-sql-image.cdx.json
+          grep -Fqi 'cockroach' r1-distributed-sql-image.cdx.json
+
+      - name: Scan candidate image
+        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
+        with:
+          image-ref: r1-distributed-sql:ci
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'

@@ -1,0 +1,264 @@
+name: Release signed image
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      artifact-metadata: write
+      attestations: write
+      contents: write
+      id-token: write
+      packages: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Validate release tag and source contracts
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_NAME" =~ ^v23\.1\.28-r1\.[0-9]+\.[0-9]+$ ]]
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          python3 scripts/verify-source-boundary.py
+          python3 scripts/generate-license-inventory.py --check
+          python3 scripts/verify-provenance.py
+          python3 scripts/verify-public-test-fixtures.py
+          python3 scripts/generate-source-manifest.py --check
+          python3 -m unittest tests.test_release_contract
+          bash -n entrypoint.sh scripts/*.sh testbed/*.sh
+
+      - name: Verify Ratio1 overrides against exact upstream source
+        run: |
+          set -euo pipefail
+          upstream_root="$(mktemp -d)"
+          trap 'rm -rf "$upstream_root"' EXIT
+          git -C "$upstream_root" init --quiet
+          git -C "$upstream_root" remote add origin https://github.com/cockroachdb/cockroach.git
+          git -C "$upstream_root" config core.sparseCheckout true
+          printf '%s\n' pkg/cli/cli.go pkg/ui/ui.go > "$upstream_root/.git/info/sparse-checkout"
+          git -C "$upstream_root" fetch --quiet --depth=1 --filter=blob:none origin \
+            76e598c9b1c100fd9280b979140b5e377c330a20
+          git -C "$upstream_root" checkout --quiet --detach FETCH_HEAD
+          python3 scripts/verify-provenance.py --upstream-root "$upstream_root"
+
+      - name: Verify the offline OSS runtime closure
+        run: |
+          docker run --rm \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            --entrypoint python3 \
+            golang:1.19.13-bookworm@sha256:da9da58d86d106a5dda2ce249b00cf3b31cdd626ea41597e476de7b4eebad8c4 \
+            scripts/verify-runtime-closure.py
+
+      - name: Resolve deterministic release metadata
+        id: metadata
+        run: |
+          set -euo pipefail
+          printf 'build_date=%s\n' "$(git show -s --format=%cI "$GITHUB_SHA")" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+
+      - name: Log in to GHCR for publication
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish immutable image tags
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/ratio1/r1-distributed-sql:${{ github.ref_name }}
+            ghcr.io/ratio1/r1-distributed-sql:sha-${{ github.sha }}
+            ghcr.io/ratio1/r1-distributed-sql:latest
+          build-args: |
+            BUILD_DATE=${{ steps.metadata.outputs.build_date }}
+            RATIO1_REVISION=${{ github.sha }}
+            RATIO1_VERSION=${{ github.ref_name }}
+            SOURCE_DATE_EPOCH=1727820937
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+
+      - name: Record immutable image reference
+        id: image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          image_ref="ghcr.io/ratio1/r1-distributed-sql@${DIGEST}"
+          printf 'ref=%s\n' "$image_ref" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$image_ref" > image-reference.txt
+
+      - name: Prove published binary and compatibility paths
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE_REF"
+          container_id="$(docker create "$IMAGE_REF")"
+          trap 'docker rm "$container_id" >/dev/null 2>&1 || true' EXIT
+          docker cp "$container_id:/cockroach/cockroach" ./cockroach
+          chmod 755 ./cockroach
+          ./cockroach version | grep -F 'Distribution:     OSS'
+          ./cockroach version | grep -F "Build Tag:        $GITHUB_REF_NAME"
+          docker run --rm --entrypoint /usr/bin/test "$IMAGE_REF" \
+            -x /usr/local/bin/deeploy-crdb-entrypoint
+
+      - name: Scan published digest
+        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
+        with:
+          image-ref: ${{ steps.image.outputs.ref }}
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Generate image SPDX SBOM
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
+        with:
+          image: ${{ steps.image.outputs.ref }}
+          format: spdx-json
+          upload-artifact: false
+          upload-release-assets: false
+          output-file: artifacts/r1-distributed-sql-image.spdx.json
+
+      - name: Generate image CycloneDX SBOM
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
+        with:
+          image: ${{ steps.image.outputs.ref }}
+          format: cyclonedx-json
+          upload-artifact: false
+          upload-release-assets: false
+          output-file: artifacts/r1-distributed-sql-image.cdx.json
+
+      - name: Generate source SPDX SBOM
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
+        with:
+          path: .
+          format: spdx-json
+          upload-artifact: false
+          upload-release-assets: false
+          output-file: artifacts/r1-distributed-sql-source.spdx.json
+
+      - name: Generate source CycloneDX SBOM
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
+        with:
+          path: .
+          format: cyclonedx-json
+          upload-artifact: false
+          upload-release-assets: false
+          output-file: artifacts/r1-distributed-sql-source.cdx.json
+
+      - name: Verify SBOM component coverage
+        run: |
+          grep -Fqi 'cloudflared' artifacts/r1-distributed-sql-image.spdx.json
+          grep -Fqi 'cockroach' artifacts/r1-distributed-sql-image.spdx.json
+          grep -Fqi 'cloudflared' artifacts/r1-distributed-sql-image.cdx.json
+          grep -Fqi 'cockroach' artifacts/r1-distributed-sql-image.cdx.json
+
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-name: ghcr.io/ratio1/r1-distributed-sql
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest image SPDX SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-name: ghcr.io/ratio1/r1-distributed-sql
+          subject-digest: ${{ steps.build.outputs.digest }}
+          sbom-path: artifacts/r1-distributed-sql-image.spdx.json
+          push-to-registry: true
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac
+
+      - name: Sign and verify the exact digest
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          set -euo pipefail
+          expected_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@${GITHUB_REF}"
+          cosign sign --yes "$IMAGE_REF"
+          cosign attest --yes \
+            --type spdxjson \
+            --predicate artifacts/r1-distributed-sql-image.spdx.json \
+            "$IMAGE_REF"
+          cosign verify \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            --certificate-identity "$expected_identity" \
+            "$IMAGE_REF"
+          cosign verify-attestation \
+            --type spdxjson \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            --certificate-identity "$expected_identity" \
+            "$IMAGE_REF"
+          gh attestation verify "oci://${IMAGE_REF}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --cert-identity "$expected_identity" \
+            --source-ref "$GITHUB_REF" \
+            --predicate-type 'https://slsa.dev/provenance/v1'
+          gh attestation verify "oci://${IMAGE_REF}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --cert-identity "$expected_identity" \
+            --source-ref "$GITHUB_REF" \
+            --predicate-type 'https://spdx.dev/Document/v2.3'
+
+      - name: Prove public anonymous pull
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          set -euo pipefail
+          docker image rm "$IMAGE_REF" >/dev/null 2>&1 || true
+          docker logout ghcr.io
+          docker pull "$IMAGE_REF"
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r1-distributed-sql-${{ github.ref_name }}-release-evidence
+          path: |
+            artifacts/*.json
+            image-reference.txt
+            NOTICE
+            RATIO1_PATCHES.md
+            THIRD_PARTY_NOTICES.md
+            UPSTREAM.md
+            source/license-inventory.json
+            source/manifest.sha256
+            source/provenance.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish release notes and evidence
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            artifacts/*.json image-reference.txt NOTICE RATIO1_PATCHES.md \
+            THIRD_PARTY_NOTICES.md UPSTREAM.md source/license-inventory.json \
+            source/manifest.sha256 source/provenance.json \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --generate-notes \
+            --title "R1 Distributed SQL $GITHUB_REF_NAME"

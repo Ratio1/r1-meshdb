@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "76e598c9b1c100fd9280b979140b5e377c330a20",
+  "files": [
+    {
+      "path": "engine/pkg/cli/cli.go",
+      "upstreamSha256": "65be03268d8674f85da607167638fe608b7a9f79d95bfd7cc18e9ae3eb4e2ebe",
+      "distributedSha256": "44c018198455a8e5ddc8a8263fbe10a4a5aa50af779af0956cc295dcf9016ce8",
+      "changeClass": "comments-only",
+      "reason": "Remove a comment reference to an excluded enterprise-only source path."
+    },
+    {
+      "path": "engine/pkg/ui/ui.go",
+      "upstreamSha256": "a69f40de750b5757ebbd7d73056c4d64cfa797f13fe1dc5a110c2c0d7ebedb06",
+      "distributedSha256": "cd095813fe2bbe03d4a1992ebfdf684f0599fd01f40340d906f80faeb5e4773f",
+      "changeClass": "comments-only",
+      "reason": "Remove a comment reference to excluded console asset paths."
+    }
+  ]
+}

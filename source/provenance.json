@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "project": "R1 Distributed SQL",
+  "nativeTreeHashAlgorithm": "sha256 over sorted entries: type-byte, NUL, relative UTF-8 path, NUL, file SHA-256 bytes or symlink target, NUL",
+  "upstream": {
+    "name": "CockroachDB",
+    "sourceUrl": "https://github.com/cockroachdb/cockroach.git",
+    "tag": "v23.1.28",
+    "commit": "76e598c9b1c100fd9280b979140b5e377c330a20",
+    "changeDate": "2026-04-01",
+    "changeLicense": "Apache-2.0",
+    "ossEntryPoint": "pkg/cmd/cockroach-oss",
+    "runtimeClosure": "source/runtime-files.txt",
+    "generatedFiles": "source/generated-files.txt",
+    "licenseInventory": "source/license-inventory.json",
+    "ratio1Overrides": "source/ratio1-engine-overrides.json",
+    "excludedPaths": [
+      "pkg/ccl",
+      "pkg/ui/distccl",
+      "pkg/ui/workspaces/db-console/ccl",
+      "c-deps/krb5"
+    ]
+  },
+  "nativeDependencies": [
+    {
+      "name": "geos",
+      "sourceUrl": "https://github.com/cockroachdb/geos.git",
+      "commit": "ac79ef98b6a7bd26c87bf069f1e0685dbb648ba2",
+      "treeSha256": "baf3beb54c2cea6deb671c5fed2461509db0cc59b24d9e1ece1479ef02335bf1",
+      "licenseFile": "engine/c-deps/geos/COPYING",
+      "role": "geometry runtime"
+    },
+    {
+      "name": "jemalloc",
+      "sourceUrl": "https://github.com/cockroachdb/jemalloc.git",
+      "commit": "54eaed1d8b56b1aa528be3bdd1877e59c56fa90c",
+      "treeSha256": "61cc4bc75f4c163820e976c1894aa640c1e2a79c9fec2daf77a8176afbbf88b3",
+      "licenseFile": "engine/c-deps/jemalloc/COPYING",
+      "role": "memory allocator"
+    },
+    {
+      "name": "libedit",
+      "sourceUrl": "https://github.com/cockroachdb/libedit.git",
+      "commit": "9dc73e7879592ba49de2cae5019a15da706422b1",
+      "treeSha256": "8edbf34392989600a82fcd6af45ec2d764f1b93c7ca0927a2e7e6c4e453169cf",
+      "licenseFile": "engine/c-deps/libedit/COPYING",
+      "role": "SQL shell line editing"
+    },
+    {
+      "name": "proj",
+      "sourceUrl": "https://github.com/cockroachdb/PROJ.git",
+      "commit": "c8ff95857beb3027b5aa3d15726795570f38eccb",
+      "treeSha256": "8c93754b0cfbc6bb5d7f6fb63c16810e85d67bc9a22623266f349ecca0f60984",
+      "licenseFile": "engine/c-deps/proj/COPYING",
+      "role": "coordinate transforms"
+    }
+  ],
+  "runtimeLayer": {
+    "sourceUrl": "https://github.com/Ratio1/deeploy-cockroachdb-service.git",
+    "commit": "89f1760c29b8d37bdac3ac4f274797e261db2811",
+    "entrypointSha256": "0e70768bf4f4125f2e171cf544ca1304ac0a83774e97c115b2efbaa0de3a4698"
+  },
+  "buildInputs": {
+    "goBuilder": "golang:1.19.13-bookworm@sha256:da9da58d86d106a5dda2ce249b00cf3b31cdd626ea41597e476de7b4eebad8c4",
+    "runtime": "debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241",
+    "cloudflared": {
+      "image": "cloudflare/cloudflared:2026.6.1@sha256:6d91c121b803126f7a5344005d17a9324788fc09d305b6e2560ec6040a7ae283",
+      "binarySha256": "a1eb422f052be0854b82bf81bf51f343a87c1c64c35e6ccde22ece001799ab16",
+      "sourceUrl": "https://github.com/cloudflare/cloudflared.git",
+      "commit": "81a53555aa827fca88605d7e67ad5c03cda468d2",
+      "vcsModified": true,
+      "buildInfo": "source/cloudflared-buildinfo.txt",
+      "licenseInventory": "source/cloudflared-license-inventory.csv"
+    },
+    "debianSnapshot": "20260701T000000Z",
+    "sourceDateEpoch": 1727820937
+  }
+}

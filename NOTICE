@@ -1,0 +1,12 @@
+R1 Distributed SQL
+Copyright 2026 Ratio1
+
+This distribution includes source derived from CockroachDB v23.1.28,
+copyright The Cockroach Authors. Source covered by the upstream Business Source
+License changed to the Apache License, Version 2.0 on 2026-04-01.
+
+CockroachDB is a trademark of Cockroach Labs, Inc. This independent
+distribution is not affiliated with or endorsed by Cockroach Labs.
+
+Third-party copyright and license notices are listed in
+THIRD_PARTY_NOTICES.md and in the license files referenced there.

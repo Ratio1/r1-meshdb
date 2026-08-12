@@ -1,0 +1,8 @@
+.git
+.playwright
+__pycache__
+*.py[cod]
+source/*.cdx.json
+source/*.spdx.json
+source/*.tar.gz
+*.log
