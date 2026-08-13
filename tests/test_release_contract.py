@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import importlib.util
 import os
 from pathlib import Path
 import re
@@ -15,7 +16,46 @@ def read(path: str) -> str:
   return (ROOT / path).read_text(encoding="utf-8")
 
 
+def load_script(path: str):
+  spec = importlib.util.spec_from_file_location(Path(path).stem, ROOT / path)
+  if spec is None or spec.loader is None:
+    raise RuntimeError(f"unable to load {path}")
+  module = importlib.util.module_from_spec(spec)
+  spec.loader.exec_module(module)
+  return module
+
+
 class ReleaseContractTests(unittest.TestCase):
+
+  def test_comments_only_projection_accepts_comments_but_rejects_code_changes(self):
+    verifier = load_script("scripts/verify-provenance.py")
+    upstream = b'''package sample
+
+// Upstream comment.
+func value() string {
+  return "// preserved literal"
+}
+'''
+    comments_changed = b'''// Required modification notice.
+
+package sample
+
+// Ratio1 comment spanning
+// multiple lines.
+func value() string {
+  return "// preserved literal"
+}
+'''
+    code_changed = comments_changed.replace(b"preserved literal", b"changed literal")
+
+    self.assertEqual(
+      verifier.comments_only_projection(upstream),
+      verifier.comments_only_projection(comments_changed),
+    )
+    self.assertNotEqual(
+      verifier.comments_only_projection(upstream),
+      verifier.comments_only_projection(code_changed),
+    )
 
   def test_required_compliance_and_provenance_files_exist(self):
     required = (

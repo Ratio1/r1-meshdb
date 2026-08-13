@@ -123,6 +123,12 @@ def without_go_comments(content: bytes) -> bytes:
   return bytes(output)
 
 
+def comments_only_projection(content: bytes) -> bytes:
+  """Remove comments and blank lines that only carried comments."""
+  uncommented = without_go_comments(content)
+  return b"\n".join(line for line in uncommented.splitlines() if line.strip())
+
+
 def tree_sha256(root: Path) -> str:
   digest = hashlib.sha256()
   paths = sorted(
@@ -370,7 +376,8 @@ def check_engine_overrides(upstream_commit: str, patch_record: str, upstream_roo
       if not upstream_path.is_file() or file_sha256(upstream_path) != upstream_hash:
         fail(f"engine override upstream hash differs: {path}")
       if change_class == "comments-only" and (
-        without_go_comments(upstream_path.read_bytes()) != without_go_comments(target.read_bytes())
+        comments_only_projection(upstream_path.read_bytes())
+        != comments_only_projection(target.read_bytes())
       ):
         fail(f"engine override changes more than Go comments: {path}")
 
