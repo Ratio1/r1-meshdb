@@ -45,7 +45,10 @@ and every reachable Git object before release.
 The container build uses the checked-in, affirmatively licensed runtime source
 closure, generated parsers, vendored Go modules, and native dependency source.
 The engine compilation runs with `GOPROXY=off`; it does not clone or download
-upstream source and does not consume an upstream CockroachDB image or builder.
+upstream engine source and does not consume an upstream CockroachDB image or
+builder. Cloudflared is independently compiled in vendor mode from an exact
+Cloudflare source commit whose archive checksum, source metadata, compiled
+package closure, binary hash, licenses, notices, and patent texts are enforced.
 
 ```bash
 docker build -t r1-distributed-sql:local .
@@ -61,6 +64,8 @@ python3 scripts/verify-source-boundary.py --worktree-only
 python3 scripts/generate-license-inventory.py --check
 python3 scripts/verify-provenance.py
 python3 scripts/verify-public-test-fixtures.py
+python3 scripts/verify-security-vex.py
+python3 scripts/generate-source-manifest.py --check
 ```
 
 The three-node runtime suite is documented in [testbed/README.md](testbed/README.md).

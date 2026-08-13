@@ -28,7 +28,7 @@ func RegisterGSSProvider(newGSSArg NewGSSFunc) {
 
 // GSS provides GSSAPI authentication (e.g., Kerberos).
 type GSS interface {
-	GetInitToken(host string, service string) ([]byte, error)
+	GetInitToken(host, service string) ([]byte, error)
 	GetInitTokenFromSPN(spn string) ([]byte, error)
 	Continue(inToken []byte) (done bool, outToken []byte, err error)
 }
@@ -63,7 +63,7 @@ func (c *PgConn) gssAuth() error {
 			Data: nextData,
 		}
 		c.frontend.Send(gssResponse)
-		err = c.frontend.Flush()
+		err = c.flushWithPotentialWriteReadDeadlock()
 		if err != nil {
 			return err
 		}

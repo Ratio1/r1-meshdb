@@ -20,6 +20,9 @@ SOURCE_KEYS = (
   "EmbedFiles",
 )
 MODULE_PREFIX = "github.com/cockroachdb/cockroach"
+SUPPLEMENTAL_PACKAGE_TREES = {
+  "github.com/knz/go-libedit/unix": ("src",),
+}
 
 
 def fail(message: str) -> None:
@@ -74,6 +77,13 @@ def closure(packages: list[dict]) -> list[str]:
         if not (ENGINE / relative).is_file():
           fail(f"go list selected missing source file {relative}")
         files.add(relative)
+    for tree_name in SUPPLEMENTAL_PACKAGE_TREES.get(import_path, ()):
+      tree = directory / tree_name
+      if not tree.is_dir():
+        fail(f"selected package asset tree is missing: {import_path}/{tree_name}")
+      for path in tree.rglob("*"):
+        if path.is_file():
+          files.add(path.resolve().relative_to(ENGINE.resolve()).as_posix())
   return sorted(files)
 
 

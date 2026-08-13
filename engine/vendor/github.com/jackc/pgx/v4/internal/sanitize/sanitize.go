@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +18,12 @@ type Part interface{}
 type Query struct {
 	Parts []Part
 }
+
+// utf.DecodeRune returns the utf8.RuneError for errors. But that is actually rune U+FFFD -- the unicode replacement
+// character. utf8.RuneError is not an error if it is also width 3.
+//
+// https://github.com/jackc/pgx/issues/1380
+const replacementcharacterwidth = 3
 
 func (q *Query) Sanitize(args ...interface{}) (string, error) {
 	argUse := make([]bool, len(args))
@@ -52,6 +59,10 @@ func (q *Query) Sanitize(args ...interface{}) (string, error) {
 				return "", fmt.Errorf("invalid arg type: %T", arg)
 			}
 			argUse[argIdx] = true
+
+			// Prevent SQL injection via Line Comment Creation
+			// https://github.com/jackc/pgx/security/advisories/GHSA-m7wr-2xf7-cm9p
+			str = " " + str + " "
 		default:
 			return "", fmt.Errorf("invalid Part type: %T", part)
 		}
@@ -90,12 +101,13 @@ func QuoteBytes(buf []byte) string {
 }
 
 type sqlLexer struct {
-	src     string
-	start   int
-	pos     int
-	nested  int // multiline comment nesting level.
-	stateFn stateFn
-	parts   []Part
+	src       string
+	start     int
+	pos       int
+	nested    int    // multiline comment nesting level.
+	dollarTag string // active tag while inside a dollar-quoted string.
+	stateFn   stateFn
+	parts     []Part
 }
 
 type stateFn func(*sqlLexer) stateFn
@@ -125,6 +137,11 @@ func rawState(l *sqlLexer) stateFn {
 				l.start = l.pos
 				return placeholderState
 			}
+			if tagLen, ok := scanDollarQuoteTag(l.src[l.pos:]); ok {
+				l.dollarTag = l.src[l.pos : l.pos+tagLen]
+				l.pos += tagLen + 1
+				return dollarQuoteState
+			}
 		case '-':
 			nextRune, width := utf8.DecodeRuneInString(l.src[l.pos:])
 			if nextRune == '-' {
@@ -138,11 +155,13 @@ func rawState(l *sqlLexer) stateFn {
 				return multilineCommentState
 			}
 		case utf8.RuneError:
-			if l.pos-l.start > 0 {
-				l.parts = append(l.parts, l.src[l.start:l.pos])
-				l.start = l.pos
+			if width != replacementcharacterwidth {
+				if l.pos-l.start > 0 {
+					l.parts = append(l.parts, l.src[l.start:l.pos])
+					l.start = l.pos
+				}
+				return nil
 			}
-			return nil
 		}
 	}
 }
@@ -160,11 +179,13 @@ func singleQuoteState(l *sqlLexer) stateFn {
 			}
 			l.pos += width
 		case utf8.RuneError:
-			if l.pos-l.start > 0 {
-				l.parts = append(l.parts, l.src[l.start:l.pos])
-				l.start = l.pos
+			if width != replacementcharacterwidth {
+				if l.pos-l.start > 0 {
+					l.parts = append(l.parts, l.src[l.start:l.pos])
+					l.start = l.pos
+				}
+				return nil
 			}
-			return nil
 		}
 	}
 }
@@ -182,11 +203,13 @@ func doubleQuoteState(l *sqlLexer) stateFn {
 			}
 			l.pos += width
 		case utf8.RuneError:
-			if l.pos-l.start > 0 {
-				l.parts = append(l.parts, l.src[l.start:l.pos])
-				l.start = l.pos
+			if width != replacementcharacterwidth {
+				if l.pos-l.start > 0 {
+					l.parts = append(l.parts, l.src[l.start:l.pos])
+					l.start = l.pos
+				}
+				return nil
 			}
-			return nil
 		}
 	}
 }
@@ -201,8 +224,11 @@ func placeholderState(l *sqlLexer) stateFn {
 		l.pos += width
 
 		if '0' <= r && r <= '9' {
-			num *= 10
-			num += int(r - '0')
+			if num > (math.MaxInt32-9)/10 {
+				num = math.MaxInt32
+			} else {
+				num = num*10 + int(r-'0')
+			}
 		} else {
 			l.parts = append(l.parts, num)
 			l.pos -= width
@@ -210,6 +236,54 @@ func placeholderState(l *sqlLexer) stateFn {
 			return rawState
 		}
 	}
+}
+
+func dollarQuoteState(l *sqlLexer) stateFn {
+	closer := "$" + l.dollarTag + "$"
+	idx := strings.Index(l.src[l.pos:], closer)
+	if idx < 0 {
+		if len(l.src)-l.start > 0 {
+			l.parts = append(l.parts, l.src[l.start:])
+			l.start = len(l.src)
+		}
+		l.pos = len(l.src)
+		return nil
+	}
+	l.pos += idx + len(closer)
+	l.dollarTag = ""
+	return rawState
+}
+
+func scanDollarQuoteTag(src string) (int, bool) {
+	first := true
+	for i := 0; i < len(src); {
+		r, width := utf8.DecodeRuneInString(src[i:])
+		if r == '$' {
+			return i, true
+		}
+		if !isDollarTagRune(r, first) {
+			return 0, false
+		}
+		first = false
+		i += width
+	}
+	return 0, false
+}
+
+func isDollarTagRune(r rune, first bool) bool {
+	switch {
+	case r == '_':
+		return true
+	case 'a' <= r && r <= 'z':
+		return true
+	case 'A' <= r && r <= 'Z':
+		return true
+	case !first && '0' <= r && r <= '9':
+		return true
+	case r >= 0x80 && r != utf8.RuneError:
+		return true
+	}
+	return false
 }
 
 func escapeStringState(l *sqlLexer) stateFn {
@@ -228,11 +302,13 @@ func escapeStringState(l *sqlLexer) stateFn {
 			}
 			l.pos += width
 		case utf8.RuneError:
-			if l.pos-l.start > 0 {
-				l.parts = append(l.parts, l.src[l.start:l.pos])
-				l.start = l.pos
+			if width != replacementcharacterwidth {
+				if l.pos-l.start > 0 {
+					l.parts = append(l.parts, l.src[l.start:l.pos])
+					l.start = l.pos
+				}
+				return nil
 			}
-			return nil
 		}
 	}
 }
@@ -249,11 +325,13 @@ func oneLineCommentState(l *sqlLexer) stateFn {
 		case '\n', '\r':
 			return rawState
 		case utf8.RuneError:
-			if l.pos-l.start > 0 {
-				l.parts = append(l.parts, l.src[l.start:l.pos])
-				l.start = l.pos
+			if width != replacementcharacterwidth {
+				if l.pos-l.start > 0 {
+					l.parts = append(l.parts, l.src[l.start:l.pos])
+					l.start = l.pos
+				}
+				return nil
 			}
-			return nil
 		}
 	}
 }
@@ -283,11 +361,13 @@ func multilineCommentState(l *sqlLexer) stateFn {
 			l.nested--
 
 		case utf8.RuneError:
-			if l.pos-l.start > 0 {
-				l.parts = append(l.parts, l.src[l.start:l.pos])
-				l.start = l.pos
+			if width != replacementcharacterwidth {
+				if l.pos-l.start > 0 {
+					l.parts = append(l.parts, l.src[l.start:l.pos])
+					l.start = l.pos
+				}
+				return nil
 			}
-			return nil
 		}
 	}
 }

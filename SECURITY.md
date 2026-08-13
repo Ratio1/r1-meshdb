@@ -47,3 +47,17 @@ dependency graph. They are explicitly nonproduction keys, are documented in
 `source/public-test-fixtures.sha256`. The release workflow fails if any fixture
 changes or any unapproved private key or token pattern is introduced. The
 fixture files are not copied as standalone files into the runtime image.
+
+## Vulnerability Assessments
+
+Release scans consume `security/openvex.json`. Each exception must name one
+exact package version, include a machine-verifiable justification, and remain
+covered by `scripts/verify-security-vex.py`.
+
+`CVE-2026-42154` affects Prometheus's unauthenticated `/api/v1/read` remote-read
+handler in `github.com/prometheus/prometheus/storage/remote`. The OSS database
+binary uses selected Prometheus labels, parser, storage-interface, and TSDB
+utility packages, but the checked-in and verified runtime closure excludes the
+`storage/remote` package and contains no Prometheus remote-read HTTP endpoint.
+The exact Prometheus module is therefore present in Go build metadata while the
+vulnerable code is not in the executable path.

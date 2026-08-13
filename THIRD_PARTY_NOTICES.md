@@ -59,30 +59,28 @@ Exact source URLs, revisions, and tree hashes are in
 
 ## Cloudflared
 
-The runtime image copies the Cloudflare Tunnel client from
-`cloudflare/cloudflared` version `2026.6.1`, image digest
-`sha256:6d91c121b803126f7a5344005d17a9324788fc09d305b6e2560ec6040a7ae283`.
-Its Apache-2.0 license is retained at `licenses/cloudflared/LICENSE`.
-The exact embedded Go build list is in `source/cloudflared-buildinfo.txt`.
-`source/cloudflared-license-inventory.csv` maps every compiled Cloudflared
-package to an SPDX conclusion and a commit-pinned source URL. Corresponding
-license and notice texts generated from the exact commit's vendored dependency
-graph are retained under `licenses/cloudflared/dependencies/` and embedded in
-the runtime image. The release image SBOM independently inventories the copied
-binary and its embedded Go modules; CI fails if Cloudflared is absent.
-The dependency inventory and copied texts were generated from commit
-`81a53555aa827fca88605d7e67ad5c03cda468d2` with
-`github.com/google/go-licenses@v1.6.0`; the commit-pinned URLs and retained
-files, not mutable `HEAD` links, are the release evidence.
+The runtime image builds the Cloudflare Tunnel client from Apache-2.0 source
+commit `b4f47e2ab538ab6e31d3dc6adc5489455ad446de`. The exact source archive,
+archive SHA-256, Git tree, source file hashes, Go toolchain, build flags, and
+resulting binary SHA-256 are recorded in `source/provenance.json` and enforced
+during the image build. No prebuilt Cloudflared image or binary is consumed.
 
-The upstream binary's embedded Go build metadata identifies commit
-`81a53555aa827fca88605d7e67ad5c03cda468d2` and also reports
-`vcs.modified=true`. Ratio1 therefore does not claim that this third-party
-binary is a byte-reproducible clean build of that commit. The exact consumed
-artifact is instead fixed by its OCI digest and binary SHA-256
-`a1eb422f052be0854b82bf81bf51f343a87c1c64c35e6ccde22ece001799ab16`;
-both are enforced during the image build. The source commit is retained as the
-upstream-provided revision evidence, not as a stronger clean-tree claim.
+The top-level Cloudflared license is retained at
+`licenses/cloudflared/LICENSE`. `source/cloudflared-buildinfo.txt` records the
+embedded Go module graph and `source/cloudflared-compiled-packages.txt` records
+the 603-package compile closure. `source/cloudflared-license-inventory.csv`
+maps every compiled component to a non-empty SPDX conclusion and immutable
+source URL. All 95 LICENSE, COPYING, NOTICE, and PATENTS files from the exact
+vendored source are retained under `licenses/cloudflared/dependencies/` and
+embedded in the runtime image.
+
+Cloudflare's vendor snapshot omits the lowercase MIT license file for compiled
+module `github.com/facebookgo/grace`. Ratio1 separately retains that exact file
+at `licenses/cloudflared/dependencies/github.com/facebookgo/grace/license`;
+its source commit and hash are enforced by the compliance verifier. Replacement
+modules `github.com/chungthuang/quic-go` and `github.com/ipostelnik/cli/v2` are
+represented explicitly in the inventory rather than only by their original
+import paths.
 
 Cloudflared compiles `gopkg.in/yaml.v2` and `gopkg.in/yaml.v3`, whose packages
 contain Apache-2.0 and MIT files. Their inventory expression is

@@ -166,7 +166,10 @@ func dial(ctx context.Context, insecure bool, o *internal.DialSettings) (*grpc.C
 		if isDirectPathEnabled(endpoint, o) && isTokenSourceDirectPathCompatible(creds.TokenSource, o) && metadata.OnGCE() {
 			// Overwrite all of the previously specific DialOptions, DirectPath uses its own set of credentials and certificates.
 			grpcOpts = []grpc.DialOption{
-				grpc.WithCredentialsBundle(grpcgoogle.NewDefaultCredentialsWithOptions(grpcgoogle.DefaultCredentialsOptions{oauth.TokenSource{creds.TokenSource}}))}
+				grpc.WithCredentialsBundle(grpcgoogle.NewDefaultCredentialsWithOptions(
+					grpcgoogle.DefaultCredentialsOptions{
+						PerRPCCreds: oauth.TokenSource{TokenSource: creds.TokenSource},
+					}))}
 			if timeoutDialerOption != nil {
 				grpcOpts = append(grpcOpts, timeoutDialerOption)
 			}

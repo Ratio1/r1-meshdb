@@ -26,6 +26,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 )
 
 // Deprecated: Use DEFAULT_MAX_FRAME_SIZE instead.
@@ -60,8 +61,13 @@ func NewTFramedTransportFactory(factory TTransportFactory) TTransportFactory {
 
 // Deprecated: Use NewTFramedTransportFactoryConf instead.
 func NewTFramedTransportFactoryMaxLength(factory TTransportFactory, maxLength uint32) TTransportFactory {
+	safeMax := maxLength
+	if safeMax > math.MaxInt32 {
+		safeMax = math.MaxInt32
+	}
+
 	return NewTFramedTransportFactoryConf(factory, &TConfiguration{
-		MaxFrameSize: int32(maxLength),
+		MaxFrameSize: int32(safeMax),
 
 		noPropagation: true,
 	})
@@ -133,7 +139,7 @@ func (p *TFramedTransport) Read(buf []byte) (read int, err error) {
 		// Make sure we return the read buffer back to pool
 		// after we finished reading from it.
 		if p.readBuf != nil && p.readBuf.Len() == 0 {
-			returnBufToPool(&p.readBuf)
+			bufPool.put(&p.readBuf)
 		}
 	}()
 
@@ -175,7 +181,7 @@ func (p *TFramedTransport) ReadByte() (c byte, err error) {
 
 func (p *TFramedTransport) ensureWriteBufferBeforeWrite() {
 	if p.writeBuf == nil {
-		p.writeBuf = getBufFromPool()
+		p.writeBuf = bufPool.get()
 	}
 }
 
@@ -196,8 +202,12 @@ func (p *TFramedTransport) WriteString(s string) (n int, err error) {
 }
 
 func (p *TFramedTransport) Flush(ctx context.Context) error {
-	defer returnBufToPool(&p.writeBuf)
 	size := p.writeBuf.Len()
+	if size > math.MaxUint32 {
+		return NewTTransportException(UNKNOWN_TRANSPORT_EXCEPTION, fmt.Sprintf("frame too large: %d bytes exceeds uint32 max",size))
+	}
+
+	defer bufPool.put(&p.writeBuf)
 	buf := p.buffer[:4]
 	binary.BigEndian.PutUint32(buf, uint32(size))
 	_, err := p.transport.Write(buf)
@@ -215,9 +225,9 @@ func (p *TFramedTransport) Flush(ctx context.Context) error {
 
 func (p *TFramedTransport) readFrame() error {
 	if p.readBuf != nil {
-		returnBufToPool(&p.readBuf)
+		bufPool.put(&p.readBuf)
 	}
-	p.readBuf = getBufFromPool()
+	p.readBuf = bufPool.get()
 
 	buf := p.buffer[:4]
 	if _, err := io.ReadFull(p.reader, buf); err != nil {

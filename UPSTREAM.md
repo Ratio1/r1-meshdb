@@ -45,10 +45,13 @@ content/symlink digest using the algorithm recorded in
 `source/provenance.json` and rejects any mismatch.
 
 CI also fetches only the exact upstream engine commit into a temporary
-verification directory and checks the recorded Ratio1 overrides against the
-original file hashes. A Go-aware lexical comparison fails unless those two
-overrides differ only in comments. The fetched checkout is evidence input; it
-is never copied into or used to build the image.
+verification directory and checks the recorded Ratio1 modifications,
+omissions, and dependency metadata against the original file hashes. A
+Go-aware lexical comparison fails unless the two comment-only overrides differ
+only in comments. Toolchain compatibility changes, Ratio1 additions, security
+backports, and the dependency snapshot are separately enumerated and
+hash-pinned in `source/ratio1-engine-overrides.json`. The fetched checkout is
+evidence input; it is never copied into or used to build the image.
 
 ## Runtime Source Closure
 
@@ -56,8 +59,11 @@ The repository retains only files required by the transitive dependency graph
 of `pkg/cmd/cockroach-oss`, plus the four native dependency source trees and
 their applicable license and notice files. `source/runtime-files.txt` records
 the exact Go package, assembly, C/C++, embedded-data, and generated-file closure
-reported by Go 1.19.13 in offline vendor mode. CI recomputes that closure and
-fails on either a missing file or an unexpected runtime file.
+reported by the pinned Go 1.26.5 builder in offline vendor mode. CI recomputes
+that closure and fails on either a missing file or an unexpected runtime file.
+The list also includes the nested C source tree consumed through local
+preprocessor includes by the selected `go-libedit/unix` package; `go list`
+does not report those indirect C include files itself.
 
 Generated parser, protobuf, and related outputs needed by that closure were
 produced in an isolated full checkout of the exact upstream commit and are

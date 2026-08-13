@@ -12,7 +12,6 @@ package ctxutil
 
 import (
 	"context"
-	_ "unsafe" // Must import unsafe to enable linkname.
 
 	"github.com/cockroachdb/cockroach/pkg/util/buildutil"
 	"github.com/cockroachdb/cockroach/pkg/util/log"
@@ -21,10 +20,6 @@ import (
 // WhenDoneFunc is the callback invoked by context when it becomes done.
 // The callback is passed the error from the parent context.
 type WhenDoneFunc func(err error)
-
-// WhenDoneCauseFunc accepts context error (context.Err()) as well
-// as the cause for cancellation (cause is nil prior to go1.20).
-type WhenDoneCauseFunc func(err, cause error)
 
 // WhenDone arranges for the specified function to be invoked when
 // parent context becomes done and returns true.
@@ -48,41 +43,12 @@ func WhenDone(parent context.Context, done WhenDoneFunc) bool {
 		log.Fatalf(parent, "expected context that supports direct cancellation detection, found %T", parent)
 	}
 
-	c := &whenDone{Context: parent, notify: func(err, cause error) { done(err) }}
-	context_propagateCancel(parent, c)
+	context.AfterFunc(parent, func() { done(parent.Err()) })
 	return true
 }
 
-// CanDirectlyDetectCancellation checks to make sure that the parent
-// context can be used to detect parent cancellation without the need
-// to spin up goroutine.
-// That would mean that the parent context is derived from
-// context.WithCancel or context.WithTimeout/Deadline.
-// Even if parent is not derived from one of the above contexts (i.e. it
-// is a custom implementation), WhenDone function can still be used; it just
-// means that there will be an additional goroutine spun up.  As such,
-// this function is meant to be used in test environment only.
+// CanDirectlyDetectCancellation reports whether the public context callback
+// API can observe cancellation for parent.
 func CanDirectlyDetectCancellation(parent context.Context) bool {
-	// context.parentCancelCtx would have been preferred mechanism to check
-	// if the cancellation can be propagated; alas, this function returns
-	// an unexported *cancelCtx, which we do not have access to.
-	// So, instead try to do what that method essentially does by
-	// getting access to internal cancelCtxKey.
-	cancellable, ok := parent.Value(&context_cancelCtxKey).(context.Context)
-	return ok && cancellable.Done() == parent.Done()
+	return parent.Done() != nil
 }
-
-type whenDone struct {
-	context.Context
-	notify WhenDoneCauseFunc
-}
-
-func (c *whenDone) cancelWithCause(removeFromParent bool, err, cause error) {
-	c.notify(err, cause)
-	if removeFromParent {
-		context_removeChild(c.Context, c)
-	}
-}
-
-//go:linkname context_cancelCtxKey context.cancelCtxKey
-var context_cancelCtxKey int

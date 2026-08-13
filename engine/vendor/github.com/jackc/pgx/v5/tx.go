@@ -3,7 +3,6 @@ package pgx
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -44,6 +43,12 @@ type TxOptions struct {
 	IsoLevel       TxIsoLevel
 	AccessMode     TxAccessMode
 	DeferrableMode TxDeferrableMode
+
+	// BeginQuery is the SQL query that will be executed to begin the transaction. This allows using non-standard syntax
+	// such as BEGIN PRIORITY HIGH with CockroachDB. If set this will override the other settings.
+	BeginQuery string
+	// CommitQuery is the SQL query that will be executed to commit the transaction.
+	CommitQuery string
 }
 
 var emptyTxOptions TxOptions
@@ -51,6 +56,10 @@ var emptyTxOptions TxOptions
 func (txOptions TxOptions) beginSQL() string {
 	if txOptions == emptyTxOptions {
 		return "begin"
+	}
+
+	if txOptions.BeginQuery != "" {
+		return txOptions.BeginQuery
 	}
 
 	var buf strings.Builder
@@ -80,24 +89,27 @@ var ErrTxClosed = errors.New("tx is closed")
 // it is treated as ROLLBACK.
 var ErrTxCommitRollback = errors.New("commit unexpectedly resulted in rollback")
 
-// Begin starts a transaction. Unlike database/sql, the context only affects the begin command. i.e. there is no
+// Begin starts a transaction. Unlike [database/sql], the context only affects the begin command. i.e. there is no
 // auto-rollback on context cancellation.
 func (c *Conn) Begin(ctx context.Context) (Tx, error) {
 	return c.BeginTx(ctx, TxOptions{})
 }
 
-// BeginTx starts a transaction with txOptions determining the transaction mode. Unlike database/sql, the context only
+// BeginTx starts a transaction with txOptions determining the transaction mode. Unlike [database/sql], the context only
 // affects the begin command. i.e. there is no auto-rollback on context cancellation.
 func (c *Conn) BeginTx(ctx context.Context, txOptions TxOptions) (Tx, error) {
 	_, err := c.Exec(ctx, txOptions.beginSQL())
 	if err != nil {
 		// begin should never fail unless there is an underlying connection issue or
 		// a context timeout. In either case, the connection is possibly broken.
-		c.die(errors.New("failed to begin transaction"))
+		c.die()
 		return nil, err
 	}
 
-	return &dbTx{conn: c}, nil
+	return &dbTx{
+		conn:        c,
+		commitQuery: txOptions.CommitQuery,
+	}, nil
 }
 
 // Tx represents a database transaction.
@@ -144,9 +156,9 @@ type Tx interface {
 // called on the dbTx.
 type dbTx struct {
 	conn         *Conn
-	err          error
 	savepointNum int64
 	closed       bool
+	commitQuery  string
 }
 
 // Begin starts a pseudo nested transaction implemented with a savepoint.
@@ -170,7 +182,12 @@ func (tx *dbTx) Commit(ctx context.Context) error {
 		return ErrTxClosed
 	}
 
-	commandTag, err := tx.conn.Exec(ctx, "commit")
+	commandSQL := "commit"
+	if tx.commitQuery != "" {
+		commandSQL = tx.commitQuery
+	}
+
+	commandTag, err := tx.conn.Exec(ctx, commandSQL)
 	tx.closed = true
 	if err != nil {
 		if tx.conn.PgConn().TxStatus() != 'I' {
@@ -198,7 +215,7 @@ func (tx *dbTx) Rollback(ctx context.Context) error {
 	tx.closed = true
 	if err != nil {
 		// A rollback failure leaves the connection in an undefined state
-		tx.conn.die(fmt.Errorf("rollback failed: %w", err))
+		tx.conn.die()
 		return err
 	}
 
@@ -368,8 +385,8 @@ func (sp *dbSimulatedNestedTx) Conn() *Conn {
 	return sp.tx.Conn()
 }
 
-// BeginFunc calls Begin on db and then calls fn. If fn does not return an error then it calls Commit on db. If fn
-// returns an error it calls Rollback on db. The context will be used when executing the transaction control statements
+// BeginFunc calls Begin on db and then calls fn. If fn does not return an error then it calls [Tx.Commit] on db. If fn
+// returns an error it calls [Tx.Rollback] on db. The context will be used when executing the transaction control statements
 // (BEGIN, ROLLBACK, and COMMIT) but does not otherwise affect the execution of fn.
 func BeginFunc(
 	ctx context.Context,
@@ -387,8 +404,8 @@ func BeginFunc(
 	return beginFuncExec(ctx, tx, fn)
 }
 
-// BeginTxFunc calls BeginTx on db and then calls fn. If fn does not return an error then it calls Commit on db. If fn
-// returns an error it calls Rollback on db. The context will be used when executing the transaction control statements
+// BeginTxFunc calls BeginTx on db and then calls fn. If fn does not return an error then it calls [Tx.Commit] on db. If fn
+// returns an error it calls [Tx.Rollback] on db. The context will be used when executing the transaction control statements
 // (BEGIN, ROLLBACK, and COMMIT) but does not otherwise affect the execution of fn.
 func BeginTxFunc(
 	ctx context.Context,

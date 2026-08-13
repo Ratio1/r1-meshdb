@@ -14,6 +14,12 @@
     "generatedFiles": "source/generated-files.txt",
     "licenseInventory": "source/license-inventory.json",
     "ratio1Overrides": "source/ratio1-engine-overrides.json",
+    "dependencySnapshot": {
+      "goVersion": "1.25.0",
+      "goModSha256": "18fae0e5364792cda8d276e4aed3f4d274e113f588e06a3914f96b22de9b3a10",
+      "goSumSha256": "26b437b7767e83074cb270517dc77c52140b273a775d76aa193fbdbd7d8f9dbb",
+      "vendorModulesSha256": "68bcd68d46b3ae82160b70c1e202c86ee404d77434ed079942107caeda3b81bd"
+    },
     "excludedPaths": [
       "pkg/ccl",
       "pkg/ui/distccl",
@@ -61,15 +67,23 @@
     "entrypointSha256": "0e70768bf4f4125f2e171cf544ca1304ac0a83774e97c115b2efbaa0de3a4698"
   },
   "buildInputs": {
-    "goBuilder": "golang:1.19.13-bookworm@sha256:da9da58d86d106a5dda2ce249b00cf3b31cdd626ea41597e476de7b4eebad8c4",
+    "goBuilder": "golang:1.26.5-bookworm@sha256:0d327c83532d3cdeeeebab56ce85962bf09cb89545355b10207c7771b0c3713f",
     "runtime": "debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241",
     "cloudflared": {
-      "image": "cloudflare/cloudflared:2026.6.1@sha256:6d91c121b803126f7a5344005d17a9324788fc09d305b6e2560ec6040a7ae283",
-      "binarySha256": "a1eb422f052be0854b82bf81bf51f343a87c1c64c35e6ccde22ece001799ab16",
       "sourceUrl": "https://github.com/cloudflare/cloudflared.git",
-      "commit": "81a53555aa827fca88605d7e67ad5c03cda468d2",
-      "vcsModified": true,
+      "commit": "b4f47e2ab538ab6e31d3dc6adc5489455ad446de",
+      "gitTree": "5ad9ad6f658088660c54089b1dc54f6f15b88349",
+      "sourceArchiveUrl": "https://github.com/cloudflare/cloudflared/archive/b4f47e2ab538ab6e31d3dc6adc5489455ad446de.tar.gz",
+      "sourceArchiveSha256": "e897f2cdb6f63964bb7b5841df80087489a65ab9fda356ef48dd13202bba59c0",
+      "sourceDateEpoch": 1786553853,
+      "version": "2026.7.3-r1.b4f47e2",
+      "binarySha256": "ab478b502bc27dc33180df190483ba84f941e18266d0ae382e85c49fc19ede29",
+      "goModSha256": "00e9b735fef2b05a1830734f12987ff6ea653958909bc59417af5a22daaf2b9d",
+      "goSumSha256": "cbc8ab59b002a5efc843e2c8470cc9b7ee717f1b24a9049f6acfad65e232da85",
+      "vendorModulesSha256": "1f1cdee78c7b5e841d10a5f8b9c73537c12dcc4f5026638ed62d569347c9553c",
+      "licenseSha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
       "buildInfo": "source/cloudflared-buildinfo.txt",
+      "compiledPackages": "source/cloudflared-compiled-packages.txt",
       "licenseInventory": "source/cloudflared-license-inventory.csv"
     },
     "debianSnapshot": "20260701T000000Z",

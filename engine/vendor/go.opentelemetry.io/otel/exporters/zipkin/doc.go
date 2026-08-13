@@ -1,19 +1,10 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 // Package zipkin contains an OpenTelemetry tracing exporter for Zipkin.
 //
-// This package is currently in a Release Candidate phase. Backwards incompatible changes
-// may be introduced prior to v1.0.0, but we believe the current API is ready to stabilize.
+// Deprecated: The zipkin exporter is deprecated and will be removed in early 2027.
+// See the blog post "[Deprecating Zipkin Exporter]".
+//
+// [Deprecating Zipkin Exporter]: https://opentelemetry.io/blog/2025/deprecating-zipkin-exporters/
 package zipkin // import "go.opentelemetry.io/otel/exporters/zipkin"

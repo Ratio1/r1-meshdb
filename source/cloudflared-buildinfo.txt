@@ -1,6 +1,6 @@
-/cloudflared: go1.26.4
+/cloudflared: go1.26.5
 	path	github.com/cloudflare/cloudflared/cmd/cloudflared
-	mod	github.com/cloudflare/cloudflared	v0.0.0-20260618133902-81a53555aa82+dirty	
+	mod	github.com/cloudflare/cloudflared	(devel)	
 	dep	github.com/BurntSushi/toml	v1.2.0	
 	dep	github.com/beorn7/perks	v1.0.1	
 	dep	github.com/cespare/xxhash/v2	v2.3.0	
@@ -11,7 +11,7 @@
 	dep	github.com/facebookgo/grace	v0.0.0-20180706040059-75cf19382434	
 	dep	github.com/fsnotify/fsnotify	v1.4.9	
 	dep	github.com/getsentry/sentry-go	v0.43.0	
-	dep	github.com/go-chi/chi/v5	v5.2.2	
+	dep	github.com/go-chi/chi/v5	v5.3.1	
 	dep	github.com/go-chi/cors	v1.2.1	
 	dep	github.com/go-jose/go-jose/v4	v4.1.4	
 	dep	github.com/go-logr/logr	v1.4.3	
@@ -36,8 +36,8 @@
 	dep	github.com/prometheus/client_model	v0.6.2	
 	dep	github.com/prometheus/common	v0.64.0	
 	dep	github.com/prometheus/procfs	v0.15.1	
-	dep	github.com/quic-go/quic-go	v0.52.0
-	=>	github.com/chungthuang/quic-go	v0.45.1-0.20250428085412-43229ad201fd	
+	dep	github.com/quic-go/quic-go	v0.59.1
+	=>	github.com/chungthuang/quic-go	v0.45.1-0.20260529212404-a9fddf436fc4	
 	
 	dep	github.com/rs/zerolog	v1.20.0	
 	dep	github.com/russross/blackfriday/v2	v2.1.0	
@@ -49,23 +49,23 @@
 	
 	dep	go.opentelemetry.io/auto/sdk	v1.2.1	
 	dep	go.opentelemetry.io/contrib/propagators	v0.22.0	
-	dep	go.opentelemetry.io/otel	v1.43.0	
+	dep	go.opentelemetry.io/otel	v1.44.0	
 	dep	go.opentelemetry.io/otel/exporters/otlp/otlptrace	v1.43.0	
-	dep	go.opentelemetry.io/otel/metric	v1.43.0	
-	dep	go.opentelemetry.io/otel/sdk	v1.43.0	
-	dep	go.opentelemetry.io/otel/trace	v1.43.0	
+	dep	go.opentelemetry.io/otel/metric	v1.44.0	
+	dep	go.opentelemetry.io/otel/sdk	v1.44.0	
+	dep	go.opentelemetry.io/otel/trace	v1.44.0	
 	dep	go.opentelemetry.io/proto/otlp	v1.10.0	
 	dep	go.uber.org/automaxprocs	v1.6.0	
-	dep	golang.org/x/crypto	v0.52.0	
-	dep	golang.org/x/net	v0.55.0	
+	dep	golang.org/x/crypto	v0.53.0	
+	dep	golang.org/x/net	v0.56.0	
 	dep	golang.org/x/oauth2	v0.36.0	
-	dep	golang.org/x/sync	v0.20.0	
-	dep	golang.org/x/sys	v0.45.0	
-	dep	golang.org/x/term	v0.43.0	
-	dep	golang.org/x/text	v0.37.0	
-	dep	google.golang.org/genproto/googleapis/api	v0.0.0-20260226221140-a57be14db171	
-	dep	google.golang.org/genproto/googleapis/rpc	v0.0.0-20260226221140-a57be14db171	
-	dep	google.golang.org/grpc	v1.81.1	
+	dep	golang.org/x/sync	v0.22.0	
+	dep	golang.org/x/sys	v0.46.0	
+	dep	golang.org/x/term	v0.44.0	
+	dep	golang.org/x/text	v0.40.0	
+	dep	google.golang.org/genproto/googleapis/api	v0.0.0-20260526163538-3dc84a4a5aaa	
+	dep	google.golang.org/genproto/googleapis/rpc	v0.0.0-20260526163538-3dc84a4a5aaa	
+	dep	google.golang.org/grpc	v1.83.0	
 	dep	google.golang.org/protobuf	v1.36.11	
 	dep	gopkg.in/natefinch/lumberjack.v2	v2.0.0	
 	dep	gopkg.in/yaml.v2	v2.4.0	
@@ -76,12 +76,8 @@
 	dep	zombiezen.com/go/capnproto2	v2.18.0+incompatible	
 	build	-buildmode=exe
 	build	-compiler=gc
-	build	-ldflags="-X \"main.Version=2026.6.1\" -X \"main.BuildTime=2026-06-18-14:45 UTC\" -X \"github.com/cloudflare/cloudflared/metrics.Runtime=virtual\" "
+	build	-trimpath=true
 	build	CGO_ENABLED=0
 	build	GOARCH=amd64
 	build	GOOS=linux
 	build	GOAMD64=v1
-	build	vcs=git
-	build	vcs.revision=81a53555aa827fca88605d7e67ad5c03cda468d2
-	build	vcs.time=2026-06-18T13:39:02Z
-	build	vcs.modified=true

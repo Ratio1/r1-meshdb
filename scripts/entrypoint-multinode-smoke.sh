@@ -155,11 +155,11 @@ fi
 
 replication_ready=false
 for _ in $(seq 1 120); do
-  under_replicated="$(docker exec "${node1}" /cockroach/cockroach sql \
+  incomplete_voter_sets="$(docker exec "${node1}" /cockroach/cockroach sql \
     --certs-dir=/cockroach/certs --host=roach1:26257 --format=csv \
-    -e "select coalesce(sum((metrics->>'ranges.underreplicated')::int), 0) from crdb_internal.kv_store_status;" \
+    -e "select count(*) from crdb_internal.ranges_no_leases where array_length(voting_replicas, 1) < 3 or array_length(learner_replicas, 1) > 0;" \
     2>/dev/null | tail -n 1 | tr -d '\r' || true)"
-  if [[ "${under_replicated}" == "0" ]]; then
+  if [[ "${incomplete_voter_sets}" == "0" ]]; then
     replication_ready=true
     break
   fi

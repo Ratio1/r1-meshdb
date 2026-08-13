@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package resource // import "go.opentelemetry.io/otel/sdk/resource"
 
@@ -31,7 +20,7 @@ type config struct {
 // Option is the interface that applies a configuration option.
 type Option interface {
 	// apply sets the Option value of a config.
-	apply(*config)
+	apply(config) config
 }
 
 // WithAttributes adds attributes to the configured Resource.
@@ -56,8 +45,9 @@ type detectorsOption struct {
 	detectors []Detector
 }
 
-func (o detectorsOption) apply(cfg *config) {
+func (o detectorsOption) apply(cfg config) config {
 	cfg.detectors = append(cfg.detectors, o.detectors...)
+	return cfg
 }
 
 // WithFromEnv adds attributes from environment variables to the configured resource.
@@ -68,6 +58,11 @@ func WithFromEnv() Option {
 // WithHost adds attributes from the host to the configured resource.
 func WithHost() Option {
 	return WithDetectors(host{})
+}
+
+// WithHostID adds host ID information to the configured resource.
+func WithHostID() Option {
+	return WithDetectors(hostIDDetector{})
 }
 
 // WithTelemetrySDK adds TelemetrySDK version info to the configured resource.
@@ -82,8 +77,9 @@ func WithSchemaURL(schemaURL string) Option {
 
 type schemaURLOption string
 
-func (o schemaURLOption) apply(cfg *config) {
+func (o schemaURLOption) apply(cfg config) config {
 	cfg.schemaURL = string(o)
+	return cfg
 }
 
 // WithOS adds all the OS attributes to the configured Resource.
@@ -108,7 +104,16 @@ func WithOSDescription() Option {
 }
 
 // WithProcess adds all the Process attributes to the configured Resource.
-// See individual WithProcess* functions to configure specific attributes.
+//
+// Warning! This option will include process command line arguments. If these
+// contain sensitive information it will be included in the exported resource.
+//
+// This option is equivalent to calling WithProcessPID,
+// WithProcessExecutableName, WithProcessExecutablePath,
+// WithProcessCommandArgs, WithProcessOwner, WithProcessRuntimeName,
+// WithProcessRuntimeVersion, and WithProcessRuntimeDescription. See each
+// option function for information about what resource attributes each
+// includes.
 func WithProcess() Option {
 	return WithDetectors(
 		processPIDDetector{},
@@ -141,7 +146,11 @@ func WithProcessExecutablePath() Option {
 }
 
 // WithProcessCommandArgs adds an attribute with all the command arguments (including
-// the command/executable itself) as received by the process the configured Resource.
+// the command/executable itself) as received by the process to the configured
+// Resource.
+//
+// Warning! This option will include process command line arguments. If these
+// contain sensitive information it will be included in the exported resource.
 func WithProcessCommandArgs() Option {
 	return WithDetectors(processCommandArgsDetector{})
 }
@@ -168,4 +177,27 @@ func WithProcessRuntimeVersion() Option {
 // about the runtime of the process to the configured Resource.
 func WithProcessRuntimeDescription() Option {
 	return WithDetectors(processRuntimeDescriptionDetector{})
+}
+
+// WithContainer adds all the Container attributes to the configured Resource.
+// See individual WithContainer* functions to configure specific attributes.
+func WithContainer() Option {
+	return WithDetectors(
+		cgroupContainerIDDetector{},
+	)
+}
+
+// WithContainerID adds an attribute with the id of the container to the configured Resource.
+// Note: WithContainerID will not extract the correct container ID in an ECS environment.
+// Please use the ECS resource detector instead (https://pkg.go.dev/go.opentelemetry.io/contrib/detectors/aws/ecs).
+func WithContainerID() Option {
+	return WithDetectors(cgroupContainerIDDetector{})
+}
+
+// WithService adds all the Service attributes to the configured Resource.
+func WithService() Option {
+	return WithDetectors(
+		defaultServiceInstanceIDDetector{},
+		defaultServiceNameDetector{},
+	)
 }

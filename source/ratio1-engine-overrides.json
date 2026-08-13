@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "upstreamCommit": "76e598c9b1c100fd9280b979140b5e377c330a20",
-  "files": [
+  "modifiedUpstreamFiles": [
     {
       "path": "engine/pkg/cli/cli.go",
       "upstreamSha256": "65be03268d8674f85da607167638fe608b7a9f79d95bfd7cc18e9ae3eb4e2ebe",
@@ -15,6 +15,99 @@
       "distributedSha256": "cd095813fe2bbe03d4a1992ebfdf684f0599fd01f40340d906f80faeb5e4773f",
       "changeClass": "comments-only",
       "reason": "Remove a comment reference to excluded console asset paths."
+    },
+    {
+      "path": "engine/pkg/util/ctxutil/context.go",
+      "upstreamSha256": "2edfa81f802786dd330615ee5104d59eb0b419389707ec8581ee3ad5aeab60c5",
+      "distributedSha256": "0962227b73948e36912bff0982da88229bf327318f428e0aa74b8673f98dcb14",
+      "changeClass": "go-toolchain-compatibility",
+      "reason": "Use the public context.AfterFunc API instead of removed Go runtime internals."
+    }
+  ],
+  "removedUpstreamFiles": [
+    {
+      "path": "engine/pkg/util/ctxutil/context_abi_pre1_20.go",
+      "upstreamSha256": "b1ddb83d868043ec5d478309514e9b7d526c8ea214452486f273485e22ee60b0",
+      "reason": "The pre-Go-1.20 private context ABI shim is incompatible with the pinned Go toolchain."
+    }
+  ],
+  "ratio1AddedFiles": [
+    {
+      "path": "engine/pkg/util/ctxutil/context_go1.20_test.go",
+      "sha256": "a911fb0ee5b92a39670a1d5c499c5e9df6ef99186086d175dc554126cc3935e7",
+      "reason": "Regression coverage for public context cancellation callbacks."
+    },
+    {
+      "path": "engine/pkg/util/goschedstats/runtime_go1.26.go",
+      "sha256": "f616d0619d962cd04bc6dc6df4bd6b8b18414a94aecad974c0f59dff3c108b94",
+      "reason": "Read supported public scheduler metrics on Go 1.26 without runtime ABI links."
+    },
+    {
+      "path": "engine/pkg/util/goschedstats/runtime_go1.26_test.go",
+      "sha256": "cb26f69cb7a26b8e7bab776ed07bcb571139fc7e22cad436c7644a4b8563c39d",
+      "reason": "Regression coverage for the Go 1.26 scheduler metric adapter."
+    }
+  ],
+  "dependencySnapshot": {
+    "upstream": {
+      "goModSha256": "53fafb91544a7d5936aeb33cf59e047ad640c03693ef55e801d4b71c1968e93c",
+      "goSumSha256": "5b49c9ca288606b8ec9ea5d244e26050312173d6d81940871c9429b622fcfcb4"
+    },
+    "sourceBaseline": {
+      "commit": "610359213980391814f8ced2b5f57ba64e2f9e01",
+      "vendorModulesSha256": "ba79d5d4e92b21bfe85aa1aa23615088800fd06dca09e0ddcd1ba782b4990c12"
+    },
+    "distributed": {
+      "goModSha256": "18fae0e5364792cda8d276e4aed3f4d274e113f588e06a3914f96b22de9b3a10",
+      "goSumSha256": "26b437b7767e83074cb270517dc77c52140b273a775d76aa193fbdbd7d8f9dbb",
+      "vendorModulesSha256": "68bcd68d46b3ae82160b70c1e202c86ee404d77434ed079942107caeda3b81bd"
+    },
+    "reason": "Refresh the retained OSS runtime dependency closure for the pinned Go 1.26.5 toolchain and published security fixes."
+  },
+  "dependencyCompatibilityBackports": [
+    {
+      "id": "google-api-grpc-credentials-options",
+      "module": "google.golang.org/api@v0.114.0",
+      "source": "https://github.com/googleapis/google-api-go-client/blob/v0.160.0/transport/grpc/dial.go",
+      "reason": "Use a named credentials-options field so the retained API client remains source-compatible with the refreshed gRPC dependency without changing authentication behavior.",
+      "files": [
+        {
+          "path": "engine/vendor/google.golang.org/api/transport/grpc/dial.go",
+          "sha256": "39a8fdb018cd7ee9e142254a9df131fc54bf7faa46714f6f4fd6e6de63408df2"
+        }
+      ]
+    }
+  ],
+  "securityBackports": [
+    {
+      "module": "github.com/jackc/pgproto3/v2@v2.3.3",
+      "advisory": "GO-2026-4518",
+      "source": "https://github.com/jackc/pgx/issues/2507",
+      "files": [
+        {
+          "path": "engine/vendor/github.com/jackc/pgproto3/v2/data_row.go",
+          "sha256": "c9deb828e74f5bc7396df0861ee493026aa994dbc58796fd927342ffa6b4a853"
+        },
+        {
+          "path": "engine/vendor/github.com/jackc/pgproto3/v2/data_row_r1_test.go",
+          "sha256": "c71883bc88ba5ba32734d2ccca32028f1ce663bc0b19b440ebc32d3013c52dca"
+        }
+      ]
+    },
+    {
+      "module": "github.com/jackc/pgx/v4@v4.18.3",
+      "advisory": "GO-2026-5004",
+      "source": "https://github.com/jackc/pgx/commit/60644f84918a8af66d14a4b0d865d4edafd955da",
+      "files": [
+        {
+          "path": "engine/vendor/github.com/jackc/pgx/v4/internal/sanitize/sanitize.go",
+          "sha256": "840ae9b17c8e22cf760227ecb3bd256f4d353fb20ad202eb6cce204349ca0b5d"
+        },
+        {
+          "path": "engine/vendor/github.com/jackc/pgx/v4/internal/sanitize/sanitize_r1_test.go",
+          "sha256": "0d3266e376b5722992de8f399612cf5a2269257ee555767fc592703ae921594c"
+        }
+      ]
     }
   ]
 }

@@ -33,11 +33,15 @@ class ReleaseContractTests(unittest.TestCase):
       "source/generated-files.txt",
       "source/public-test-fixtures.sha256",
       "source/cloudflared-buildinfo.txt",
+      "source/cloudflared-compiled-packages.txt",
       "source/cloudflared-license-inventory.csv",
       "scripts/verify-source-boundary.py",
       "scripts/verify-runtime-closure.py",
       "scripts/verify-provenance.py",
+      "scripts/verify-cloudflared-source.py",
       "scripts/verify-public-test-fixtures.py",
+      "scripts/verify-security-vex.py",
+      "security/openvex.json",
       "scripts/verify-image.sh",
     )
     missing = [path for path in required if not (ROOT / path).is_file()]
@@ -60,24 +64,44 @@ class ReleaseContractTests(unittest.TestCase):
     )
     self.assertEqual(provenance["upstream"]["changeLicense"], "Apache-2.0")
     self.assertEqual(provenance["upstream"]["changeDate"], "2026-04-01")
+    self.assertEqual(
+      provenance["buildInputs"]["goBuilder"],
+      "golang:1.26.5-bookworm@sha256:0d327c83532d3cdeeeebab56ce85962bf09cb89545355b10207c7771b0c3713f",
+    )
     dependencies = {item["name"]: item for item in provenance["nativeDependencies"]}
     self.assertEqual(set(dependencies), {"geos", "jemalloc", "libedit", "proj"})
     for dependency in dependencies.values():
       for key in ("sourceUrl", "commit", "treeSha256", "licenseFile", "role"):
         self.assertTrue(dependency.get(key), f"native dependency is missing {key}: {dependency}")
     cloudflared = provenance["buildInputs"]["cloudflared"]
-    self.assertIn("@sha256:", cloudflared["image"])
-    self.assertEqual(cloudflared["commit"], "81a53555aa827fca88605d7e67ad5c03cda468d2")
-    self.assertEqual(cloudflared["binarySha256"], "a1eb422f052be0854b82bf81bf51f343a87c1c64c35e6ccde22ece001799ab16")
-    self.assertIs(cloudflared["vcsModified"], True)
+    self.assertEqual(cloudflared["commit"], "b4f47e2ab538ab6e31d3dc6adc5489455ad446de")
+    self.assertEqual(
+      cloudflared["sourceArchiveSha256"],
+      "e897f2cdb6f63964bb7b5841df80087489a65ab9fda356ef48dd13202bba59c0",
+    )
+    self.assertEqual(
+      cloudflared["binarySha256"],
+      "ab478b502bc27dc33180df190483ba84f941e18266d0ae382e85c49fc19ede29",
+    )
 
     overrides = json.loads(read("source/ratio1-engine-overrides.json"))
     self.assertEqual(overrides["upstreamCommit"], provenance["upstream"]["commit"])
     self.assertEqual(
-      {record["path"] for record in overrides["files"]},
-      {"engine/pkg/cli/cli.go", "engine/pkg/ui/ui.go"},
+      {record["path"] for record in overrides["modifiedUpstreamFiles"]},
+      {
+        "engine/pkg/cli/cli.go",
+        "engine/pkg/ui/ui.go",
+        "engine/pkg/util/ctxutil/context.go",
+      },
     )
-    self.assertTrue(all(record["changeClass"] == "comments-only" for record in overrides["files"]))
+    self.assertEqual(
+      {record["advisory"] for record in overrides["securityBackports"]},
+      {"GO-2026-4518", "GO-2026-5004"},
+    )
+    self.assertEqual(
+      {record["id"] for record in overrides["dependencyCompatibilityBackports"]},
+      {"google-api-grpc-credentials-options"},
+    )
 
   def test_cloudflared_dependency_notices_are_complete_and_pinned(self):
     rows = read("source/cloudflared-license-inventory.csv").splitlines()
@@ -86,7 +110,8 @@ class ReleaseContractTests(unittest.TestCase):
     for row in rows[1:]:
       package, url, spdx = row.split(",", 2)
       self.assertTrue(package)
-      self.assertIn("/blob/81a53555aa827fca88605d7e67ad5c03cda468d2/", url)
+      self.assertIn("/blob/", url)
+      self.assertNotIn("/blob/HEAD/", url)
       self.assertNotIn(spdx.lower(), {"", "unknown", "noassertion"})
     by_package = {row.split(",", 2)[0]: row.split(",", 2)[2] for row in rows[1:]}
     self.assertEqual(by_package["gopkg.in/yaml.v2"], "Apache-2.0 AND MIT")
@@ -95,16 +120,21 @@ class ReleaseContractTests(unittest.TestCase):
       by_package["github.com/klauspost/compress"],
       "BSD-3-Clause AND Apache-2.0 AND MIT",
     )
+    self.assertEqual(by_package["github.com/facebookgo/grace"], "MIT")
+    self.assertIn("github.com/chungthuang/quic-go", by_package)
+    self.assertIn("github.com/ipostelnik/cli/v2", by_package)
     notices = [
       path for path in (ROOT / "licenses/cloudflared/dependencies").rglob("*")
       if path.is_file()
     ]
-    self.assertGreaterEqual(len(notices), 70)
+    self.assertEqual(len(notices), 96)
     self.assertTrue((ROOT / "licenses/cloudflared/dependencies/gopkg.in/yaml.v2/LICENSE.libyaml").is_file())
     build_info = read("source/cloudflared-buildinfo.txt")
     self.assertIn("github.com/cloudflare/cloudflared/cmd/cloudflared", build_info)
-    self.assertIn("vcs.revision=81a53555aa827fca88605d7e67ad5c03cda468d2", build_info)
-    self.assertIn("vcs.modified=true", build_info)
+    self.assertIn("/cloudflared: go1.26.5", build_info)
+    self.assertIn("google.golang.org/grpc\tv1.83.0", build_info)
+    self.assertNotIn("vcs.modified=true", build_info)
+    self.assertEqual(len(read("source/cloudflared-compiled-packages.txt").splitlines()), 603)
 
   def test_checked_out_source_has_no_ccl_implementation_or_nested_git(self):
     forbidden_paths = (
@@ -247,7 +277,15 @@ class ReleaseContractTests(unittest.TestCase):
     self.assertIn("bash=5.2.15-2+b13", dockerfile)
     self.assertIn("scripts/build-engine.sh", dockerfile)
     self.assertIn("scripts/verify-provenance.py", dockerfile)
-    self.assertIn("a1eb422f052be0854b82bf81bf51f343a87c1c64c35e6ccde22ece001799ab16", dockerfile)
+    self.assertIn("go test -mod=vendor", dockerfile)
+    self.assertIn("github.com/jackc/pgproto3/v2", dockerfile)
+    self.assertIn("github.com/jackc/pgx/v4/internal/sanitize", dockerfile)
+    self.assertIn("./pkg/util/ctxutil", dockerfile)
+    self.assertIn("./pkg/util/goschedstats", dockerfile)
+    self.assertIn("ab478b502bc27dc33180df190483ba84f941e18266d0ae382e85c49fc19ede29", dockerfile)
+    self.assertIn("ADD --checksum=sha256:e897f2cdb6f63964bb7b5841df80087489a65ab9fda356ef48dd13202bba59c0", dockerfile)
+    self.assertNotRegex(lowered, r"from\s+cloudflare/cloudflared")
+    self.assertIn("scripts/verify-cloudflared-source.py", dockerfile)
     self.assertIn("ARG BUILD_JOBS=4", dockerfile)
     self.assertIn("ENTRYPOINT [\"/usr/local/bin/deeploy-crdb-entrypoint\"]", dockerfile)
     self.assertIn("source/manifest.sha256", dockerfile)
@@ -303,6 +341,15 @@ class ReleaseContractTests(unittest.TestCase):
       text=True,
     )
 
+  def test_security_vex_is_narrow_and_evidenced(self):
+    subprocess.run(
+      ["python3", "scripts/verify-security-vex.py"],
+      cwd=ROOT,
+      check=True,
+      stdout=subprocess.PIPE,
+      text=True,
+    )
+
   def test_runtime_and_local_testbed_are_present(self):
     required = (
       "entrypoint.sh",
@@ -319,9 +366,15 @@ class ReleaseContractTests(unittest.TestCase):
     self.assertIn('CRDB_TEST_MAX_OFFSET:-500ms', testbed)
     self.assertIn("generate_series(1, 10000)", testbed)
     self.assertIn("expected replicated row count 10000", testbed)
+    self.assertIn("array_length(voting_replicas, 1) < 3", testbed)
+    self.assertIn("array_length(learner_replicas, 1) > 0", testbed)
+    self.assertNotIn("ranges.underreplicated", testbed)
     direct_test = read("scripts/direct-engine-three-node-smoke.sh")
     self.assertIn("--max-offset=500ms", direct_test)
     self.assertIn("generate_series(1, 10000)", direct_test)
+    self.assertIn("array_length(voting_replicas, 1) < 3", direct_test)
+    self.assertIn("array_length(learner_replicas, 1) > 0", direct_test)
+    self.assertNotIn("ranges.underreplicated", direct_test)
     local_runner = read("testbed/run-local-cluster.sh")
     self.assertIn("base_binary_hash", local_runner)
     self.assertIn("base_entrypoint_hash", local_runner)

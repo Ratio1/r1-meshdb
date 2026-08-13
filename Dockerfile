@@ -1,8 +1,37 @@
 # syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 
-FROM cloudflare/cloudflared:2026.6.1@sha256:6d91c121b803126f7a5344005d17a9324788fc09d305b6e2560ec6040a7ae283 AS cloudflared
+FROM golang:1.26.5-bookworm@sha256:0d327c83532d3cdeeeebab56ce85962bf09cb89545355b10207c7771b0c3713f AS cloudflared-builder
 
-FROM golang:1.19.13-bookworm@sha256:da9da58d86d106a5dda2ce249b00cf3b31cdd626ea41597e476de7b4eebad8c4 AS engine-builder
+ARG CLOUDFLARED_COMMIT=b4f47e2ab538ab6e31d3dc6adc5489455ad446de
+ARG CLOUDFLARED_VERSION=2026.7.3-r1.b4f47e2
+
+ENV GOPROXY=off \
+    GOSUMDB=off
+
+ADD --checksum=sha256:e897f2cdb6f63964bb7b5841df80087489a65ab9fda356ef48dd13202bba59c0 \
+  https://github.com/cloudflare/cloudflared/archive/b4f47e2ab538ab6e31d3dc6adc5489455ad446de.tar.gz \
+  /tmp/cloudflared.tar.gz
+
+RUN mkdir /cloudflared \
+  && tar -xzf /tmp/cloudflared.tar.gz --strip-components=1 -C /cloudflared \
+  && rm /tmp/cloudflared.tar.gz
+
+WORKDIR /cloudflared
+
+RUN --mount=type=cache,target=/root/.cache/go-build \
+  go test -mod=vendor ./cmd/cloudflared/... ./carrier/... ./tunnelrpc/...
+
+RUN --mount=type=cache,target=/root/.cache/go-build \
+  CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 \
+  go build -mod=vendor -trimpath -buildvcs=false \
+    -ldflags="-s -w -X main.Version=${CLOUDFLARED_VERSION} -X main.BuildTime=2026-08-12-16:57_UTC -X github.com/cloudflare/cloudflared/metrics.Runtime=virtual" \
+    -o /out/cloudflared ./cmd/cloudflared \
+  && printf '%s  %s\n' \
+      'ab478b502bc27dc33180df190483ba84f941e18266d0ae382e85c49fc19ede29' \
+      '/out/cloudflared' \
+    | sha256sum -c -
+
+FROM golang:1.26.5-bookworm@sha256:0d327c83532d3cdeeeebab56ce85962bf09cb89545355b10207c7771b0c3713f AS engine-builder
 
 ARG RATIO1_VERSION=v23.1.28-r1.0.0
 ARG SOURCE_DATE_EPOCH=1727820937
@@ -40,19 +69,34 @@ RUN python3 scripts/verify-source-boundary.py --worktree-only \
   && python3 scripts/generate-license-inventory.py --check \
   && python3 scripts/verify-provenance.py \
   && python3 scripts/verify-public-test-fixtures.py \
+  && python3 scripts/verify-security-vex.py \
   && python3 scripts/generate-source-manifest.py --check \
   && sha256sum -c source/manifest.sha256 >/tmp/source-manifest.log
 
+RUN --mount=from=cloudflared-builder,source=/cloudflared,target=/cloudflared,ro \
+    --mount=from=cloudflared-builder,source=/out/cloudflared,target=/cloudflared-bin,ro \
+  python3 scripts/verify-cloudflared-source.py \
+    --source-root /cloudflared \
+    --binary /cloudflared-bin
+
 RUN --mount=type=cache,target=/root/.cache/go-build \
-  ENGINE_ROOT=/workspace/engine \
+  cd /workspace/engine \
+  && go test -mod=vendor \
+    github.com/jackc/pgproto3/v2 \
+    github.com/jackc/pgx/v4/internal/sanitize \
+    ./pkg/util/ctxutil \
+    ./pkg/util/goschedstats \
+  && cd /workspace \
+  && ENGINE_ROOT=/workspace/engine \
   BUILD_ROOT=/build \
   OUTPUT_ROOT=/out \
   BUILD_JOBS="${BUILD_JOBS}" \
   RATIO1_VERSION="${RATIO1_VERSION}" \
   SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH}" \
   scripts/build-engine.sh \
-  && mkdir -p /out/licenses/cloudflared /out/licenses/engine /out/licenses/source \
-  && cp LICENSE NOTICE THIRD_PARTY_NOTICES.md UPSTREAM.md RATIO1_PATCHES.md /out/licenses/ \
+  && mkdir -p /out/licenses/cloudflared /out/licenses/engine /out/licenses/security /out/licenses/source \
+  && cp LICENSE NOTICE THIRD_PARTY_NOTICES.md UPSTREAM.md RATIO1_PATCHES.md SECURITY.md /out/licenses/ \
+  && cp security/openvex.json /out/licenses/security/ \
   && cp source/provenance.json source/license-inventory.json \
        source/cloudflared-buildinfo.txt source/cloudflared-license-inventory.csv \
        /out/licenses/source/ \
@@ -98,7 +142,7 @@ RUN printf '%s\n' \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-COPY --chmod=755 --from=cloudflared /usr/local/bin/cloudflared /usr/local/bin/cloudflared
+COPY --chmod=755 --from=cloudflared-builder /out/cloudflared /usr/local/bin/cloudflared
 COPY --chmod=755 --from=engine-builder /out/cockroach /cockroach/cockroach
 COPY --from=engine-builder /out/lib/ /usr/local/lib/r1-distributed-sql/
 COPY --from=engine-builder /out/licenses/ /usr/share/doc/r1-distributed-sql/
@@ -107,7 +151,7 @@ COPY --chmod=755 entrypoint.sh /usr/local/bin/deeploy-crdb-entrypoint
 RUN ln -s /usr/local/bin/deeploy-crdb-entrypoint /usr/local/bin/r1-distributed-sql-entrypoint
 
 RUN printf '%s  %s\n' \
-      'a1eb422f052be0854b82bf81bf51f343a87c1c64c35e6ccde22ece001799ab16' \
+      'ab478b502bc27dc33180df190483ba84f941e18266d0ae382e85c49fc19ede29' \
       '/usr/local/bin/cloudflared' \
     | sha256sum -c -
 

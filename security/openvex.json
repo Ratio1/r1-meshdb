@@ -1,0 +1,28 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/Ratio1/r1-distributed-sql/security/vex/1",
+  "author": "Ratio1",
+  "role": "Project Maintainer",
+  "timestamp": "2026-08-13T00:00:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "@id": "https://nvd.nist.gov/vuln/detail/CVE-2026-42154",
+        "aliases": [
+          "CVE-2026-42154",
+          "GHSA-8rm2-7qqf-34qm",
+          "GO-2026-5264"
+        ]
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/github.com/prometheus/prometheus@v1.8.2-0.20210914090109-37468d88dce8"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The advisory affects Prometheus's /api/v1/read remote-read handler. R1 Distributed SQL compiles selected labels, parser, storage-interface, and TSDB utility packages, but its verified runtime closure excludes github.com/prometheus/prometheus/storage/remote and contains no remote-read HTTP handler."
+    }
+  ]
+}

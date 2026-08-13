@@ -35,6 +35,7 @@ jobs:
           python3 scripts/generate-license-inventory.py --check
           python3 scripts/verify-provenance.py
           python3 scripts/verify-public-test-fixtures.py
+          python3 scripts/verify-security-vex.py
           python3 scripts/generate-source-manifest.py --check
           python3 -m unittest tests.test_release_contract
           bash -n entrypoint.sh scripts/*.sh testbed/*.sh
@@ -47,7 +48,14 @@ jobs:
           git -C "$upstream_root" init --quiet
           git -C "$upstream_root" remote add origin https://github.com/cockroachdb/cockroach.git
           git -C "$upstream_root" config core.sparseCheckout true
-          printf '%s\n' pkg/cli/cli.go pkg/ui/ui.go > "$upstream_root/.git/info/sparse-checkout"
+          printf '%s\n' \
+            go.mod \
+            go.sum \
+            pkg/cli/cli.go \
+            pkg/ui/ui.go \
+            pkg/util/ctxutil/context.go \
+            pkg/util/ctxutil/context_abi_pre1_20.go \
+            > "$upstream_root/.git/info/sparse-checkout"
           git -C "$upstream_root" fetch --quiet --depth=1 --filter=blob:none origin \
             76e598c9b1c100fd9280b979140b5e377c330a20
           git -C "$upstream_root" checkout --quiet --detach FETCH_HEAD
@@ -59,7 +67,7 @@ jobs:
             --volume "$PWD:/workspace" \
             --workdir /workspace \
             --entrypoint python3 \
-            golang:1.19.13-bookworm@sha256:da9da58d86d106a5dda2ce249b00cf3b31cdd626ea41597e476de7b4eebad8c4 \
+            golang:1.26.5-bookworm@sha256:0d327c83532d3cdeeeebab56ce85962bf09cb89545355b10207c7771b0c3713f \
             scripts/verify-runtime-closure.py
 
       - name: Resolve deterministic release metadata
@@ -78,7 +86,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish immutable image tags
+      - name: Build and publish image tags
         id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
         with:
@@ -124,8 +132,11 @@ jobs:
             -x /usr/local/bin/deeploy-crdb-entrypoint
 
       - name: Scan published digest
-        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        env:
+          TRIVY_VEX: security/openvex.json
         with:
+          version: v0.73.0
           image-ref: ${{ steps.image.outputs.ref }}
           format: table
           severity: CRITICAL,HIGH
@@ -244,6 +255,8 @@ jobs:
             RATIO1_PATCHES.md
             THIRD_PARTY_NOTICES.md
             UPSTREAM.md
+            SECURITY.md
+            security/openvex.json
             source/license-inventory.json
             source/manifest.sha256
             source/provenance.json
@@ -257,7 +270,8 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             artifacts/*.json image-reference.txt NOTICE RATIO1_PATCHES.md \
             THIRD_PARTY_NOTICES.md UPSTREAM.md source/license-inventory.json \
-            source/manifest.sha256 source/provenance.json \
+            source/manifest.sha256 source/provenance.json SECURITY.md \
+            security/openvex.json \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
             --generate-notes \
