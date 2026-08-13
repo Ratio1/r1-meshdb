@@ -62,6 +62,27 @@ class ReleaseContractTests(unittest.TestCase):
     missing = [path for path in required if not (ROOT / path).is_file()]
     self.assertEqual(missing, [], f"missing release-contract files: {missing}")
 
+  def test_direct_workflow_entrypoints_are_executable(self):
+    required = {
+      "scripts/inspect-ghcr-tag.sh",
+      "scripts/inspect-github-release.sh",
+      "scripts/verify-upstream-provenance.sh",
+      "testbed/run-real-cloudflare-cluster.sh",
+      "testbed/run-rolling-upgrade.sh",
+    }
+    result = subprocess.run(
+      ["git", "ls-files", "--stage", "--", *sorted(required)],
+      cwd=ROOT,
+      check=True,
+      text=True,
+      stdout=subprocess.PIPE,
+    )
+    modes = {
+      line.split(maxsplit=3)[3]: line.split(maxsplit=1)[0]
+      for line in result.stdout.splitlines()
+    }
+    self.assertEqual(modes, {path: "100755" for path in required})
+
   def test_root_license_is_apache_2(self):
     license_text = read("LICENSE")
     self.assertIn("Apache License", license_text)
