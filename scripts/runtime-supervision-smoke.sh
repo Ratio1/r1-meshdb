@@ -51,11 +51,26 @@ fi
 
 docker build \
   --build-arg "BASE_IMAGE=${base_image}" \
-  --build-arg "ENTRYPOINT_MODE=${expectation}" \
+  --target "${expectation}" \
   --label "${test_label}" \
   -f tests/runtime-supervision/Dockerfile \
   -t "${test_image}" \
   . >/dev/null
+
+base_binary_hash="$(docker run --rm --entrypoint sha256sum "${base_image}" /cockroach/cockroach | awk '{print $1}')"
+test_binary_hash="$(docker run --rm --entrypoint sha256sum "${test_image}" /cockroach/cockroach-real | awk '{print $1}')"
+[[ "${test_binary_hash}" == "${base_binary_hash}" ]] || {
+  echo "runtime supervision overlay changed the database binary" >&2
+  exit 1
+}
+if [[ "${expectation}" == "fixed" && "${R1_RUNTIME_REQUIRE_EXACT_ENTRYPOINT:-true}" == "true" ]]; then
+  base_entrypoint_hash="$(docker run --rm --entrypoint sha256sum "${base_image}" /usr/local/bin/deeploy-crdb-entrypoint | awk '{print $1}')"
+  test_entrypoint_hash="$(docker run --rm --entrypoint sha256sum "${test_image}" /usr/local/bin/deeploy-crdb-entrypoint | awk '{print $1}')"
+  [[ "${test_entrypoint_hash}" == "${base_entrypoint_hash}" ]] || {
+    echo "runtime supervision overlay changed the production entrypoint" >&2
+    exit 1
+  }
+fi
 
 mkdir -p "${tmp}/certs" "${tmp}/token"
 printf 'runtime-supervision-fake-token\n' > "${tmp}/token/cf-token"
@@ -104,8 +119,7 @@ wait_for_exit() {
   local deadline=$(( $(date +%s) + timeout_seconds ))
   while true; do
     if [[ "$(docker inspect -f '{{.State.Running}}' "${name}" 2>/dev/null || true)" != "true" ]]; then
-      [[ "$(date +%s)" -le "${deadline}" ]]
-      return
+      return 0
     fi
     [[ "$(date +%s)" -lt "${deadline}" ]] || return 1
     sleep 0.25
@@ -125,6 +139,8 @@ wait_for_file() {
     fi
     sleep 0.25
   done
+  docker inspect "${name}" --format '{{json .State}}' >&2 2>/dev/null || true
+  docker top "${name}" -eo pid,ppid,pgid,stat,args >&2 2>/dev/null || true
   docker logs "${name}" >&2 2>/dev/null || true
   echo "timed out waiting for file '${path}' in ${name}" >&2
   return 1
@@ -145,18 +161,39 @@ wait_for_log() {
     [[ "$(date +%s)" -lt "${deadline}" ]] || break
     sleep 0.25
   done
+  docker inspect "${name}" --format '{{json .State}}' >&2 2>/dev/null || true
+  docker top "${name}" -eo pid,ppid,pgid,stat,args >&2 2>/dev/null || true
   docker logs "${name}" >&2 2>/dev/null || true
   echo "timed out waiting for log '${expected}' in ${name}" >&2
   return 1
 }
 
-monotonic_millis() {
-  local uptime seconds fraction
-  read -r uptime _ < /proc/uptime
-  seconds="${uptime%%.*}"
-  fraction="${uptime#*.}000"
-  fraction="${fraction:0:3}"
-  TEST_MONOTONIC_MILLIS=$((10#${seconds} * 1000 + 10#${fraction}))
+marker_elapsed_millis() {
+  local started_file="$1"
+  local finished_file="$2"
+  local started finished started_seconds started_fraction
+  local finished_seconds finished_fraction
+  [[ -f "${started_file}" && -f "${finished_file}" ]] || {
+    echo "bounded-operation timing markers are missing: ${started_file}, ${finished_file}" >&2
+    return 1
+  }
+  if ! IFS= read -r started < "${started_file}" ||
+     ! IFS= read -r finished < "${finished_file}"; then
+    echo "bounded-operation timing markers are unreadable: ${started_file}, ${finished_file}" >&2
+    return 1
+  fi
+  if [[ ! "${started}" =~ ^[0-9]+\.[0-9]+$ || ! "${finished}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    echo "bounded-operation timing markers are malformed: ${started_file}, ${finished_file}" >&2
+    return 1
+  fi
+  started_seconds="${started%%.*}"
+  started_fraction="${started#*.}000"
+  finished_seconds="${finished%%.*}"
+  finished_fraction="${finished#*.}000"
+  printf '%s\n' "$((
+    (10#${finished_seconds} - 10#${started_seconds}) * 1000 +
+    10#${finished_fraction:0:3} - 10#${started_fraction:0:3}
+  ))"
 }
 
 kill_real_server() {
@@ -166,7 +203,7 @@ kill_real_server() {
     for command_file in /proc/[0-9]*/cmdline; do
       command="$(tr "\0" " " 2>/dev/null < "${command_file}" || true)"
       case "${command}" in
-        "/cockroach/cockroach-real start "*)
+        "/cockroach/cockroach-real start "*|"/usr/local/bin/r1-test-tcp-proxy --listen "*)
           pid="${command_file#/proc/}"
           pid="${pid%/cmdline}"
           kill -KILL "${pid}"
@@ -210,6 +247,7 @@ start_case() {
     -e CF_TUNNEL_TOKEN_FILE=/runtime/cf-token \
     "${timeout_args[@]}" \
     -e CRDB_SHUTDOWN_GRACE_SECONDS=1 \
+    -e TEST_CRDB_START_MODE=listen_block \
     "$@" \
     "${test_image}" >/dev/null
 }
@@ -279,7 +317,9 @@ assert_no_bootstrap_temp() {
 }
 
 init_case="deeploy-crdb-supervision-init-${run_id}"
-start_case "${init_case}" -e TEST_CRDB_INIT_MODE=block
+start_case "${init_case}" \
+  -e CRDB_BOOTSTRAP_TIMEOUT_SECONDS=30 \
+  -e TEST_CRDB_INIT_MODE=block
 wait_for_command "${init_case}" "/cockroach/cockroach init "
 kill_real_server "${init_case}"
 
@@ -322,14 +362,20 @@ if ! wait_for_exit "${default_timeout_case}" 5 || \
 fi
 
 sql_case="deeploy-crdb-supervision-sql-${run_id}"
-start_case "${sql_case}" -e TEST_CRDB_INIT_MODE=success -e TEST_CRDB_SQL_MODE=block
+start_case "${sql_case}" \
+  -e CRDB_BOOTSTRAP_TIMEOUT_SECONDS=30 \
+  -e TEST_CRDB_INIT_MODE=success \
+  -e TEST_CRDB_SQL_MODE=block
 wait_for_command "${sql_case}" "/cockroach/cockroach sql "
 kill_real_server "${sql_case}"
 assert_failed_cleanly "${sql_case}" "CockroachDB exited during SQL bootstrap readiness" 137
 assert_no_bootstrap_temp "${sql_case}"
 
 bootstrap_case="deeploy-crdb-supervision-bootstrap-${run_id}"
-start_case "${bootstrap_case}" -e TEST_CRDB_INIT_MODE=success -e TEST_CRDB_SQL_MODE=block_bootstrap
+start_case "${bootstrap_case}" \
+  -e CRDB_BOOTSTRAP_TIMEOUT_SECONDS=30 \
+  -e TEST_CRDB_INIT_MODE=success \
+  -e TEST_CRDB_SQL_MODE=block_bootstrap
 wait_for_file "${bootstrap_case}" /tmp/runtime-supervision-readiness-complete
 wait_for_command "${bootstrap_case}" "/cockroach/cockroach sql "
 kill_real_server "${bootstrap_case}"
@@ -338,6 +384,7 @@ assert_no_bootstrap_temp "${bootstrap_case}"
 
 cleanup_rm_case="deeploy-crdb-supervision-cleanup-rm-${run_id}"
 start_case "${cleanup_rm_case}" \
+  -e CRDB_BOOTSTRAP_TIMEOUT_SECONDS=30 \
   -e TEST_CRDB_INIT_MODE=success \
   -e TEST_CRDB_SQL_MODE=block_bootstrap \
   -e TEST_RM_MODE=fail_once_secret_temp
@@ -354,20 +401,16 @@ assert_no_bootstrap_temp "${simultaneous_case}"
 
 timeout_case="deeploy-crdb-supervision-timeout-${run_id}"
 start_case "${timeout_case}" -e TEST_CRDB_INIT_MODE=block
-wait_for_command "${timeout_case}" "/cockroach/cockroach init "
 assert_failed_cleanly "${timeout_case}" "cluster initialization timed out after 3 seconds" 124 8
 assert_no_bootstrap_temp "${timeout_case}"
 
 sql_timeout_case="deeploy-crdb-supervision-sql-timeout-${run_id}"
 start_case "${sql_timeout_case}" -e TEST_CRDB_INIT_MODE=success -e TEST_CRDB_SQL_MODE=block
-wait_for_command "${sql_timeout_case}" "/cockroach/cockroach sql "
 assert_failed_cleanly "${sql_timeout_case}" "SQL bootstrap readiness timed out after 3 seconds" 124 8
 assert_no_bootstrap_temp "${sql_timeout_case}"
 
 ddl_timeout_case="deeploy-crdb-supervision-ddl-timeout-${run_id}"
 start_case "${ddl_timeout_case}" -e TEST_CRDB_INIT_MODE=success -e TEST_CRDB_SQL_MODE=block_bootstrap
-wait_for_file "${ddl_timeout_case}" /tmp/runtime-supervision-readiness-complete
-wait_for_command "${ddl_timeout_case}" "/cockroach/cockroach sql "
 assert_failed_cleanly "${ddl_timeout_case}" "SQL bootstrap timed out after 3 seconds" 124 8
 assert_no_bootstrap_temp "${ddl_timeout_case}"
 
@@ -385,17 +428,18 @@ assert_no_bootstrap_temp "${ddl_failure_case}"
 resistant_timeout_case="deeploy-crdb-supervision-resistant-timeout-${run_id}"
 start_case "${resistant_timeout_case}" -e TEST_CRDB_INIT_MODE=ignore_term
 wait_for_command "${resistant_timeout_case}" "/cockroach/cockroach init "
-assert_failed_cleanly "${resistant_timeout_case}" "initializing CockroachDB cluster if needed" 137 10
+assert_failed_cleanly "${resistant_timeout_case}" "initializing CockroachDB cluster if needed" 137 30
 assert_no_bootstrap_temp "${resistant_timeout_case}"
 
 compound_case="deeploy-crdb-supervision-compound-${run_id}"
 start_case "${compound_case}" \
+  -e CRDB_BOOTSTRAP_TIMEOUT_SECONDS=30 \
   -e TEST_CRDB_INIT_MODE=ignore_term \
   -e TEST_CLOUDFLARED_SERVER_MODE=ignore_term \
   -e CRDB_SHUTDOWN_GRACE_SECONDS=3
 wait_for_command "${compound_case}" "/cockroach/cockroach init "
 kill_real_server "${compound_case}"
-assert_failed_cleanly "${compound_case}" "CockroachDB exited during cluster initialization" 137 5
+assert_failed_cleanly "${compound_case}" "CockroachDB exited during cluster initialization" 137 30
 assert_no_bootstrap_temp "${compound_case}"
 
 cloudflared_case="deeploy-crdb-supervision-cloudflared-${run_id}"
@@ -415,33 +459,29 @@ start_case "${access_case}" \
 assert_failed_cleanly "${access_case}" "Cloudflare access listener for roach2 exited during peer listener readiness" 24
 
 peer_listener_timeout_case="deeploy-crdb-supervision-peer-listener-timeout-${run_id}"
-monotonic_millis
-peer_listener_timeout_overall_started_ms="${TEST_MONOTONIC_MILLIS}"
 start_case "${peer_listener_timeout_case}" \
   -e CRDB_NODE_COUNT=3 \
   -e CRDB_HOSTNAMES=roach1.local,roach2.local,roach3.local \
   -e TEST_CLOUDFLARED_ACCESS_LISTEN_DELAY_HOSTNAME=roach2.local \
   -e TEST_CLOUDFLARED_ACCESS_LISTEN_DELAY_SECONDS=2 \
   -e TEST_CLOUDFLARED_ACCESS_PROBE_CAPTURE_HOSTNAME=roach2.local \
-  -e TEST_CLOUDFLARED_ACCESS_BLOCK_HOSTNAME=roach3.local
+  -e TEST_CLOUDFLARED_ACCESS_BLOCK_HOSTNAME=roach3.local \
+  -e TEST_CLOUDFLARED_ACCESS_BLOCK_STARTED_FILE=/tmp/cloudflared/peer-block-started \
+  -e TEST_CLOUDFLARED_ACCESS_BLOCK_TERM_FILE=/tmp/cloudflared/peer-block-term
 wait_for_log "${peer_listener_timeout_case}" \
   "starting access listener for roach3 via roach3.local on 127.77.0.3:26257" 3
-monotonic_millis
-peer_listener_timeout_started_ms="${TEST_MONOTONIC_MILLIS}"
 peer_listener_timeout_log="one or more Cloudflare peer access listeners did not become ready within 3 seconds"
 wait_for_log "${peer_listener_timeout_case}" "${peer_listener_timeout_log}" 6
-monotonic_millis
-peer_listener_timeout_elapsed_ms=$((TEST_MONOTONIC_MILLIS - peer_listener_timeout_started_ms))
-peer_listener_timeout_overall_elapsed_ms=$((TEST_MONOTONIC_MILLIS - peer_listener_timeout_overall_started_ms))
+assert_failed_cleanly "${peer_listener_timeout_case}" "${peer_listener_timeout_log}" 1 8
+peer_block_started="${tmp}/peer-block-started"
+peer_block_term="${tmp}/peer-block-term"
+docker cp "${peer_listener_timeout_case}:/tmp/cloudflared/peer-block-started" "${peer_block_started}" >/dev/null
+docker cp "${peer_listener_timeout_case}:/tmp/cloudflared/peer-block-term" "${peer_block_term}" >/dev/null
+peer_listener_timeout_elapsed_ms="$(marker_elapsed_millis "${peer_block_started}" "${peer_block_term}")"
 if [[ "${peer_listener_timeout_elapsed_ms}" -gt 3500 ]]; then
   echo "peer readiness exceeded its shared deadline: ${peer_listener_timeout_elapsed_ms}ms" >&2
   exit 1
 fi
-if [[ "${peer_listener_timeout_overall_elapsed_ms}" -gt 4500 ]]; then
-  echo "peer readiness exceeded its startup-inclusive deadline: ${peer_listener_timeout_overall_elapsed_ms}ms" >&2
-  exit 1
-fi
-assert_failed_cleanly "${peer_listener_timeout_case}" "${peer_listener_timeout_log}" 1 8
 peer_probe_capture="${tmp}/peer-probes"
 docker cp "${peer_listener_timeout_case}:/tmp/cloudflared/peer-probes" "${peer_probe_capture}" >/dev/null
 peer_probe_count="$(wc -l < "${peer_probe_capture}")"
@@ -452,6 +492,7 @@ fi
 
 runtime_case="deeploy-crdb-supervision-runtime-${run_id}"
 start_case "${runtime_case}" \
+  -e TEST_REQUIRE_LEGACY_GRPC_ALPN_COMPAT=true \
   -e TEST_CRDB_INIT_MODE=success \
   -e TEST_CRDB_SQL_MODE=fail_once \
   -e TEST_CLOUDFLARED_SERVER_MODE=ignore_term

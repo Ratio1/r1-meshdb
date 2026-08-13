@@ -1,0 +1,17 @@
+base-files=12.4+deb12u15
+base-passwd=3.6.1
+bash=5.2.15-2+b13
+ca-certificates=20230311+deb12u1
+coreutils=9.1-1
+findutils=4.9.0-4
+grep=3.8-5
+hostname=3.23+nmu1
+libc-bin=2.36-9+deb12u14
+libc6=2.36-9+deb12u14
+libgcc-s1=12.2.0-14+deb12u1
+libpcre2-8-0=10.42-1
+libselinux1=3.4-1+b6
+libstdc++6=12.2.0-14+deb12u1
+libtinfo6=6.4-4
+mawk=1.3.4.20200120-3.1
+util-linux=2.38.1-5+deb12u3

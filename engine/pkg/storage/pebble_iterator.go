@@ -1,4 +1,5 @@
 // Copyright 2019 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -924,6 +925,14 @@ func (p *pebbleIterator) getBlockPropertyFilterMask() pebble.BlockPropertyFilter
 	return &p.maskFilter
 }
 
+// panicOnLocalPebbleCorruption preserves Pebble's typed marker while adding
+// the narrow signal consumed by Ratio1's bounded store-recovery supervisor.
+func panicOnLocalPebbleCorruption(err error) {
+	if errors.Is(err, pebble.ErrCorruption) {
+		panic(errors.Wrap(err, "local corruption detected"))
+	}
+}
+
 func (p *pebbleIterator) destroy() {
 	if p.inuse {
 		panic("iterator still in use")
@@ -950,8 +959,8 @@ func (p *pebbleIterator) destroy() {
 		//
 		// NB: The panic is omitted if the error is encountered on an external
 		// iterator which is iterating over uncommitted sstables.
-		if err := p.iter.Close(); !p.external && errors.Is(err, pebble.ErrCorruption) {
-			panic(err)
+		if err := p.iter.Close(); !p.external {
+			panicOnLocalPebbleCorruption(err)
 		}
 		p.iter = nil
 	}

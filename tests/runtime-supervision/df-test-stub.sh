@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+record_block_timestamp() {
+  local path="${1:-}"
+  local uptime
+  [[ -n "${path}" ]] || return 0
+  read -r uptime _ < /proc/uptime
+  umask 022
+  printf '%s\n' "${uptime}" > "${path}"
+  chmod 644 "${path}"
+}
+
 if [[ "${TEST_DF_MODE:-}" == "block" ]]; then
-  trap '' TERM INT
+  record_block_timestamp "${TEST_DF_BLOCK_STARTED_FILE:-}"
+  trap 'record_block_timestamp "${TEST_DF_BLOCK_TERM_FILE:-}"' TERM INT
   while true; do
     sleep 1
   done
@@ -22,4 +33,4 @@ if [[ -n "${TEST_DF_USED_INODES:-}" && -n "${TEST_DF_AVAILABLE_INODES:-}" && " $
   exit 0
 fi
 
-exec /bin/df "$@"
+exec /usr/bin/df "$@"

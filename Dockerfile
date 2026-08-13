@@ -31,6 +31,12 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
       '/out/cloudflared' \
     | sha256sum -c -
 
+COPY scripts/runtime-tools/atomic-replace.go /tmp/atomic-replace.go
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 \
+  go build -trimpath -buildvcs=false -ldflags='-s -w' \
+    -o /out/r1-atomic-replace /tmp/atomic-replace.go
+
 FROM golang:1.26.5-bookworm@sha256:0d327c83532d3cdeeeebab56ce85962bf09cb89545355b10207c7771b0c3713f AS engine-builder
 
 ARG RATIO1_VERSION=v23.1.28-r1.0.0
@@ -86,6 +92,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     github.com/jackc/pgx/v4/internal/sanitize \
     ./pkg/util/ctxutil \
     ./pkg/util/goschedstats \
+  && go test -vet=off -mod=vendor \
+    ./pkg/storage -run '^TestPanicOnLocalPebbleCorruption$' -count=1 \
   && cd /workspace \
   && ENGINE_ROOT=/workspace/engine \
   BUILD_ROOT=/build \
@@ -107,7 +115,33 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   && cp engine/c-deps/proj/COPYING /out/licenses/engine/PROJ-COPYING \
   && cp -a licenses/cloudflared/. /out/licenses/cloudflared/
 
-FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241
+FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241 AS runtime-rootfs-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN printf '%s\n' \
+      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260701T000000Z bookworm main' \
+      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260701T000000Z bookworm-security main' \
+      > /etc/apt/sources.list \
+  && rm -f /etc/apt/sources.list.d/debian.sources \
+  && apt-get -o Acquire::Check-Valid-Until=false update \
+  && apt-get install -y --no-install-recommends \
+    bash=5.2.15-2+b13 \
+    ca-certificates=20230311+deb12u1 \
+    libtinfo6=6.4-4 \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY --chmod=755 scripts/assemble-runtime-rootfs.sh /usr/local/bin/assemble-runtime-rootfs
+COPY source/runtime-packages.txt /usr/share/r1-distributed-sql/runtime-packages.txt
+
+RUN --mount=from=engine-builder,source=/out/cockroach,target=/candidate-cockroach,ro \
+  assemble-runtime-rootfs \
+    /minimal-rootfs \
+    /candidate-cockroach \
+    /usr/share/r1-distributed-sql/runtime-packages.txt
+
+FROM scratch
 
 ARG BUILD_DATE=""
 ARG RATIO1_REVISION="unknown"
@@ -127,33 +161,13 @@ LABEL org.opencontainers.image.title="R1 Distributed SQL" \
       io.ratio1.r1-distributed-sql.upstream.revision="76e598c9b1c100fd9280b979140b5e377c330a20" \
       io.ratio1.r1-distributed-sql.distribution="OSS"
 
-RUN printf '%s\n' \
-      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260701T000000Z bookworm main' \
-      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260701T000000Z bookworm-security main' \
-      > /etc/apt/sources.list \
-  && rm -f /etc/apt/sources.list.d/debian.sources \
-  && apt-get -o Acquire::Check-Valid-Until=false update \
-  && apt-get install -y --no-install-recommends \
-    bash=5.2.15-2+b13 \
-    ca-certificates=20230311+deb12u1 \
-    libncurses6=6.4-4 \
-    libstdc++6=12.2.0-14+deb12u1 \
-    libtinfo6=6.4-4 \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
-
+COPY --from=runtime-rootfs-builder /minimal-rootfs/ /
 COPY --chmod=755 --from=cloudflared-builder /out/cloudflared /usr/local/bin/cloudflared
+COPY --chmod=755 --from=cloudflared-builder /out/r1-atomic-replace /usr/local/bin/r1-atomic-replace
 COPY --chmod=755 --from=engine-builder /out/cockroach /cockroach/cockroach
 COPY --from=engine-builder /out/lib/ /usr/local/lib/r1-distributed-sql/
 COPY --from=engine-builder /out/licenses/ /usr/share/doc/r1-distributed-sql/
 COPY --chmod=755 entrypoint.sh /usr/local/bin/deeploy-crdb-entrypoint
-
-RUN ln -s /usr/local/bin/deeploy-crdb-entrypoint /usr/local/bin/r1-distributed-sql-entrypoint
-
-RUN printf '%s  %s\n' \
-      'ab478b502bc27dc33180df190483ba84f941e18266d0ae382e85c49fc19ede29' \
-      '/usr/local/bin/cloudflared' \
-    | sha256sum -c -
 
 ENV LD_LIBRARY_PATH=/usr/local/lib/r1-distributed-sql
 

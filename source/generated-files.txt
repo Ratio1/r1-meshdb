@@ -99,9 +99,11 @@ pkg/sql/opt/rule_name.og.go
 pkg/sql/opt/rule_name_string.go
 pkg/sql/opt/xform/explorer.og.go
 pkg/sql/parser/help_messages.go
+pkg/sql/parser/sql.go
 pkg/sql/pgwire/pgerror/errors.pb.go
 pkg/sql/plpgsql/parser/lexbase/keywords.go
 pkg/sql/plpgsql/parser/lexbase/tokens.go
+pkg/sql/plpgsql/parser/plpgsql.go
 pkg/sql/rowenc/rowencpb/index_encoding.pb.go
 pkg/sql/schemachanger/scpb/elements.pb.go
 pkg/sql/schemachanger/scpb/scpb.pb.go

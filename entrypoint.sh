@@ -1,21 +1,109 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "${R1_SQL_SECRETS_REEXEC:-}" != "1" ]]; then
+  stage_secret_input() {
+    local value="$1"
+    local source_file="$2"
+    local destination="$3"
+    local label="$4"
+
+    if [[ -n "${source_file}" ]]; then
+      if [[ ! -f "${source_file}" || -L "${source_file}" || ! -r "${source_file}" ]]; then
+        echo "[deeploy-crdb] ${label} file is not a readable regular file" >&2
+        return 1
+      fi
+      cat "${source_file}" > "${destination}"
+    else
+      printf '%s' "${value}" > "${destination}"
+    fi
+    chmod 600 "${destination}"
+  }
+
+  : "${CRDB_PASSWORD:?CRDB_PASSWORD is required}"
+  if [[ -z "${CF_TUNNEL_TOKEN:-}" && -z "${CF_TUNNEL_TOKEN_FILE:-}" ]]; then
+    echo "[deeploy-crdb] CF_TUNNEL_TOKEN or CF_TUNNEL_TOKEN_FILE is required" >&2
+    exit 1
+  fi
+  secret_dir="$(mktemp -d /tmp/r1-distributed-sql-secrets.XXXXXXXX)"
+  chmod 700 "${secret_dir}"
+  umask 077
+  printf '%s' "${CRDB_PASSWORD}" > "${secret_dir}/database-password"
+  chmod 600 "${secret_dir}/database-password"
+  if ! stage_secret_input "${CF_TUNNEL_TOKEN:-}" "${CF_TUNNEL_TOKEN_FILE:-}" \
+      "${secret_dir}/cloudflare-token" "Cloudflare token" || \
+    ! stage_secret_input "${CRDB_CA_CRT:-}" "${CRDB_CA_CRT_FILE:-}" \
+      "${secret_dir}/ca-crt" "CA certificate" || \
+    ! stage_secret_input "${CRDB_NODE_CRT:-}" "${CRDB_NODE_CRT_FILE:-}" \
+      "${secret_dir}/node-crt" "node certificate" || \
+    ! stage_secret_input "${CRDB_NODE_KEY:-}" "${CRDB_NODE_KEY_FILE:-}" \
+      "${secret_dir}/node-key" "node key" || \
+    ! stage_secret_input "${CRDB_CLIENT_ROOT_CRT:-}" "${CRDB_CLIENT_ROOT_CRT_FILE:-}" \
+      "${secret_dir}/client-root-crt" "root client certificate" || \
+    ! stage_secret_input "${CRDB_CLIENT_ROOT_KEY:-}" "${CRDB_CLIENT_ROOT_KEY_FILE:-}" \
+      "${secret_dir}/client-root-key" "root client key"; then
+    rm -rf "${secret_dir}"
+    exit 1
+  fi
+  exec env \
+    -u CRDB_PASSWORD -u CF_TUNNEL_TOKEN -u CF_TUNNEL_TOKEN_FILE -u TUNNEL_TOKEN -u TUNNEL_TOKEN_FILE \
+    -u CRDB_CA_CRT -u CRDB_CA_CRT_FILE \
+    -u CRDB_NODE_CRT -u CRDB_NODE_CRT_FILE \
+    -u CRDB_NODE_KEY -u CRDB_NODE_KEY_FILE \
+    -u CRDB_CLIENT_ROOT_CRT -u CRDB_CLIENT_ROOT_CRT_FILE \
+    -u CRDB_CLIENT_ROOT_KEY -u CRDB_CLIENT_ROOT_KEY_FILE \
+    R1_SQL_SECRETS_REEXEC=1 \
+    R1_SQL_SECRET_DIR="${secret_dir}" \
+    CRDB_CA_CRT_FILE="${secret_dir}/ca-crt" \
+    CRDB_NODE_CRT_FILE="${secret_dir}/node-crt" \
+    CRDB_NODE_KEY_FILE="${secret_dir}/node-key" \
+    CRDB_CLIENT_ROOT_CRT_FILE="${secret_dir}/client-root-crt" \
+    CRDB_CLIENT_ROOT_KEY_FILE="${secret_dir}/client-root-key" \
+    "$0" "$@"
+fi
+
+: "${R1_SQL_SECRET_DIR:?internal secret directory is required}"
+case "${R1_SQL_SECRET_DIR}" in
+  /tmp/r1-distributed-sql-secrets.*) ;;
+  *) echo "[deeploy-crdb] invalid internal secret directory" >&2; exit 1 ;;
+esac
+if [[ -L "${R1_SQL_SECRET_DIR}" || ! -d "${R1_SQL_SECRET_DIR}" ||
+      "$(stat -c '%u:%a' "${R1_SQL_SECRET_DIR}" 2>/dev/null || true)" != "0:700" ]]; then
+  echo "[deeploy-crdb] invalid internal secret directory" >&2
+  exit 1
+fi
+R1_SQL_PASSWORD_FILE="${R1_SQL_SECRET_DIR}/database-password"
+R1_SQL_TUNNEL_TOKEN_FILE="${R1_SQL_SECRET_DIR}/cloudflare-token"
+R1_SQL_STAGED_CERT_FILES=(
+  "${R1_SQL_SECRET_DIR}/ca-crt"
+  "${R1_SQL_SECRET_DIR}/node-crt"
+  "${R1_SQL_SECRET_DIR}/node-key"
+  "${R1_SQL_SECRET_DIR}/client-root-crt"
+  "${R1_SQL_SECRET_DIR}/client-root-key"
+)
+for secret_file in "${R1_SQL_PASSWORD_FILE}" "${R1_SQL_TUNNEL_TOKEN_FILE}" \
+    "${R1_SQL_STAGED_CERT_FILES[@]}"; do
+  if [[ -L "${secret_file}" || ! -f "${secret_file}" ||
+        "$(stat -c '%u:%a' "${secret_file}" 2>/dev/null || true)" != "0:600" ]]; then
+    echo "[deeploy-crdb] invalid internal secret file" >&2
+    exit 1
+  fi
+done
+early_secret_cleanup() {
+  rm -f -- "${R1_SQL_PASSWORD_FILE}" "${R1_SQL_TUNNEL_TOKEN_FILE}" \
+    "${R1_SQL_STAGED_CERT_FILES[@]}" >/dev/null 2>&1 || true
+  rmdir "${R1_SQL_SECRET_DIR}" >/dev/null 2>&1 || true
+}
+trap early_secret_cleanup EXIT
+CRDB_PASSWORD="$(cat "${R1_SQL_PASSWORD_FILE}")"
+export -n CRDB_PASSWORD R1_SQL_SECRET_DIR R1_SQL_PASSWORD_FILE R1_SQL_TUNNEL_TOKEN_FILE
+
 : "${CRDB_NODE_ID:?CRDB_NODE_ID is required}"
 : "${CRDB_NODE_COUNT:?CRDB_NODE_COUNT is required}"
 : "${CRDB_HOSTNAMES:?CRDB_HOSTNAMES is required}"
 : "${CRDB_DATABASE:?CRDB_DATABASE is required}"
 : "${CRDB_USER:?CRDB_USER is required}"
 : "${CRDB_PASSWORD:?CRDB_PASSWORD is required}"
-
-if [[ -n "${CF_TUNNEL_TOKEN_FILE:-}" ]]; then
-  if [[ ! -r "${CF_TUNNEL_TOKEN_FILE}" ]]; then
-    echo "[deeploy-crdb] token file is not readable: ${CF_TUNNEL_TOKEN_FILE}" >&2
-    exit 1
-  fi
-  CF_TUNNEL_TOKEN="$(tr -d '\r\n' < "${CF_TUNNEL_TOKEN_FILE}")"
-fi
-: "${CF_TUNNEL_TOKEN:?CF_TUNNEL_TOKEN or CF_TUNNEL_TOKEN_FILE is required}"
 
 CRDB_SQL_PORT="${CRDB_SQL_PORT:-26257}"
 CRDB_HTTP_PORT="${CRDB_HTTP_PORT:-8080}"
@@ -36,6 +124,10 @@ CRDB_RECOVERY_MIN_FREE_INODES="${CRDB_RECOVERY_MIN_FREE_INODES:-1024}"
 CRDB_RECOVERY_HANDLER_TIMEOUT_SECONDS="${CRDB_RECOVERY_HANDLER_TIMEOUT_SECONDS:-2}"
 CRDB_RECOVERY_LOG_SCAN_BYTES="${CRDB_RECOVERY_LOG_SCAN_BYTES:-1048576}"
 CRDB_RECOVERY_LOG_RETENTION_RUNS="${CRDB_RECOVERY_LOG_RETENTION_RUNS:-10}"
+# The legacy v23.1.28 image does not advertise gRPC TLS ALPN. Keep certificate
+# authentication and encryption while allowing one-at-a-time image migration.
+GRPC_ENFORCE_ALPN_ENABLED=false
+export GRPC_ENFORCE_ALPN_ENABLED
 
 log() {
   printf '[deeploy-crdb] %s\n' "$*" >&2
@@ -216,6 +308,19 @@ if [[ "${CRDB_NODE_ID}" == "1" ]]; then
   write_secret_file "${CRDB_CERTS_DIR}/client.root.key" "${CRDB_CLIENT_ROOT_KEY}"
 fi
 
+rm -f -- "${R1_SQL_STAGED_CERT_FILES[@]}" || {
+  log "could not remove staged certificate material"
+  exit 1
+}
+CRDB_CA_CRT=""
+CRDB_NODE_CRT=""
+CRDB_NODE_KEY=""
+CRDB_CLIENT_ROOT_CRT=""
+CRDB_CLIENT_ROOT_KEY=""
+unset CRDB_CA_CRT CRDB_NODE_CRT CRDB_NODE_KEY CRDB_CLIENT_ROOT_CRT CRDB_CLIENT_ROOT_KEY
+unset CRDB_CA_CRT_FILE CRDB_NODE_CRT_FILE CRDB_NODE_KEY_FILE
+unset CRDB_CLIENT_ROOT_CRT_FILE CRDB_CLIENT_ROOT_KEY_FILE
+
 CRDB_BIND_HOST="${CRDB_LISTEN_HOST}"
 if [[ "${CRDB_LISTEN_HOST}" == "0.0.0.0" && "${CRDB_NODE_COUNT}" -gt 1 ]]; then
   read -r detected_container_ip _ <<< "$(hostname -i)"
@@ -297,7 +402,7 @@ write_recovery_marker() {
     rm -f "${marker_tmp}"
     return 1
   fi
-  if ! mv -fT "${marker_tmp}" "${CRDB_RECOVERY_MARKER}"; then
+  if ! r1-atomic-replace "${marker_tmp}" "${CRDB_RECOVERY_MARKER}"; then
     rm -f "${marker_tmp}"
     return 1
   fi
@@ -309,7 +414,7 @@ write_recovery_marker() {
 }
 
 mark_recovery_exhausted() {
-  if mv -fT "${CRDB_RECOVERY_MARKER}" "${CRDB_RECOVERY_EXHAUSTED}"; then
+  if r1-atomic-replace "${CRDB_RECOVERY_MARKER}" "${CRDB_RECOVERY_EXHAUSTED}"; then
     if ! sync "${CRDB_RECOVERY_STATE_DIR}" >/dev/null 2>&1; then
       log "could not synchronize corrupt-store recovery exhaustion state; the fail-closed sentinel remains active"
       return 1
@@ -499,16 +604,15 @@ recovery_run_has_checksum_corruption() {
 }
 
 run_dir_contains_mount() {
-  local mount_targets target run_dir="$1"
+  local _ escaped_target target run_dir="$1"
 
-  if ! mount_targets="$(findmnt -rn -o TARGET)"; then
-    return 2
-  fi
-  while IFS= read -r target; do
+  [[ -r /proc/self/mountinfo ]] || return 2
+  while IFS=' ' read -r _ _ _ _ escaped_target _; do
+    printf -v target '%b' "${escaped_target}"
     if [[ "${target}" == "${run_dir}" || "${target}" == "${run_dir}/"* ]]; then
       return 0
     fi
-  done <<< "${mount_targets}"
+  done < /proc/self/mountinfo
   return 1
 }
 
@@ -900,6 +1004,7 @@ cleanup() {
   remove_sensitive_temp_file "${bootstrap_output}"
   remove_sensitive_temp_file "${init_output_file}"
   remove_sensitive_temp_file "${run_log_list_file}"
+  remove_sensitive_temp_file "${R1_SQL_PASSWORD_FILE}"
 
   [[ -z "${recovery_handler_pid}" ]] || recovery_handler_was_active=true
   if [[ "${recovery_handler_was_active}" == "true" ]]; then
@@ -907,6 +1012,8 @@ cleanup() {
     recovery_handler_pid=""
   fi
   terminate_processes "${active_operation_pid}" "${REQUIRED_PIDS[@]:-}"
+  remove_sensitive_temp_file "${R1_SQL_TUNNEL_TOKEN_FILE}"
+  rmdir "${R1_SQL_SECRET_DIR}" >/dev/null 2>&1 || true
   if [[ "${recovery_handler_was_active}" == "true" ]]; then
     fail_closed_interrupted_recovery "fresh-store recovery classification was interrupted"
   fi
@@ -1019,7 +1126,8 @@ for node in $(seq 1 "${CRDB_NODE_COUNT}"); do
 done
 
 log "starting Cloudflare server tunnel for node ${CRDB_NODE_ID}"
-TUNNEL_TOKEN="${CF_TUNNEL_TOKEN}" cloudflared tunnel --no-autoupdate run \
+cloudflared tunnel --no-autoupdate run \
+  --token-file "${R1_SQL_TUNNEL_TOKEN_FILE}" \
   --url "tcp://${CRDB_BIND_HOST}:${CRDB_SQL_PORT}" \
   >/tmp/cloudflared/server.log 2>&1 &
 register_required_process "$!" "Cloudflare server tunnel"
@@ -1235,6 +1343,10 @@ SQL
     exit "${sql_bootstrap_status}"
   fi
 fi
+
+remove_sensitive_temp_file "${R1_SQL_PASSWORD_FILE}"
+CRDB_PASSWORD=""
+unset CRDB_PASSWORD
 
 log "startup orchestration complete; supervising required processes"
 wait_for_required_process_exit "runtime"

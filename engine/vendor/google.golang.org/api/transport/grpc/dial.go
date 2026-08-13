@@ -1,6 +1,8 @@
 // Copyright 2015 Google LLC.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 
 // Package grpc supports network connections to GRPC servers.
 // This package is not intended for use by end developers. Use the

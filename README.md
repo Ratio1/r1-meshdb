@@ -17,8 +17,8 @@ ghcr.io/ratio1/r1-distributed-sql
 ```
 
 Production deployments must use an immutable digest. Release workflows publish
-version and source-revision tags for discovery, but those tags are not a
-substitute for a digest pin.
+an immutable version tag and update `latest` only after release publication,
+but those tags are not a substitute for a digest pin.
 
 The executable intentionally remains `/cockroach/cockroach` to preserve the
 upstream wire protocol, on-disk format, diagnostic tooling, and existing

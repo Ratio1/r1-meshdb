@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "${TEST_REQUIRE_LEGACY_GRPC_ALPN_COMPAT:-false}" == "true" &&
+      "${GRPC_ENFORCE_ALPN_ENABLED:-}" != "false" ]]; then
+  echo "legacy gRPC ALPN compatibility was not enabled for the database process" >&2
+  exit 49
+fi
+
 block_forever() {
   trap 'exit 143' TERM INT
   while true; do
@@ -28,7 +34,7 @@ kill_real_server() {
   for command_file in /proc/[0-9]*/cmdline; do
     command="$(tr '\0' ' ' 2>/dev/null < "${command_file}" || true)"
     case "${command}" in
-      "/cockroach/cockroach-real start "*)
+      "/cockroach/cockroach-real start "*|"/usr/local/bin/r1-test-tcp-proxy --listen "*)
         pid="${command_file#/proc/}"
         pid="${pid%/cmdline}"
         kill -KILL "${pid}"
@@ -78,6 +84,13 @@ listen_address_from_start_args() {
   return 1
 }
 
+run_test_listener() {
+  local listen_address="$1"
+  exec /usr/local/bin/r1-test-tcp-proxy \
+    --listen "${listen_address}" \
+    --target 127.0.0.1:1
+}
+
 write_test_server_log() {
   local log_dir="$1"
   local mode="$2"
@@ -123,7 +136,8 @@ case "${1:-}" in
         ;;
       rename_stale_exit)
         store="$(store_from_start_args "$@")"
-        mv "${store}/logs/stale.log" "${store}/logs/cockroach-renamed.log"
+        /usr/local/bin/r1-atomic-replace-real \
+          "${store}/logs/stale.log" "${store}/logs/cockroach-renamed.log"
         exit "${TEST_CRDB_START_EXIT_CODE:-86}"
         ;;
       capture_store_exit)
@@ -135,7 +149,7 @@ case "${1:-}" in
         ;;
       listen_block)
         listen_address="$(listen_address_from_start_args "$@")"
-        exec socat "TCP-LISTEN:${listen_address##*:},bind=${listen_address%:*},reuseaddr,fork" SYSTEM:'sleep 60'
+        run_test_listener "${listen_address}"
         ;;
       block_no_listener)
         block_forever
@@ -143,11 +157,12 @@ case "${1:-}" in
       listen_after_delay)
         listen_address="$(listen_address_from_start_args "$@")"
         sleep "${TEST_CRDB_LISTEN_DELAY_SECONDS:-61}"
-        exec socat "TCP-LISTEN:${listen_address##*:},bind=${listen_address%:*},reuseaddr,fork" SYSTEM:'sleep 60'
+        run_test_listener "${listen_address}"
         ;;
       listen_then_exit)
         listen_address="$(listen_address_from_start_args "$@")"
-        socat "TCP-LISTEN:${listen_address##*:},bind=${listen_address%:*},reuseaddr,fork" SYSTEM:'sleep 60' &
+        /usr/local/bin/r1-test-tcp-proxy \
+          --listen "${listen_address}" --target 127.0.0.1:1 &
         listener_pid="$!"
         sleep 2
         kill "${listener_pid}" >/dev/null 2>&1 || true

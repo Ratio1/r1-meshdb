@@ -61,3 +61,31 @@ utility packages, but the checked-in and verified runtime closure excludes the
 `storage/remote` package and contains no Prometheus remote-read HTTP endpoint.
 The exact Prometheus module is therefore present in Go build metadata while the
 vulnerable code is not in the executable path.
+
+`CVE-2026-32286` / `GO-2026-4518` affects negative field lengths decoded by
+`github.com/jackc/pgproto3/v2` clients. The distributed v2.3.3 source contains
+the maintained bounds-check fix and regressions for `-2`, minimum `int32`, a
+valid `-1` null, and a complete malicious frontend frame. The scanner still
+identifies the upstream module version, so the exact VEX decision is `fixed`;
+the patch and test hashes are enforced by
+`source/ratio1-engine-overrides.json`.
+
+The final image is assembled from a tracked minimal root filesystem rather
+than a complete Debian userspace. This removes Perl, gzip, zlib, block-device
+parsers, mount tools, package managers, login tools, and ncurses commands while
+retaining Debian package metadata and copyright files for every copied OS
+component.
+
+- `CVE-2026-53615` is in util-linux's DOS/EBR parser. Only `setsid` is retained;
+  `libblkid`, `blkid`, `findmnt`, and mount utilities are absent, and the
+  entrypoint reads `/proc/self/mountinfo` directly.
+- `CVE-2025-69720` is in the `infocmp` command's `analyze_string` function.
+  `infocmp`, ncurses commands, and `libncurses` are absent; only `libtinfo` is
+  retained for Bash and the database binary.
+- `CVE-2026-54369` affects pathname-based libacl operations. The final image
+  contains neither `libacl` nor `mv`; recovery markers use a static Ratio1
+  helper that accepts only same-directory regular-file replacements.
+
+The release gate runs Trivy without `ignore-unfixed`. These exact source and
+runtime decisions are the complete allowlist; any new high or critical finding
+fails the release.

@@ -1,3 +1,5 @@
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 package sanitize
 
 import (

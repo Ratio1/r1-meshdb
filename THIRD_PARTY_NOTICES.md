@@ -97,6 +97,16 @@ SBOMs. Debian copyright files remain in `/usr/share/doc` in the image.
 
 Report a missing or inaccurate notice through the process in `SECURITY.md`.
 
+## SBOM Validation Schemas
+
+Release validation vendors the official SPDX 2.3 JSON schema from SPDX
+specification commit `aadf3b0b8dbbabdb4d880b0fc714255fea436ff7` under
+Creative Commons Attribution 3.0 Unported, and the official CycloneDX 1.7
+schemas from specification commit
+`b29bae660048e0ad2fbc5f2972927b442ce951c4` under Apache-2.0. The unchanged
+license texts are retained in `licenses/schemas/`. These schemas are source and
+release tooling; they are not copied into the runtime image.
+
 ## Public Upstream Test Keys
 
 The OSS CLI dependency graph embeds CockroachDB's published security test

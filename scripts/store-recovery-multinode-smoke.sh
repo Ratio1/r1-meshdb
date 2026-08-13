@@ -7,17 +7,23 @@ run_id="${2:-$$-${RANDOM}}"
 test_max_offset="${CRDB_TEST_MAX_OFFSET:-5s}"
 network="deeploy-crdb-recovery-multinode-${run_id}"
 test_label="com.ratio1.deeploy-crdb-recovery-multinode=${run_id}"
-tmp="$(mktemp -d /tmp/deeploy-crdb-recovery-multinode.XXXXXX)"
+runtime_volume="deeploy-crdb-recovery-runtime-${run_id}"
 nodes=(
   "deeploy-crdb-recovery-node1-${run_id}"
   "deeploy-crdb-recovery-node2-${run_id}"
   "deeploy-crdb-recovery-node3-${run_id}"
 )
+stores=(
+  "deeploy-crdb-recovery-store1-${run_id}"
+  "deeploy-crdb-recovery-store2-${run_id}"
+  "deeploy-crdb-recovery-store3-${run_id}"
+)
+volumes=("${runtime_volume}" "${stores[@]}")
 
 cleanup() {
   local status=$?
   local cleanup_failed=0
-  local name
+  local name volume
   trap - EXIT
   if [[ "${status}" != "0" ]]; then
     for name in "${nodes[@]}"; do
@@ -29,11 +35,12 @@ cleanup() {
   fi
   docker ps -aq --filter "label=${test_label}" | xargs -r docker rm -f >/dev/null 2>&1 || true
   docker ps -aq --filter "label=${test_label}" | grep -q . && cleanup_failed=1
+  for volume in "${volumes[@]}"; do
+    docker volume rm "${volume}" >/dev/null 2>&1 || true
+    docker volume inspect "${volume}" >/dev/null 2>&1 && cleanup_failed=1
+  done
   docker network rm "${network}" >/dev/null 2>&1 || true
   docker network inspect "${network}" >/dev/null 2>&1 && cleanup_failed=1
-  docker run --rm -v "${tmp}:/cleanup" --entrypoint /bin/sh "${image}" \
-    -c 'rm -rf /cleanup/* /cleanup/.[!.]* /cleanup/..?*' >/dev/null 2>&1 || cleanup_failed=1
-  rmdir "${tmp}" >/dev/null 2>&1 || cleanup_failed=1
   if [[ "${status}" == "0" && "${cleanup_failed}" != "0" ]]; then
     echo "store recovery multinode cleanup failed" >&2
     status=1
@@ -42,22 +49,28 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "${tmp}/certs" "${tmp}/token" "${tmp}/roach1" "${tmp}/roach2" "${tmp}/roach3"
-printf 'store-recovery-multinode-fake-token\n' > "${tmp}/token/cf-token"
-docker run --rm -v "${tmp}:/testbed" --entrypoint /bin/sh "${image}" \
-  -c 'chown 0:0 /testbed/roach1 /testbed/roach2 /testbed/roach3 && chmod 700 /testbed/roach1 /testbed/roach2 /testbed/roach3'
+for volume in "${volumes[@]}"; do
+  docker volume create --label "${test_label}" "${volume}" >/dev/null
+done
+for store in "${stores[@]}"; do
+  docker run --rm -v "${store}:/store" --entrypoint /bin/sh "${image}" \
+    -c 'chown 0:0 /store && chmod 700 /store'
+done
 
-docker run --rm -u "$(id -u):$(id -g)" -v "${tmp}/certs:/certs" \
+docker run --rm -v "${runtime_volume}:/runtime" --entrypoint /bin/sh "${image}" \
+  -c 'mkdir -m 700 /runtime/certs /runtime/token && printf "store-recovery-multinode-fake-token\n" > /runtime/token/cf-token'
+docker run --rm -v "${runtime_volume}:/runtime" \
   --entrypoint /cockroach/cockroach-real "${image}" \
-  cert create-ca --certs-dir=/certs --ca-key=/certs/ca.key >/dev/null
-docker run --rm -u "$(id -u):$(id -g)" -v "${tmp}/certs:/certs" \
+  cert create-ca --certs-dir=/runtime/certs --ca-key=/runtime/certs/ca.key >/dev/null
+docker run --rm -v "${runtime_volume}:/runtime" \
   --entrypoint /cockroach/cockroach-real "${image}" \
   cert create-node roach1 roach2 roach3 localhost 127.0.0.1 \
-  --certs-dir=/certs --ca-key=/certs/ca.key >/dev/null
-docker run --rm -u "$(id -u):$(id -g)" -v "${tmp}/certs:/certs" \
+  --certs-dir=/runtime/certs --ca-key=/runtime/certs/ca.key >/dev/null
+docker run --rm -v "${runtime_volume}:/runtime" \
   --entrypoint /cockroach/cockroach-real "${image}" \
-  cert create-client root --certs-dir=/certs --ca-key=/certs/ca.key >/dev/null
-rm -f "${tmp}/certs/ca.key"
+  cert create-client root --certs-dir=/runtime/certs --ca-key=/runtime/certs/ca.key >/dev/null
+docker run --rm -v "${runtime_volume}:/runtime" --entrypoint /bin/sh "${image}" \
+  -c 'rm -f /runtime/certs/ca.key'
 
 docker network create "${network}" >/dev/null
 
@@ -68,13 +81,8 @@ start_node() {
   docker run -d --name "${name}" --hostname "roach${node_id}" \
     --label "${test_label}" \
     --network "${network}" --network-alias "target-roach${node_id}" \
-    -v "${tmp}/certs/ca.crt:/runtime/ca.crt:ro" \
-    -v "${tmp}/certs/node.crt:/runtime/node.crt:ro" \
-    -v "${tmp}/certs/node.key:/runtime/node.key:ro" \
-    -v "${tmp}/certs/client.root.crt:/runtime/client.root.crt:ro" \
-    -v "${tmp}/certs/client.root.key:/runtime/client.root.key:ro" \
-    -v "${tmp}/token/cf-token:/runtime/cf-token:ro" \
-    -v "${tmp}/roach${node_id}:/cockroach/cockroach-data" \
+    -v "${runtime_volume}:/runtime:ro" \
+    -v "${stores[$((node_id - 1))]}:/cockroach/cockroach-data" \
     -e "CRDB_NODE_ID=${node_id}" \
     -e CRDB_NODE_COUNT=3 \
     -e CRDB_HOSTNAMES=roach1.local,roach2.local,roach3.local \
@@ -83,12 +91,12 @@ start_node() {
     -e CRDB_PASSWORD=store_recovery_multinode_secret \
     -e CRDB_LISTEN_HOST=0.0.0.0 \
     -e "CRDB_MAX_OFFSET=${test_max_offset}" \
-    -e CRDB_CA_CRT_FILE=/runtime/ca.crt \
-    -e CRDB_NODE_CRT_FILE=/runtime/node.crt \
-    -e CRDB_NODE_KEY_FILE=/runtime/node.key \
-    -e CRDB_CLIENT_ROOT_CRT_FILE=/runtime/client.root.crt \
-    -e CRDB_CLIENT_ROOT_KEY_FILE=/runtime/client.root.key \
-    -e CF_TUNNEL_TOKEN_FILE=/runtime/cf-token \
+    -e CRDB_CA_CRT_FILE=/runtime/certs/ca.crt \
+    -e CRDB_NODE_CRT_FILE=/runtime/certs/node.crt \
+    -e CRDB_NODE_KEY_FILE=/runtime/certs/node.key \
+    -e CRDB_CLIENT_ROOT_CRT_FILE=/runtime/certs/client.root.crt \
+    -e CRDB_CLIENT_ROOT_KEY_FILE=/runtime/certs/client.root.key \
+    -e CF_TUNNEL_TOKEN_FILE=/runtime/token/cf-token \
     -e TEST_CLOUDFLARED_ACCESS_MODE=proxy \
     -e CRDB_BOOTSTRAP_TIMEOUT_SECONDS=120 \
     -e TEST_DF_USED_KB=1024 \
@@ -247,7 +255,7 @@ inject_corruption_and_kill() {
 
 inspect_node1_store() {
   local command="$1"
-  docker run --rm -v "${tmp}/roach1:/store" --entrypoint /bin/sh "${image}" -c "${command}"
+  docker run --rm -v "${stores[0]}:/store" --entrypoint /bin/sh "${image}" -c "${command}"
 }
 
 start_node 3

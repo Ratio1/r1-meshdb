@@ -1,13 +1,17 @@
+# Copyright 2026 Ratio1
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+
 ARG BASE_IMAGE
+
+FROM golang:1.26.5-bookworm@sha256:0d327c83532d3cdeeeebab56ce85962bf09cb89545355b10207c7771b0c3713f AS tcp-proxy-builder
+
+WORKDIR /src
+COPY tests/local-transport/tcp-proxy.go .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 \
+  go build -trimpath -buildvcs=false -ldflags='-s -w' \
+    -o /out/r1-test-tcp-proxy ./tcp-proxy.go
+
 FROM ${BASE_IMAGE}
 
-RUN printf '%s\n' \
-      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260701T000000Z bookworm main' \
-      > /etc/apt/sources.list \
-  && rm -f /etc/apt/sources.list.d/debian.sources \
-  && apt-get -o Acquire::Check-Valid-Until=false update \
-  && apt-get install -y --no-install-recommends socat=1.7.4.4-2 \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
-
+COPY --chmod=755 --from=tcp-proxy-builder /out/r1-test-tcp-proxy /usr/local/bin/r1-test-tcp-proxy
 COPY --chmod=755 tests/runtime-supervision/cloudflared-test-stub.sh /usr/local/bin/cloudflared

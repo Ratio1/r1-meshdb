@@ -21,4 +21,4 @@ if [[ "${TEST_SYNC_MODE:-}" == "record_invalid_marker" ]]; then
   done
 fi
 
-exec /bin/sync "$@"
+exec /usr/bin/sync "$@"

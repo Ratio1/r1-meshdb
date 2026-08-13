@@ -44,6 +44,7 @@ timeout --signal=TERM --kill-after=30s 5m \
   bash scripts/sql-tls-transport-smoke.sh "${test_image}"
 bash scripts/secure-single-node-smoke.sh "${test_image}"
 bash scripts/local-multinode-smoke.sh "${test_image}"
-bash scripts/runtime-supervision-smoke.sh "${test_image}" fixed
+R1_RUNTIME_REQUIRE_EXACT_ENTRYPOINT=false \
+  bash scripts/runtime-supervision-smoke.sh "${test_image}" fixed
 
 echo "runtime change validation ok"

@@ -5,10 +5,16 @@ image="${1:-deeploy-crdb-runtime-supervision:local}"
 run_id="${2:-$$-${RANDOM}}"
 # This local Docker topology test isolates host clock jumps; production stays at 500ms.
 test_max_offset="${CRDB_TEST_MAX_OFFSET:-5s}"
+test_recovery_handler_timeout="${CRDB_TEST_RECOVERY_HANDLER_TIMEOUT_SECONDS:-10}"
+# Docker Desktop process creation is outside the behavior under test here. The
+# dedicated supervision suite owns strict peer/readiness timeout assertions.
+test_bootstrap_timeout="${CRDB_TEST_BOOTSTRAP_TIMEOUT_SECONDS:-30}"
+test_container_exit_timeout="${CRDB_TEST_CONTAINER_EXIT_TIMEOUT_SECONDS:-75}"
 tmp="$(mktemp -d /tmp/deeploy-crdb-store-recovery.XXXXXX)"
 test_label="com.ratio1.deeploy-crdb-store-recovery=${run_id}"
 state_dir_name=".deeploy-recovery-v1"
 containers=()
+volumes=()
 
 cleanup() {
   local status=$?
@@ -16,6 +22,10 @@ cleanup() {
   trap - EXIT
   docker ps -aq --filter "label=${test_label}" | xargs -r docker rm -f >/dev/null 2>&1 || true
   docker ps -aq --filter "label=${test_label}" | grep -q . && cleanup_failed=1
+  for volume in "${volumes[@]}"; do
+    docker volume rm "${volume}" >/dev/null 2>&1 || true
+    docker volume inspect "${volume}" >/dev/null 2>&1 && cleanup_failed=1
+  done
   docker run --rm -v "${tmp}:/cleanup" --entrypoint /bin/sh "${image}" \
     -c 'rm -rf /cleanup/* /cleanup/.[!.]* /cleanup/..?*' >/dev/null 2>&1 || cleanup_failed=1
   rmdir "${tmp}" >/dev/null 2>&1 || cleanup_failed=1
@@ -44,7 +54,7 @@ rm -f "${tmp}/certs/ca.key"
 
 wait_for_exit() {
   local name="$1"
-  local deadline=$(( $(date +%s) + 20 ))
+  local deadline=$(( $(date +%s) + test_container_exit_timeout ))
   while [[ "$(docker inspect -f '{{.State.Running}}' "${name}" 2>/dev/null || true)" == "true" ]]; do
     if [[ "$(date +%s)" -ge "${deadline}" ]]; then
       docker top "${name}" -eo pid,ppid,pgid,stat,args >&2 2>/dev/null || true
@@ -74,7 +84,9 @@ create_case() {
   local node_count="$3"
   local node_id="$4"
   shift 4
-  mkdir -p "${store}"
+  if [[ "${store}" == /* ]]; then
+    mkdir -p "${store}"
+  fi
   inspect_store "${store}" "chown 0:0 /store && chmod 700 /store"
   containers+=("${name}")
   docker create --name "${name}" --label "${test_label}" \
@@ -101,12 +113,13 @@ create_case() {
     -e CRDB_CLIENT_ROOT_KEY_FILE=/runtime/client.root.key \
     -e CF_TUNNEL_TOKEN_FILE=/runtime/cf-token \
     -e TEST_CLOUDFLARED_ACCESS_MODE=proxy \
-    -e CRDB_BOOTSTRAP_TIMEOUT_SECONDS=5 \
+    -e "CRDB_BOOTSTRAP_TIMEOUT_SECONDS=${test_bootstrap_timeout}" \
     -e CRDB_SHUTDOWN_GRACE_SECONDS=1 \
     -e TEST_DF_USED_KB=1024 \
     -e TEST_DF_AVAILABLE_KB=2097152 \
     -e TEST_DF_USED_INODES=1000 \
     -e TEST_DF_AVAILABLE_INODES=100000 \
+    -e "CRDB_RECOVERY_HANDLER_TIMEOUT_SECONDS=${test_recovery_handler_timeout}" \
     "$@" "${image}" >/dev/null
 }
 
@@ -114,6 +127,34 @@ run_case() {
   local name="$1"
   docker start "${name}" >/dev/null
   wait_for_exit "${name}"
+}
+
+marker_elapsed_millis() {
+  local started_file="$1"
+  local finished_file="$2"
+  local started finished started_seconds started_fraction
+  local finished_seconds finished_fraction
+  if [[ ! -f "${started_file}" || ! -f "${finished_file}" ]]; then
+    echo "bounded-operation timing markers are missing: ${started_file}, ${finished_file}" >&2
+    return 1
+  fi
+  if ! IFS= read -r started < "${started_file}" ||
+     ! IFS= read -r finished < "${finished_file}"; then
+    echo "bounded-operation timing markers are unreadable: ${started_file}, ${finished_file}" >&2
+    return 1
+  fi
+  if [[ ! "${started}" =~ ^[0-9]+\.[0-9]+$ || ! "${finished}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    echo "bounded-operation timing markers are malformed: ${started_file}, ${finished_file}" >&2
+    return 1
+  fi
+  started_seconds="${started%%.*}"
+  started_fraction="${started#*.}000"
+  finished_seconds="${finished%%.*}"
+  finished_fraction="${finished#*.}000"
+  printf '%s\n' "$((
+    (10#${finished_seconds} - 10#${started_seconds}) * 1000 +
+    10#${finished_fraction:0:3} - 10#${started_fraction:0:3}
+  ))"
 }
 
 assert_exit() {
@@ -427,17 +468,23 @@ assert_active_recovery "${byte_boundary_case}" "${byte_boundary_store}"
 
 timeout_store="${tmp}/handler-timeout-store"
 timeout_case="deeploy-crdb-recovery-handler-timeout-${run_id}"
-timeout_started_ms="$(date +%s%3N)"
+rm -f "${tmp}/capture/df-block-started" "${tmp}/capture/df-block-term"
 create_case "${timeout_case}" "${timeout_store}" 3 2 \
   -e CRDB_RECOVERY_HANDLER_TIMEOUT_SECONDS=1 \
   -e TEST_DF_MODE=block \
+  -e TEST_DF_BLOCK_STARTED_FILE=/runtime/capture/df-block-started \
+  -e TEST_DF_BLOCK_TERM_FILE=/runtime/capture/df-block-term \
   -e TEST_CRDB_START_MODE=corruption_exit
 run_case "${timeout_case}"
-timeout_elapsed_ms=$(( $(date +%s%3N) - timeout_started_ms ))
 assert_exit "${timeout_case}" 86
 assert_no_recovery_state "${timeout_store}"
 assert_log "${timeout_case}" "corrupt-store classification exceeded 1 seconds"
-if [[ "${timeout_elapsed_ms}" -gt 5000 ]]; then
+timeout_elapsed_ms="$(marker_elapsed_millis \
+  "${tmp}/capture/df-block-started" "${tmp}/capture/df-block-term")" || {
+  docker logs "${timeout_case}" >&2 || true
+  exit 1
+}
+if [[ "${timeout_elapsed_ms}" -lt 800 || "${timeout_elapsed_ms}" -gt 2000 ]]; then
   echo "bounded recovery handler took ${timeout_elapsed_ms}ms" >&2
   exit 1
 fi
@@ -460,21 +507,25 @@ assert_log "${sync_restart_case}" "invalid corrupt-store recovery state"
 
 client_store="${tmp}/client-store"
 client_case="deeploy-crdb-recovery-client-${run_id}"
-create_case "${client_case}" "${client_store}" 3 1 -e TEST_CRDB_INIT_MODE=corruption_exit
+create_case "${client_case}" "${client_store}" 3 1 \
+  -e TEST_CRDB_START_MODE=listen_block \
+  -e TEST_CRDB_INIT_MODE=corruption_exit
 run_case "${client_case}"
 assert_exit "${client_case}" 48
 assert_no_recovery_state "${client_store}"
 
-real_corrupt_store="${tmp}/real-corrupt-store"
-mkdir -p "${real_corrupt_store}"
+real_fixture_volume="deeploy-crdb-real-corrupt-fixture-${run_id}"
+real_corrupt_store="${real_fixture_volume}"
+docker volume create --label "${test_label}" "${real_fixture_volume}" >/dev/null
+volumes+=("${real_fixture_volume}")
 real_fixture_case="deeploy-crdb-real-corrupt-fixture-${run_id}"
 containers+=("${real_fixture_case}")
 docker run -d --name "${real_fixture_case}" --label "${test_label}" \
-  -v "${real_corrupt_store}:/store" \
+  -v "${real_fixture_volume}:/store" \
   -v "${tmp}/certs:/certs:ro" \
   --entrypoint /cockroach/cockroach-real "${image}" \
   start-single-node --certs-dir=/certs --store=/store \
-    --listen-addr=0.0.0.0:26257 --http-addr=127.0.0.1:8080 \
+    --listen-addr=127.0.0.1:26257 --http-addr=127.0.0.1:8080 \
     --max-offset="${test_max_offset}" \
     --log-dir=/store/fixture-logs >/dev/null
 fixture_deadline=$(( $(date +%s) + 30 ))
@@ -487,33 +538,94 @@ until docker exec "${real_fixture_case}" /cockroach/cockroach-real sql \
   fi
   sleep 0.2
 done
-docker exec "${real_fixture_case}" /cockroach/cockroach-real sql \
-  --certs-dir=/certs --host=127.0.0.1:26257 -e \
-  "CREATE DATABASE fixture; CREATE TABLE fixture.public.t (id INT PRIMARY KEY, payload BYTES); INSERT INTO fixture.public.t SELECT i, repeat('x', 4096)::BYTES FROM generate_series(1, 20000) AS g(i);" \
-  >/dev/null
+if ! {
+    printf '%s\n' \
+      'CREATE DATABASE fixture;' \
+      'CREATE TABLE fixture.public.t (id INT PRIMARY KEY, payload BYTES);'
+    for batch_start in $(seq 1 1000 19001); do
+      batch_end=$((batch_start + 999))
+      printf "INSERT INTO fixture.public.t SELECT i, repeat('x', 4096)::BYTES FROM generate_series(%s, %s) AS g(i);\n" \
+        "${batch_start}" "${batch_end}"
+    done
+  } | timeout --signal=TERM --kill-after=10s 5m \
+    docker exec -i "${real_fixture_case}" /cockroach/cockroach-real sql \
+      --certs-dir=/certs --host=127.0.0.1:26257 >/dev/null; then
+  docker inspect "${real_fixture_case}" --format '{{json .State}}' >&2 || true
+  docker logs "${real_fixture_case}" >&2 || true
+  docker run --rm -v "${real_fixture_volume}:/store:ro" \
+    --entrypoint /bin/sh "${image}" -c '
+      find /store/fixture-logs -maxdepth 1 -type f -name "cockroach*.log" -print |
+        while IFS= read -r log_file; do
+          printf "--- %s ---\n" "${log_file}"
+          tail -n 100 "${log_file}"
+        done
+    ' >&2 || true
+  echo "real corrupt-store fixture workload failed" >&2
+  exit 1
+fi
+fixture_target="$(docker exec "${real_fixture_case}" /cockroach/cockroach-real sql \
+  --certs-dir=/certs --host=127.0.0.1:26257 --format=csv \
+  -e 'SELECT node_id, store_id FROM crdb_internal.kv_store_status
+      WHERE node_id = crdb_internal.node_id() ORDER BY store_id LIMIT 1' \
+  | tail -n 1 | tr -d '\r')"
+IFS=, read -r fixture_node_id fixture_store_id <<< "${fixture_target}"
+if [[ ! "${fixture_node_id}" =~ ^[1-9][0-9]*$ || ! "${fixture_store_id}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "real corrupt-store fixture could not identify its node and store" >&2
+  exit 1
+fi
 docker stop -t 30 "${real_fixture_case}" >/dev/null
+docker rm "${real_fixture_case}" >/dev/null
+docker run --rm -v "${real_fixture_volume}:/store" \
+  --entrypoint /cockroach/cockroach-real "${image}" \
+  debug compact /store >/dev/null
 fixture_sst="$(inspect_store "${real_corrupt_store}" "find /store -maxdepth 1 -type f -name '*.sst' -printf '%s %p\\n' | sort -nr | head -n 1 | sed 's/^[0-9]* //'")"
 if [[ -z "${fixture_sst}" ]]; then
   echo "real corrupt-store fixture produced no SSTable" >&2
   exit 1
 fi
+fixture_layout="$(docker run --rm -v "${real_fixture_volume}:/store:ro" \
+  --entrypoint /cockroach/cockroach-real "${image}" \
+  debug pebble sstable layout "${fixture_sst}")"
+read -r fixture_data_start fixture_data_size <<< "$(awk '
+  $2 == "data" { start=$1; size=$3 }
+  END { gsub(/[()]/, "", size); print start, size }
+' <<< "${fixture_layout}")"
+if [[ ! "${fixture_data_start}" =~ ^[0-9]+$ || ! "${fixture_data_size}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "real corrupt-store fixture produced no data block" >&2
+  exit 1
+fi
+fixture_corruption_offset=$((fixture_data_start + fixture_data_size / 2))
+fixture_check="$(docker run --rm -v "${real_fixture_volume}:/store:ro" \
+  --entrypoint /cockroach/cockroach-real "${image}" \
+  debug pebble sstable check "${fixture_sst}" 2>&1)"
+if grep -Fq 'checksum mismatch' <<< "${fixture_check}"; then
+  echo "real corrupt-store fixture was corrupt before fault injection" >&2
+  exit 1
+fi
 fixture_sst_sha_before="$(inspect_store "${real_corrupt_store}" "sha256sum '${fixture_sst}' | cut -d ' ' -f 1")"
 inspect_store "${real_corrupt_store}" "
-  byte=\$(dd if='${fixture_sst}' bs=1 skip=100000 count=1 status=none | od -An -tu1 | tr -d ' ')
+  byte=\$(dd if='${fixture_sst}' bs=1 skip=${fixture_corruption_offset} count=1 status=none | od -An -tu1 | tr -d ' ')
   if [ \"\${byte}\" = 0 ]; then value='\\377'; else value='\\000'; fi
-  printf \"\${value}\" | dd of='${fixture_sst}' bs=1 seek=100000 conv=notrunc status=none
+  printf \"\${value}\" | dd of='${fixture_sst}' bs=1 seek=${fixture_corruption_offset} conv=notrunc status=none
 "
 fixture_sst_sha_corrupt="$(inspect_store "${real_corrupt_store}" "sha256sum '${fixture_sst}' | cut -d ' ' -f 1")"
 if [[ "${fixture_sst_sha_corrupt}" == "${fixture_sst_sha_before}" ]]; then
   echo "real corrupt-store fixture did not alter its SSTable" >&2
   exit 1
 fi
-docker rm "${real_fixture_case}" >/dev/null
+fixture_check="$(docker run --rm -v "${real_fixture_volume}:/store:ro" \
+  --entrypoint /cockroach/cockroach-real "${image}" \
+  debug pebble sstable check "${fixture_sst}" 2>&1)"
+if ! grep -Fq 'checksum mismatch' <<< "${fixture_check}"; then
+  echo "CockroachDB checksum verification did not detect the injected SSTable corruption" >&2
+  exit 1
+fi
 
 real_detection_case="deeploy-crdb-real-corrupt-detection-${run_id}"
-create_case "${real_detection_case}" "${real_corrupt_store}" 3 2
+create_case "${real_detection_case}" "${real_corrupt_store}" 3 2 \
+  -e CRDB_BOOTSTRAP_TIMEOUT_SECONDS=90
 docker start "${real_detection_case}" >/dev/null
-real_detection_deadline=$(( $(date +%s) + 20 ))
+real_detection_deadline=$(( $(date +%s) + 75 ))
 while [[ "$(docker inspect -f '{{.State.Running}}' "${real_detection_case}" 2>/dev/null || true)" == "true" ]]; do
   if docker exec "${real_detection_case}" timeout --kill-after=1s 2s /cockroach/cockroach-real sql \
       --certs-dir=/cockroach/certs --host=127.0.0.1:26257 \
@@ -528,8 +640,10 @@ done
 if [[ "$(docker inspect -f '{{.State.Running}}' "${real_detection_case}" 2>/dev/null || true)" == "true" ]]; then
   if docker exec "${real_detection_case}" timeout --kill-after=1s 20s /cockroach/cockroach-real sql \
       --certs-dir=/cockroach/certs --host=127.0.0.1:26257 \
-      -e 'SELECT count(*) FROM fixture.public.t' >/dev/null 2>&1; then
-    echo "corrupt SSTable scan unexpectedly succeeded" >&2
+      -e "SELECT crdb_internal.compact_engine_span(
+            ${fixture_node_id}, ${fixture_store_id}, ''::BYTES, decode('ff', 'hex')
+          )" >/dev/null 2>&1; then
+    echo "corrupt SSTable compaction unexpectedly succeeded" >&2
     exit 1
   fi
 fi
@@ -706,20 +820,27 @@ assert_log "${store_owner_case}" "invalid corrupt-store recovery state"
 classifier_timeout_store="${tmp}/classifier-timeout-active-store"
 clone_store "${recovery_store}" "${classifier_timeout_store}"
 startup_scan_timeout_case="deeploy-crdb-recovery-startup-scan-timeout-${run_id}"
-startup_scan_timeout_started_ms="$(date +%s%3N)"
+rm -f "${tmp}/capture/tail-block-started" "${tmp}/capture/tail-block-term"
 create_case "${startup_scan_timeout_case}" "${classifier_timeout_store}" 3 2 \
   -e CRDB_RECOVERY_HANDLER_TIMEOUT_SECONDS=1 \
   -e TEST_TAIL_MODE=block_run_log \
+  -e TEST_TAIL_BLOCK_STARTED_FILE=/runtime/capture/tail-block-started \
+  -e TEST_TAIL_BLOCK_TERM_FILE=/runtime/capture/tail-block-term \
   -e TEST_CRDB_START_MODE=capture_store_exit \
   -e TEST_CRDB_CAPTURE_STORE_FILE=/runtime/capture/selected-store
 run_case "${startup_scan_timeout_case}"
-startup_scan_timeout_elapsed_ms=$(( $(date +%s%3N) - startup_scan_timeout_started_ms ))
 assert_exit "${startup_scan_timeout_case}" 1
 assert_no_classifier_temp "${startup_scan_timeout_case}"
 assert_log "${startup_scan_timeout_case}" "previous recovery log classification exceeded 1 seconds"
 inspect_store "${classifier_timeout_store}" \
   "test ! -e /store/${state_dir_name}/exhausted && grep -Fxq 'state=started' /store/${state_dir_name}/state"
-if [[ "${startup_scan_timeout_elapsed_ms}" -gt 5000 ]]; then
+startup_scan_timeout_elapsed_ms="$(marker_elapsed_millis \
+  "${tmp}/capture/tail-block-started" "${tmp}/capture/tail-block-term")" || {
+  docker logs "${startup_scan_timeout_case}" >&2 || true
+  exit 1
+}
+if [[ "${startup_scan_timeout_elapsed_ms}" -lt 800 || \
+      "${startup_scan_timeout_elapsed_ms}" -gt 2000 ]]; then
   echo "bounded startup recovery scan took ${startup_scan_timeout_elapsed_ms}ms" >&2
   exit 1
 fi
@@ -926,7 +1047,7 @@ assert_active_recovery "${mv_exhaustion_first}" "${mv_exhaustion_store}"
 mv_exhaustion_second="deeploy-crdb-recovery-mv-exhaustion-second-${run_id}"
 rm -f "${tmp}/capture/invalid-marker-synced"
 create_case "${mv_exhaustion_second}" "${mv_exhaustion_store}" 3 2 \
-  -e TEST_MV_MODE=fail_exhaustion \
+  -e TEST_ATOMIC_REPLACE_MODE=fail_exhaustion \
   -e TEST_SYNC_MODE=record_invalid_marker \
   -e TEST_CRDB_START_MODE=corruption_exit
 run_case "${mv_exhaustion_second}"

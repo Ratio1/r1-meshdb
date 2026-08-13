@@ -15,4 +15,4 @@ if [[ "${TEST_RM_MODE:-}" == "fail_once_secret_temp" &&
   exit 1
 fi
 
-exec /bin/rm "$@"
+exec /usr/bin/rm "$@"

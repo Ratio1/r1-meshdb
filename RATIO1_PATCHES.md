@@ -17,8 +17,12 @@ Every released file is covered by `source/manifest.sha256`.
   upstream workflow configuration, nested Git metadata, and the unused Kerberos
   native dependency. No enterprise feature gate was bypassed or relabeled.
 - Generated parser, protobuf, and related outputs in an isolated full checkout
-  of the exact upstream commit. `source/generated-files.txt` identifies those
-  outputs; the public build never regenerates or mutates source.
+  of the exact upstream commit. The release gate runs the legacy Make generators
+  with Go 1.19.10 in the neutral, digest-pinned validator defined by
+  `tests/generated-source/Dockerfile`, then byte-compares all 155 retained
+  generated OSS outputs. `source/generated-files.txt` identifies those outputs;
+  the public image build never regenerates or mutates source. The temporary full
+  checkout is validation input only and is never archived or distributed.
 
 ### Comment-only source cleanup
 
@@ -53,6 +57,11 @@ changing its authentication behavior. This compatibility backport is
 recorded as `google-api-grpc-credentials-options` and hash-pinned in
 `source/ratio1-engine-overrides.json`.
 
+The vendored libedit binding's generated
+`engine/vendor/github.com/knz/go-libedit/unix/zcgo_flags_extra.go` is also
+hash-pinned there because CockroachDB's `vendor_rebuild` emits it and it is not
+part of the checksum-backed upstream module archive.
+
 `scripts/build-engine.sh` replaces the omitted mixed-tree Make/Bazel entrypoints.
 It builds the four checked-in native dependencies and then compiles only
 `pkg/cmd/cockroach-oss` with Go 1.26.5, `GOPROXY=off`, `-mod=vendor`, a fixed
@@ -85,8 +94,9 @@ non-cancellable contexts.
 
 - `GO-2026-4518`: `engine/vendor/github.com/jackc/pgproto3/v2/data_row.go`
   rejects negative non-null field lengths. The regression is in
-  `data_row_r1_test.go`; the fix follows the upstream report at
-  `https://github.com/jackc/pgx/issues/2507`.
+  `data_row_r1_test.go` and covers direct decoding plus a complete frontend
+  frame; the fix follows maintained pgx commit
+  `7f382f5190f58c16f5bd9d60f4443b658a5a3a22`.
 - `GO-2026-5004`:
   `engine/vendor/github.com/jackc/pgx/v4/internal/sanitize/sanitize.go`
   recognizes PostgreSQL dollar-quoted strings and clamps overflowing
@@ -95,7 +105,7 @@ non-cancellable contexts.
 
 ## Ratio1 Runtime Layer
 
-The entrypoint and its tests were ported without behavior changes from
+The entrypoint compatibility contract and its tests were ported from
 `Ratio1/deeploy-cockroachdb-service` commit
 `89f1760c29b8d37bdac3ac4f274797e261db2811`:
 
@@ -115,6 +125,31 @@ The image retains `/cockroach/cockroach`, the legacy
 `/usr/local/bin/deeploy-crdb-entrypoint`, `CRDB_*`, `roachN` logical hostnames,
 certificate layout, Cloudflare topology, recovery metadata, and store format.
 
+Before starting supervised processes, the entrypoint re-executes itself with
+database passwords, tunnel tokens, inline certificate values, and private keys
+removed from the inherited process environment. It stages those inputs in
+owner-only temporary files, installs certificates into the established certs
+directory, deletes the staged certificate copies, and deletes the password
+after bootstrap. Deeploy's persisted pipeline/Docker configuration exposure is
+unchanged and remains governed by the separately planned secrets-vault work.
+
+The original entrypoint used `findmnt` only to prevent deletion of a mounted
+run-log subtree. This distribution reads the kernel's
+`/proc/self/mountinfo` interface directly, preserving that guard while allowing
+all block-device and mount libraries to be removed from the final image. The
+entrypoint hash and original base hash are both recorded in
+`source/provenance.json`.
+
+The refreshed gRPC dependency enforces TLS ALPN by default, while the legacy
+Ratio1 v23.1.28 image does not advertise ALPN on its CockroachDB RPC listener.
+The entrypoint therefore sets gRPC's documented
+`GRPC_ENFORCE_ALPN_ENABLED=false` compatibility switch so a persisted cluster
+can be upgraded one node at a time. TLS encryption and certificate identity
+verification remain active; only the missing protocol-negotiation extension is
+tolerated. The persisted-volume rolling gate covers legacy-to-current upgrade
+and rollback, and this switch can be removed only after legacy mixed-image
+operation is no longer supported.
+
 ## Release Layer
 
 - Uses digest-pinned neutral Go and Debian images.
@@ -124,10 +159,29 @@ certificate layout, Cloudflare topology, recovery metadata, and store format.
   command, carrier, and tunnel RPC tests run during the image build.
 - Resolves Debian packages from a dated snapshot and pins direct package
   versions.
+- Copies only the runtime executables, shared libraries, CA bundle, and OS
+  metadata required by the database, Cloudflared, and compatibility entrypoint
+  into a `scratch` final image. `source/runtime-packages.txt` is the exact
+  package/version closure, and the image retains matching `dpkg` and copyright
+  records for scanner and SBOM visibility.
 - Embeds Apache, upstream, third-party, provenance, patch, and affirmative
   source-license records.
 - Publishes source/image SPDX and CycloneDX SBOMs, GitHub build provenance, an
   OCI SPDX attestation, and a keyless Cosign signature for each image digest.
+- Pins Buildx, BuildKit, Syft, Trivy, and Cosign versions in both provenance and
+  workflows. A release performs one digest-only build, validates that immutable
+  registry candidate, and adds public tags only after signing succeeds.
 
 Future releases must add the purpose, affected files, compatibility impact,
 tests, and first release for every new engine or runtime patch.
+
+### Foreground local-store corruption signal
+
+`engine/pkg/storage/pebble_iterator.go` recognizes only iterator-close errors
+carrying Pebble's typed `ErrCorruption` marker and preserves that marker while
+adding `local corruption detected` to the resulting panic. The Ratio1
+entrypoint uses that exact signal, together with `checksum mismatch`, to permit
+its bounded one-time fresh-store recovery on clusters with at least three
+configured nodes. All non-corruption errors retain upstream behavior, and
+matching error text without the typed marker is rejected. The focused
+regression is `engine/pkg/storage/pebble_iterator_r1_test.go`.

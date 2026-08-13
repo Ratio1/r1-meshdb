@@ -1,6 +1,7 @@
 .git
 .playwright
 artifacts
+source-snapshot
 __pycache__
 *.py[cod]
 source/*.cdx.json

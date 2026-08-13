@@ -18,17 +18,25 @@ PROVENANCE = ROOT / "source" / "provenance.json"
 OVERRIDES = ROOT / "source" / "ratio1-engine-overrides.json"
 EXPECTED_MODIFIED_FILES = {
   "engine/pkg/cli/cli.go",
+  "engine/pkg/storage/pebble_iterator.go",
   "engine/pkg/ui/ui.go",
   "engine/pkg/util/ctxutil/context.go",
 }
 EXPECTED_REMOVED_FILES = {"engine/pkg/util/ctxutil/context_abi_pre1_20.go"}
 EXPECTED_ADDED_FILES = {
+  "engine/pkg/storage/pebble_iterator_r1_test.go",
   "engine/pkg/util/ctxutil/context_go1.20_test.go",
   "engine/pkg/util/goschedstats/runtime_go1.26.go",
   "engine/pkg/util/goschedstats/runtime_go1.26_test.go",
 }
 EXPECTED_SECURITY_BACKPORTS = {"GO-2026-4518", "GO-2026-5004"}
 EXPECTED_COMPATIBILITY_BACKPORTS = {"google-api-grpc-credentials-options"}
+MIN_RETAINED_UPSTREAM_PACKAGE_FILES = 3000
+MODIFICATION_NOTICE = b"Modified by Ratio1 in 2026; see RATIO1_PATCHES.md."
+RATIO1_APACHE_MARKERS = (
+  b"Copyright 2026 Ratio1",
+  b'Licensed under the Apache License, Version 2.0 (the "License")',
+)
 
 
 def fail(message: str) -> None:
@@ -42,6 +50,19 @@ def file_sha256(path: Path) -> str:
     for chunk in iter(lambda: handle.read(1024 * 1024), b""):
       digest.update(chunk)
   return digest.hexdigest()
+
+
+def check_source_notice(path: Path, change_type: str) -> None:
+  content = path.read_bytes()
+  if change_type == "modified-upstream":
+    if MODIFICATION_NOTICE not in content:
+      fail(f"modified upstream file has no prominent Ratio1 notice: {path.relative_to(ROOT)}")
+    return
+  if change_type == "ratio1-added":
+    if any(marker not in content for marker in RATIO1_APACHE_MARKERS):
+      fail(f"Ratio1-added file has no Apache-2.0 source header: {path.relative_to(ROOT)}")
+    return
+  fail(f"invalid source change type for {path.relative_to(ROOT)}: {change_type}")
 
 
 def without_go_comments(content: bytes) -> bytes:
@@ -104,7 +125,10 @@ def without_go_comments(content: bytes) -> bytes:
 
 def tree_sha256(root: Path) -> str:
   digest = hashlib.sha256()
-  paths = sorted(root.rglob("*"), key=lambda path: path.relative_to(root).as_posix())
+  paths = sorted(
+    (path for path in root.rglob("*") if ".git" not in path.relative_to(root).parts),
+    key=lambda path: path.relative_to(root).as_posix(),
+  )
   for path in paths:
     relative = path.relative_to(root).as_posix().encode("utf-8")
     if path.is_symlink():
@@ -157,6 +181,47 @@ def check_build_input(build_inputs: dict, dockerfile: str, build_info: str) -> N
   if "\tdep\tgoogle.golang.org/grpc\tv1.83.0\t" not in build_info:
     fail("Cloudflared does not embed the reviewed gRPC version")
 
+  release_tooling = build_inputs.get("releaseTooling")
+  expected_release_tooling = {
+    "buildx": "v0.36.1",
+    "buildkit": (
+      "moby/buildkit:v0.32.2@sha256:"
+      "28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8"
+    ),
+    "cosign": "v3.1.3",
+    "gh": "v2.97.0",
+    "syft": "v1.51.0",
+    "trivy": "v0.73.0",
+  }
+  if release_tooling != expected_release_tooling:
+    fail("release tooling versions differ from the reviewed set")
+  workflow_text = "\n".join(
+    path.read_text(encoding="utf-8")
+    for path in sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+  )
+  for name, version in release_tooling.items():
+    if version not in workflow_text:
+      fail(f"workflow does not pin reviewed release tool: {name}")
+
+  schema_validation = build_inputs.get("schemaValidation", {})
+  expected_schema_validation = {
+    "pythonImage": (
+      "python:3.13.7-slim@sha256:"
+      "5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689"
+    ),
+    "jsonschema": "4.25.1",
+    "requirementsSha256": file_sha256(ROOT / "source/sbom-validation-requirements.txt"),
+    "spdxSchemaCommit": "aadf3b0b8dbbabdb4d880b0fc714255fea436ff7",
+    "spdxSchemaSha256": file_sha256(ROOT / "schemas/spdx/spdx-2.3.schema.json"),
+    "cycloneDxSchemaCommit": "b29bae660048e0ad2fbc5f2972927b442ce951c4",
+    "cycloneDxSchemaSha256": file_sha256(ROOT / "schemas/cyclonedx/bom-1.7.schema.json"),
+  }
+  if schema_validation != expected_schema_validation:
+    fail("SBOM schema-validation inputs differ from the reviewed set")
+  for value in (schema_validation["pythonImage"], schema_validation["jsonschema"]):
+    if value not in workflow_text:
+      fail("release workflow does not enforce the reviewed schema validator")
+
 
 def check_engine_dependency_snapshot(upstream: dict) -> None:
   snapshot = upstream.get("dependencySnapshot", {})
@@ -170,6 +235,103 @@ def check_engine_dependency_snapshot(upstream: dict) -> None:
   for key, path in expected.items():
     if snapshot.get(key) != file_sha256(path):
       fail(f"engine dependency snapshot differs: {key}")
+
+
+def load_generated_files(upstream: dict) -> set[str]:
+  generated_path = ROOT / "source" / "generated-files.txt"
+  generated = [line.strip() for line in generated_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+  if generated != sorted(set(generated)):
+    fail("generated source inventory must be sorted and contain no duplicates")
+  missing = [path for path in generated if not (ROOT / "engine" / path).is_file()]
+  if missing:
+    fail(f"generated source inventory contains missing files: {missing[:5]}")
+  if upstream.get("generatedFiles") != "source/generated-files.txt":
+    fail("provenance does not reference the generated source inventory")
+  generated_validation = upstream.get("generatedSourceValidation")
+  expected_validation = {
+    "method": "make",
+    "validatorDockerfile": "tests/generated-source/Dockerfile",
+    "baseImage": (
+      "golang:1.19.10-bullseye@sha256:"
+      "08defd390a65f3a72cfde1d04a538c6dc2d48d1f0f443ff99a8862c11c19572c"
+    ),
+    "goVersion": "go1.19.10",
+    "debianSnapshot": "20260701T000000Z",
+    "targets": (
+      "vendor/modules.txt, protobuf, and every non-protobuf path in "
+      "source/generated-files.txt"
+    ),
+  }
+  if generated_validation != expected_validation:
+    fail("generated-source validation inputs differ from the reviewed set")
+  verifier = (ROOT / "scripts" / "verify-upstream-provenance.sh").read_text(encoding="utf-8")
+  required_verifier_values = (
+    expected_validation["validatorDockerfile"],
+    expected_validation["goVersion"],
+    "make -j4 vendor/modules.txt",
+    "make -j4 protobuf",
+    "verify-generated-provenance.py",
+  )
+  for value in required_verifier_values:
+    if value not in verifier:
+      fail("upstream provenance script does not enforce generated-source inputs")
+  return {f"engine/{path}" for path in generated}
+
+
+def check_retained_upstream_package_files(
+  upstream_root: Path,
+) -> int:
+  declared_differences = EXPECTED_MODIFIED_FILES | EXPECTED_ADDED_FILES
+  compared = 0
+  for local_path in sorted((ROOT / "engine" / "pkg").rglob("*")):
+    if not local_path.is_file() and not local_path.is_symlink():
+      continue
+    relative = local_path.relative_to(ROOT / "engine").as_posix()
+    recorded_path = f"engine/{relative}"
+    if recorded_path in declared_differences:
+      continue
+    upstream_path = upstream_root / relative
+    if local_path.is_symlink():
+      if not upstream_path.is_symlink() or os.readlink(local_path) != os.readlink(upstream_path):
+        fail(f"retained upstream symlink differs without a declaration: {recorded_path}")
+    elif not upstream_path.is_file() or file_sha256(local_path) != file_sha256(upstream_path):
+      fail(f"retained upstream file differs without a declaration: {recorded_path}")
+    compared += 1
+  if compared < MIN_RETAINED_UPSTREAM_PACKAGE_FILES:
+    fail(f"retained upstream comparison was unexpectedly small: {compared}")
+  return compared
+
+
+def parse_native_upstreams(values: list[str]) -> dict[str, Path]:
+  parsed = {}
+  for value in values:
+    name, separator, path = value.partition("=")
+    if not separator or not name or not path or name in parsed:
+      fail(f"invalid native upstream mapping: {value}")
+    parsed[name] = Path(path).resolve()
+  return parsed
+
+
+def check_native_upstreams(dependencies: list[dict], native_roots: dict[str, Path]) -> None:
+  expected_names = {dependency.get("name") for dependency in dependencies}
+  if set(native_roots) != expected_names:
+    fail("native upstream mappings do not match the provenance dependency set")
+  for dependency in dependencies:
+    name = dependency["name"]
+    remote_root = native_roots[name]
+    if not remote_root.is_dir():
+      fail(f"native upstream checkout is missing: {name}")
+    revision = subprocess.run(
+      ["git", "rev-parse", "HEAD"],
+      cwd=remote_root,
+      check=True,
+      text=True,
+      stdout=subprocess.PIPE,
+    ).stdout.strip()
+    if revision != dependency.get("commit"):
+      fail(f"native upstream revision differs for {name}: {revision}")
+    if tree_sha256(remote_root) != dependency.get("treeSha256"):
+      fail(f"native upstream tree differs from the distributed tree: {name}")
 
 
 def check_engine_overrides(upstream_commit: str, patch_record: str, upstream_root: Path | None) -> None:
@@ -187,7 +349,11 @@ def check_engine_overrides(upstream_commit: str, patch_record: str, upstream_roo
     upstream_hash = record.get("upstreamSha256", "")
     distributed_hash = record.get("distributedSha256", "")
     change_class = record.get("changeClass")
-    if change_class not in {"comments-only", "go-toolchain-compatibility"}:
+    if change_class not in {
+      "comments-only",
+      "go-toolchain-compatibility",
+      "runtime-recovery-signal",
+    }:
       fail(f"engine override has an invalid change class: {path}")
     if not record.get("reason"):
       fail(f"engine override has no reason: {path}")
@@ -196,6 +362,7 @@ def check_engine_overrides(upstream_commit: str, patch_record: str, upstream_roo
     target = ROOT / path
     if not target.is_file() or file_sha256(target) != distributed_hash:
       fail(f"engine override distributed hash differs: {path}")
+    check_source_notice(target, "modified-upstream")
     if path not in patch_record:
       fail(f"engine override is absent from RATIO1_PATCHES.md: {path}")
     if upstream_root is not None:
@@ -231,6 +398,7 @@ def check_engine_overrides(upstream_commit: str, patch_record: str, upstream_roo
     target = ROOT / path
     if not target.is_file() or file_sha256(target) != record.get("sha256"):
       fail(f"Ratio1-added engine file hash differs: {path}")
+    check_source_notice(target, "ratio1-added")
     if path not in patch_record:
       fail(f"Ratio1-added engine file is absent from RATIO1_PATCHES.md: {path}")
 
@@ -289,6 +457,7 @@ def check_engine_overrides(upstream_commit: str, patch_record: str, upstream_roo
       target = ROOT / record.get("path", "")
       if not target.is_file() or file_sha256(target) != record.get("sha256"):
         fail(f"security backport file hash differs: {record.get('path')}")
+      check_source_notice(target, record.get("changeType", ""))
 
   compatibility_backports = overrides.get("dependencyCompatibilityBackports")
   backport_ids = {
@@ -310,12 +479,14 @@ def check_engine_overrides(upstream_commit: str, patch_record: str, upstream_roo
       target = ROOT / record.get("path", "")
       if not target.is_file() or file_sha256(target) != record.get("sha256"):
         fail(f"dependency compatibility backport file hash differs: {record.get('path')}")
+      check_source_notice(target, "modified-upstream")
 
 
 def main() -> None:
   parser = argparse.ArgumentParser()
   parser.add_argument("--print-native-hashes", action="store_true")
   parser.add_argument("--upstream-root", type=Path)
+  parser.add_argument("--native-upstream", action="append", default=[])
   args = parser.parse_args()
 
   provenance = json.loads(PROVENANCE.read_text(encoding="utf-8"))
@@ -326,7 +497,8 @@ def main() -> None:
   if provenance.get("nativeTreeHashAlgorithm") != expected_algorithm:
     fail("native tree-hash algorithm is missing or changed")
   actual_hashes = {}
-  for dependency in provenance.get("nativeDependencies", []):
+  native_dependencies = provenance.get("nativeDependencies", [])
+  for dependency in native_dependencies:
     name = dependency.get("name", "")
     root = ROOT / "engine" / "c-deps" / name
     if not root.is_dir():
@@ -340,6 +512,9 @@ def main() -> None:
     print(json.dumps(actual_hashes, indent=2, sort_keys=True))
     return
 
+  if args.native_upstream:
+    check_native_upstreams(native_dependencies, parse_native_upstreams(args.native_upstream))
+
   runtime = provenance.get("runtimeLayer", {})
   if runtime.get("entrypointSha256") != file_sha256(ROOT / "entrypoint.sh"):
     fail("entrypoint hash differs from provenance")
@@ -350,12 +525,19 @@ def main() -> None:
     (ROOT / "source" / "cloudflared-buildinfo.txt").read_text(encoding="utf-8"),
   )
   check_engine_dependency_snapshot(provenance.get("upstream", {}))
+  load_generated_files(provenance.get("upstream", {}))
   check_engine_overrides(
     provenance.get("upstream", {}).get("commit", ""),
     (ROOT / "RATIO1_PATCHES.md").read_text(encoding="utf-8"),
     args.upstream_root.resolve() if args.upstream_root else None,
   )
-  print(f"provenance verified: {len(actual_hashes)} native trees and pinned runtime inputs")
+  compared = 0
+  if args.upstream_root:
+    compared = check_retained_upstream_package_files(args.upstream_root.resolve())
+  print(
+    f"provenance verified: {len(actual_hashes)} native trees, "
+    f"{compared} retained upstream package files, and pinned runtime inputs"
+  )
 
 
 if __name__ == "__main__":

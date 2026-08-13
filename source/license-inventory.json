@@ -13941,7 +13941,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/cli.go",
-      "sha256": "44c018198455a8e5ddc8a8263fbe10a4a5aa50af779af0956cc295dcf9016ce8",
+      "sha256": "5fbdc5fcbc813fccd7c54bcb74f4f31fc815e9b673e9417dd88ece9572af3c14",
       "spdx": "Apache-2.0"
     },
     {
@@ -31623,7 +31623,13 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/storage/pebble_iterator.go",
-      "sha256": "cc8fb92f3b20e064325e9f65d8c5dc2f2c4216d7fb5dacac64acd1494a5a506b",
+      "sha256": "197e122c6189b803701cbdf2097b34b18710590a108487ed5369724f1caaf73c",
+      "spdx": "Apache-2.0"
+    },
+    {
+      "basis": "Apache-2.0 source header",
+      "path": "engine/pkg/storage/pebble_iterator_r1_test.go",
+      "sha256": "3a9ede812d155ffa4b442a42eebfccc60c61179c68af8325bea9d2a6e1316348",
       "spdx": "Apache-2.0"
     },
     {
@@ -32049,7 +32055,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/ui/ui.go",
-      "sha256": "cd095813fe2bbe03d4a1992ebfdf684f0599fd01f40340d906f80faeb5e4773f",
+      "sha256": "f1c779909382e3988361639a91ac9626424dcd54b9bba97f8c83d1d1b50dcbb1",
       "spdx": "Apache-2.0"
     },
     {
@@ -32601,7 +32607,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/util/ctxutil/context.go",
-      "sha256": "0962227b73948e36912bff0982da88229bf327318f428e0aa74b8673f98dcb14",
+      "sha256": "c9263e82e83f2aeff86bd5d026a1ca329830e339e626f6f43d256edd43621103",
       "spdx": "Apache-2.0"
     },
     {
@@ -48765,13 +48771,13 @@
     {
       "basis": "engine/vendor/github.com/jackc/pgproto3/v2/LICENSE",
       "path": "engine/vendor/github.com/jackc/pgproto3/v2/data_row.go",
-      "sha256": "c9deb828e74f5bc7396df0861ee493026aa994dbc58796fd927342ffa6b4a853",
+      "sha256": "d7c00f6ab2ae82c89b2a82f86b9e5a565dafaad7e3d28db694dd525577f17c28",
       "spdx": "MIT"
     },
     {
       "basis": "engine/vendor/github.com/jackc/pgproto3/v2/LICENSE",
       "path": "engine/vendor/github.com/jackc/pgproto3/v2/data_row_r1_test.go",
-      "sha256": "c71883bc88ba5ba32734d2ccca32028f1ce663bc0b19b440ebc32d3013c52dca",
+      "sha256": "77049988896d9d664105640848e55b339281aed5a985f8a8877de5740ef00df2",
       "spdx": "MIT"
     },
     {
@@ -49635,13 +49641,13 @@
     {
       "basis": "engine/vendor/github.com/jackc/pgx/v4/LICENSE",
       "path": "engine/vendor/github.com/jackc/pgx/v4/internal/sanitize/sanitize.go",
-      "sha256": "840ae9b17c8e22cf760227ecb3bd256f4d353fb20ad202eb6cce204349ca0b5d",
+      "sha256": "9243190812884fded39e9e18c6f6cc418be6631616ac9dfae6af24ee2d2632b0",
       "spdx": "MIT"
     },
     {
       "basis": "engine/vendor/github.com/jackc/pgx/v4/LICENSE",
       "path": "engine/vendor/github.com/jackc/pgx/v4/internal/sanitize/sanitize_r1_test.go",
-      "sha256": "0d3266e376b5722992de8f399612cf5a2269257ee555767fc592703ae921594c",
+      "sha256": "21266f38da239e8cad359b9e21f0305332cf06d2b253f203b92275e07c6b54ba",
       "spdx": "MIT"
     },
     {
@@ -68583,7 +68589,7 @@
     {
       "basis": "engine/vendor/google.golang.org/api/LICENSE",
       "path": "engine/vendor/google.golang.org/api/transport/grpc/dial.go",
-      "sha256": "39a8fdb018cd7ee9e142254a9df131fc54bf7faa46714f6f4fd6e6de63408df2",
+      "sha256": "b0ec91d01e89216737b7dfc2c117e3d421a18f3e1ee266ded4d135f5d8ab65cd",
       "spdx": "BSD-3-Clause"
     },
     {
