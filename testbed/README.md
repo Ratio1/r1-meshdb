@@ -44,9 +44,20 @@ failover through the real tunnel path, checks process environments and logs for
 secrets, and deletes all DNS and tunnel resources on exit.
 If Cloudflare rejects cleanup after retries, token files are deleted and the
 non-secret resource identifiers are retained as
-`cloudflare-cleanup-state.json` in the evidence directory. Operators can pass
-that state back to `scripts/cloudflare_ephemeral_tunnels.py cleanup` with fresh
-scoped credentials; cleanup is idempotent for resources already removed.
+`cloudflare-cleanup-state.json` in a seven-day, attempt-specific artifact. The
+`Recover ephemeral Cloudflare resources` workflow runs automatically after an
+unsuccessful release attempt. It validates the exact repository, workflow,
+branch, run ID, and attempt before using that state, then verifies the
+deterministic `r1-sql-ci-<run-id>-<attempt>` namespace through the Cloudflare
+API. If the artifact is unavailable after runner loss, the same exact-prefix
+lookup removes matching DNS records and tunnels without touching adjacent run
+or attempt namespaces.
+
+The recovery workflow can also be started manually from GitHub Actions with a
+failed release run ID. Leaving the attempt empty selects the latest completed
+attempt; specify an older failed attempt after a rerun. Successful, active,
+foreign-repository, non-main, and non-release attempts are rejected. Cleanup is
+idempotent, and downloaded artifact content is treated only as validated data.
 
 CI and release also run `scripts/runtime-supervision-smoke.sh` against the
 exact candidate. Its scratch-compatible multistage overlay preserves the
@@ -58,3 +69,6 @@ rebuilding, the production image.
 The protected `release` environment must provide scoped `CF_ACCOUNT_ID`,
 `CF_ZONE_ID`, `CF_API_TOKEN`, and `CF_BASE_DOMAIN` secrets. The API token must
 be dedicated to CI and limited to the selected account and disposable zone.
+Restrict that environment to the `main` branch. If it requires reviewer
+approval, automatic recovery waits for the same approval before using its
+Cloudflare credentials.

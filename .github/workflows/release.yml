@@ -409,11 +409,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: r1-distributed-sql-${{ inputs.release_tag }}-release-evidence
+          name: r1-distributed-sql-${{ inputs.release_tag }}-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             artifacts/*.json
             artifacts/*.txt
-            artifacts/real-cloudflare/
+            artifacts/real-cloudflare/summary.txt
+            artifacts/real-cloudflare/topology.json
+            artifacts/real-cloudflare/node-*.log
             artifacts/rolling-upgrade/
             image-reference.txt
             NOTICE
@@ -428,6 +430,15 @@ jobs:
             source/runtime-packages.txt
           if-no-files-found: warn
           retention-days: 90
+
+      - name: Upload non-secret Cloudflare cleanup state on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r1-distributed-sql-cloudflare-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/real-cloudflare/cloudflare-cleanup-state.json
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Preflight resumable immutable release identifiers
         id: preflight
@@ -507,6 +518,55 @@ jobs:
             --draft \
             --generate-notes \
             --title "R1 Distributed SQL $RELEASE_TAG"
+
+      - name: Refresh and verify resumable draft release assets
+        if: steps.preflight.outputs.release_state == 'draft'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          release_assets=(
+            artifacts/*.json
+            artifacts/*.txt
+            image-reference.txt
+            NOTICE
+            RATIO1_PATCHES.md
+            THIRD_PARTY_NOTICES.md
+            UPSTREAM.md
+            source/license-inventory.json
+            source/manifest.sha256
+            source/provenance.json
+            SECURITY.md
+            source/runtime-packages.txt
+            security/openvex.json
+          )
+          gh release upload "$RELEASE_TAG" "${release_assets[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+          downloaded="$(mktemp -d)"
+          cleanup_downloaded() {
+            find "$downloaded" -mindepth 1 -depth -delete
+            rmdir "$downloaded"
+          }
+          trap cleanup_downloaded EXIT
+          printf '%s\n' "${release_assets[@]##*/}" | LC_ALL=C sort \
+            > "$downloaded/expected-assets.txt"
+          gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json assets \
+            --jq '.assets[].name' | LC_ALL=C sort \
+            > "$downloaded/actual-assets.txt"
+          if ! cmp "$downloaded/expected-assets.txt" "$downloaded/actual-assets.txt"; then
+            echo "resumable draft contains stale or missing release assets" >&2
+            diff -u "$downloaded/expected-assets.txt" "$downloaded/actual-assets.txt" >&2 || true
+            exit 1
+          fi
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern image-reference.txt \
+            --dir "$downloaded"
+          cmp image-reference.txt "$downloaded/image-reference.txt"
 
       - name: Promote the single immutable version tag
         if: steps.preflight.outputs.image_tag_exists != 'true'

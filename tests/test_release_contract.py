@@ -482,6 +482,18 @@ func value() string {
     self.assertIn("image_tag_exists=true", release)
     self.assertIn("existing source tag does not identify this release commit", release)
     self.assertIn("immutable image tag identifies a different digest", release)
+    self.assertIn("Refresh and verify resumable draft release assets", release)
+    self.assertIn("gh release upload", release)
+    self.assertIn("--clobber", release)
+    self.assertIn("gh release download", release)
+    self.assertIn("gh release view", release)
+    self.assertIn("--json assets", release)
+    self.assertIn(".assets[].name", release)
+    self.assertIn('cmp "$downloaded/expected-assets.txt" "$downloaded/actual-assets.txt"', release)
+    self.assertLess(
+      release.index("Refresh and verify resumable draft release assets"),
+      release.index("Promote the single immutable version tag"),
+    )
     self.assertLess(
       release.index("Prove public anonymous pull before tag promotion"),
       release.index("Prepare draft release and immutable source tag"),
@@ -788,6 +800,80 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
     self.assertIn("cloudflare-cleanup-state.json", testbed)
     self.assertIn("find \"${allocation_dir}\" -maxdepth 1 -name '*.token' -delete", testbed)
     self.assertIn("cleanup state preserved", testbed)
+
+    heredocs = re.findall(r"<<'PY'\n(.*?)\nPY(?:\n|$)", testbed, flags=re.DOTALL)
+    self.assertTrue(heredocs)
+    for index, source in enumerate(heredocs, start=1):
+      compile(source, f"run-real-cloudflare-cluster.sh:heredoc-{index}", "exec")
+
+    function = re.search(
+      r"(?ms)^preserve_cleanup_state\(\) \{\n.*?^\}",
+      testbed,
+    )
+    self.assertIsNotNone(function)
+    with tempfile.TemporaryDirectory() as tmp:
+      allocation = Path(tmp) / "allocation"
+      evidence = Path(tmp) / "evidence"
+      allocation.mkdir()
+      (allocation / "state.json").write_text('{"schemaVersion": 1}\n', encoding="utf-8")
+      (allocation / "node-1.token").write_text("secret-token", encoding="utf-8")
+      subprocess.run(
+        [
+          "bash",
+          "-c",
+          "set -euo pipefail\n"
+          "allocation_dir=$1\n"
+          "evidence_dir=$2\n"
+          f"{function.group(0)}\n"
+          "preserve_cleanup_state\n",
+          "bash",
+          str(allocation),
+          str(evidence),
+        ],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+      )
+      preserved = evidence / "cloudflare-cleanup-state.json"
+      self.assertEqual(preserved.read_text(encoding="utf-8"), '{"schemaVersion": 1}\n')
+      self.assertEqual(preserved.stat().st_mode & 0o777, 0o600)
+      self.assertFalse((allocation / "node-1.token").exists())
+
+    self.assertIn('run_id="${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}"', testbed)
+    self.assertNotIn('${GITHUB_RUN_ATTEMPT:-0}-${RANDOM}', testbed)
+    self.assertNotIn('prefix="${prefix:0:40}"', testbed)
+
+  def test_failed_release_has_exact_attempt_cloudflare_recovery(self):
+    release = read(".github/workflows/release.yml")
+    cleanup = read(".github/workflows/cloudflare-cleanup.yml")
+    runbook = read("RELEASE.md")
+
+    self.assertIn("${{ github.run_id }}-${{ github.run_attempt }}", release)
+    self.assertIn("workflow_run:", cleanup)
+    self.assertIn("workflows: [Release signed image]", cleanup)
+    self.assertIn("workflow_dispatch:", cleanup)
+    self.assertIn("run_id:", cleanup)
+    self.assertIn("run_attempt:", cleanup)
+    self.assertIn("environment: release", cleanup)
+    self.assertIn("actions: read", cleanup)
+    self.assertIn("contents: read", cleanup)
+    self.assertNotIn("packages: write", cleanup)
+    self.assertNotIn("contents: write", cleanup)
+    self.assertNotIn("id-token: write", cleanup)
+    self.assertIn("scripts/cloudflare_cleanup_recovery.py", cleanup)
+    self.assertIn("cleanup-prefix", cleanup)
+    self.assertIn("github.event.workflow_run.id", cleanup)
+    self.assertIn("github.event.workflow_run.run_attempt", cleanup)
+    for secret in ("CF_ACCOUNT_ID", "CF_ZONE_ID", "CF_API_TOKEN", "CF_BASE_DOMAIN"):
+      self.assertIn("${{ secrets." + secret + " }}", cleanup)
+    self.assertIn("Cloudflare cleanup recovery", runbook)
+    self.assertRegex(runbook, r"Recover\s+ephemeral Cloudflare resources")
+    self.assertIn("run ID", runbook)
+    self.assertIn("run attempt", runbook)
+    self.assertIn("seven days", runbook)
+    self.assertNotIn("in the release evidence", runbook)
+    self.assertNotIn("cloudflare_ephemeral_tunnels.py cleanup", runbook)
 
   def test_public_fixture_allowlist_is_enforced(self):
     subprocess.run(

@@ -23,6 +23,7 @@ from urllib.parse import urlencode
 API_ROOT = "https://api.cloudflare.com/client/v4"
 STATE_FILE = "state.json"
 RESOURCE_ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
+RUN_PREFIX = re.compile(r"r1-sql-ci-[1-9][0-9]*-[1-9][0-9]*")
 
 
 class CloudflareError(RuntimeError):
@@ -122,6 +123,32 @@ class CloudflareClient:
       and isinstance(item.get("id"), str)
       and RESOURCE_ID.fullmatch(item["id"])
     ]
+
+  def find_run_tunnels(self, prefix: str) -> list[dict]:
+    query = urlencode({
+      "include_prefix": f"{prefix}-",
+      "is_deleted": "false",
+      "per_page": "1000",
+    })
+    result = self.call("GET", f"/accounts/{self.account_id}/cfd_tunnel?{query}")
+    if not isinstance(result, list):
+      raise CloudflareError("Cloudflare run tunnel lookup returned an invalid result")
+    if len(result) >= 1000:
+      raise CloudflareError("Cloudflare run tunnel lookup is ambiguous")
+    return result
+
+  def find_run_dns_records(self, prefix: str) -> list[dict]:
+    query = urlencode({
+      "type": "CNAME",
+      "name.startswith": f"{prefix}-",
+      "per_page": "1000",
+    })
+    result = self.call("GET", f"/zones/{self.zone_id}/dns_records?{query}")
+    if not isinstance(result, list):
+      raise CloudflareError("Cloudflare run DNS lookup returned an invalid result")
+    if len(result) >= 1000:
+      raise CloudflareError("Cloudflare run DNS lookup is ambiguous")
+    return result
 
   def find_dns_record_ids(self, hostname: str, tunnel_id: str) -> list[str]:
     content = f"{tunnel_id}.cfargotunnel.com"
@@ -271,7 +298,7 @@ def allocate(
     raise
 
 
-def load_state(path: Path) -> dict:
+def load_state(path: Path, expected_run_prefix: str | None = None) -> dict:
   if path.is_symlink() or not path.is_file():
     raise CloudflareError("ephemeral tunnel state is not a regular file")
   mode = stat.S_IMODE(path.stat().st_mode)
@@ -291,6 +318,13 @@ def load_state(path: Path) -> dict:
   if len(state["tunnels"]) > 10:
     raise CloudflareError("ephemeral tunnel state contains too many tunnels")
   seen_indexes = set()
+  expected_name = None
+  if expected_run_prefix is not None:
+    if not RUN_PREFIX.fullmatch(expected_run_prefix):
+      raise CloudflareError("ephemeral cleanup run prefix is invalid")
+    expected_name = re.compile(
+      rf"{re.escape(expected_run_prefix)}-(?P<index>[1-3])-[0-9a-f]{{8}}"
+    )
   for tunnel in state["tunnels"]:
     if not isinstance(tunnel, dict) or not set(tunnel) <= {
       "id", "name", "hostname", "nodeIndex", "dnsRecordId", "tokenFile"
@@ -319,6 +353,10 @@ def load_state(path: Path) -> dict:
       raise CloudflareError("ephemeral tunnel state contains an invalid hostname")
     if name is not None and hostname != f"{name}.{base_domain}":
       raise CloudflareError("ephemeral tunnel state hostname does not match its tunnel name")
+    if expected_name is not None:
+      match = expected_name.fullmatch(str(name or ""))
+      if match is None or int(match.group("index")) != node_index:
+        raise CloudflareError("ephemeral tunnel state does not match the requested run prefix")
     dns_record_id = tunnel.get("dnsRecordId")
     if dns_record_id is not None and (
       not isinstance(dns_record_id, str) or not RESOURCE_ID.fullmatch(dns_record_id)
@@ -328,6 +366,100 @@ def load_state(path: Path) -> dict:
     if token_file is not None and token_file != f"node-{node_index}.token":
       raise CloudflareError("ephemeral tunnel state contains an invalid token file")
   return state
+
+
+def discover_run_allocations(client: CloudflareClient, prefix: str) -> list[dict]:
+  if not RUN_PREFIX.fullmatch(prefix):
+    raise CloudflareError("ephemeral cleanup run prefix is invalid")
+  expected_name = re.compile(rf"{re.escape(prefix)}-(?P<index>[1-3])-[0-9a-f]{{8}}")
+  tunnels = client.find_run_tunnels(prefix)
+  dns_records = client.find_run_dns_records(prefix)
+  if len(tunnels) > 3 or len(dns_records) > 3:
+    raise CloudflareError("Cloudflare run lookup returned more than three matches")
+  allocations = {}
+  for tunnel in tunnels:
+    if not isinstance(tunnel, dict):
+      raise CloudflareError("Cloudflare run tunnel lookup returned an invalid tunnel")
+    tunnel_id = tunnel.get("id")
+    name = tunnel.get("name")
+    match = expected_name.fullmatch(str(name or ""))
+    if match is None or not isinstance(tunnel_id, str) or not RESOURCE_ID.fullmatch(tunnel_id):
+      raise CloudflareError("Cloudflare run tunnel lookup returned an unexpected match")
+    if tunnel.get("config_src") not in (None, "local"):
+      raise CloudflareError("Cloudflare run tunnel has an unexpected configuration source")
+    node_index = int(match.group("index"))
+    if node_index in allocations:
+      raise CloudflareError("Cloudflare run tunnel lookup returned a duplicate node index")
+    allocations[node_index] = {
+      "id": tunnel_id,
+      "name": name,
+      "hostname": f"{name}.{client.base_domain}",
+      "nodeIndex": node_index,
+    }
+  expected_hostname = re.compile(
+    rf"(?P<name>{re.escape(prefix)}-(?P<index>[1-3])-[0-9a-f]{{8}})\."
+    rf"{re.escape(client.base_domain)}"
+  )
+  expected_content = re.compile(rf"(?P<id>{RESOURCE_ID.pattern})\.cfargotunnel\.com")
+  for record in dns_records:
+    if not isinstance(record, dict):
+      raise CloudflareError("Cloudflare run DNS lookup returned an invalid record")
+    record_id = record.get("id")
+    hostname = str(record.get("name") or "").lower()
+    hostname_match = expected_hostname.fullmatch(hostname)
+    content_match = expected_content.fullmatch(str(record.get("content") or ""))
+    if (
+      hostname_match is None
+      or content_match is None
+      or not isinstance(record_id, str)
+      or not RESOURCE_ID.fullmatch(record_id)
+    ):
+      raise CloudflareError("Cloudflare run DNS lookup returned an unexpected match")
+    node_index = int(hostname_match.group("index"))
+    name = hostname_match.group("name")
+    tunnel_id = content_match.group("id")
+    existing = allocations.get(node_index)
+    if existing is None:
+      allocations[node_index] = {
+        "name": name,
+        "hostname": hostname,
+        "nodeIndex": node_index,
+        "dnsRecordId": record_id,
+      }
+    elif (
+      existing["name"] != name
+      or existing.get("id") != tunnel_id
+      or "dnsRecordId" in existing
+    ):
+      raise CloudflareError("Cloudflare run DNS lookup conflicts with its tunnel")
+    else:
+      existing["dnsRecordId"] = record_id
+  return [allocations[index] for index in sorted(allocations)]
+
+
+def cleanup_run_prefix(client: CloudflareClient, prefix: str, retries: int = 4) -> int:
+  allocations = discover_run_allocations(client, prefix)
+  failures = cleanup_allocations(client, allocations, retries=retries)
+  if failures:
+    raise CloudflareError(f"ephemeral run cleanup had {len(failures)} failure(s)")
+  if discover_run_allocations(client, prefix):
+    raise CloudflareError("ephemeral run cleanup left matching tunnels")
+  return len(allocations)
+
+
+def cleanup_state_allocations(
+  client: CloudflareClient,
+  state: dict,
+  expected_run_prefix: str | None = None,
+  retries: int = 4,
+) -> int:
+  if expected_run_prefix is not None:
+    # Downloaded evidence is untrusted data. Its IDs never drive deletion.
+    return cleanup_run_prefix(client, expected_run_prefix, retries=retries)
+  failures = cleanup_allocations(client, state["tunnels"], retries=retries)
+  if failures:
+    raise CloudflareError(f"ephemeral cleanup had {len(failures)} failure(s)")
+  return len(state["tunnels"])
 
 
 def client_from_environment(state: dict | None = None) -> CloudflareClient:
@@ -357,6 +489,9 @@ def main() -> None:
   create.add_argument("--prefix", required=True)
   cleanup = subparsers.add_parser("cleanup")
   cleanup.add_argument("--state", required=True, type=Path)
+  cleanup.add_argument("--expected-run-prefix")
+  cleanup_prefix = subparsers.add_parser("cleanup-prefix")
+  cleanup_prefix.add_argument("--prefix", required=True)
   args = parser.parse_args()
 
   try:
@@ -364,16 +499,22 @@ def main() -> None:
       state = allocate(client_from_environment(), args.output_dir, args.count, args.prefix)
       print("\n".join(tunnel["hostname"] for tunnel in state["tunnels"]))
       return
-    state = load_state(args.state)
-    failures = cleanup_allocations(client_from_environment(state), state["tunnels"])
-    if failures:
-      raise CloudflareError(f"ephemeral cleanup had {len(failures)} failure(s)")
+    if args.command == "cleanup-prefix":
+      count = cleanup_run_prefix(client_from_environment(), args.prefix)
+      print(f"cleaned {count} ephemeral Cloudflare tunnels for {args.prefix}")
+      return
+    state = load_state(args.state, expected_run_prefix=args.expected_run_prefix)
+    count = cleanup_state_allocations(
+      client_from_environment(state),
+      state,
+      expected_run_prefix=args.expected_run_prefix,
+    )
     for tunnel in state["tunnels"]:
       token_file = tunnel.get("tokenFile")
       if token_file:
         (args.state.parent / token_file).unlink(missing_ok=True)
     args.state.unlink()
-    print(f"cleaned {len(state['tunnels'])} ephemeral Cloudflare tunnels")
+    print(f"cleaned {count} ephemeral Cloudflare tunnels")
   except (CloudflareError, OSError, json.JSONDecodeError) as exc:
     print(f"ephemeral tunnel error: {exc}", file=sys.stderr)
     raise SystemExit(1) from exc

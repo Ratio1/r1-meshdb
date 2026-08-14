@@ -171,6 +171,15 @@ operation is no longer supported.
 - Pins Buildx, BuildKit, Syft, Trivy, and Cosign versions in both provenance and
   workflows. A release performs one digest-only build, validates that immutable
   registry candidate, and adds public tags only after signing succeeds.
+- Names disposable Cloudflare release resources by exact GitHub run and attempt,
+  preserves only non-secret cleanup identifiers for seven days, and runs an
+  independent least-privilege recovery workflow after failed or cancelled
+  release attempts. Manual recovery accepts an explicit failed run and optional
+  attempt; both paths reject unrelated runs and exact-prefix near matches.
+- Refreshes every asset of a resumable draft release, requires its asset set to
+  exactly match the current release contract, and compares its published image
+  reference with the validated candidate before image-tag promotion. A failed
+  partial release cannot publish stale draft evidence.
 
 Future releases must add the purpose, affected files, compatibility impact,
 tests, and first release for every new engine or runtime patch.

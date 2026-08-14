@@ -14,10 +14,13 @@ image="${1:?usage: testbed/run-real-cloudflare-cluster.sh <immutable-image-ref>}
 : "${CF_API_TOKEN:?CF_API_TOKEN is required}"
 : "${CF_BASE_DOMAIN:?CF_BASE_DOMAIN is required}"
 
-run_id="${GITHUB_RUN_ID:-$$}-${GITHUB_RUN_ATTEMPT:-0}-${RANDOM}"
-prefix="r1-sql-ci-${run_id,,}"
-prefix="${prefix//[^a-z0-9-]/-}"
-prefix="${prefix:0:40}"
+GITHUB_RUN_ID="${GITHUB_RUN_ID:-$$}"
+GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-1}"
+[[ "${GITHUB_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
+[[ "${GITHUB_RUN_ATTEMPT}" =~ ^[1-9][0-9]*$ ]]
+run_id="${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}"
+prefix="r1-sql-ci-${run_id}"
+[[ "${#prefix}" -le 40 ]]
 tmp="$(mktemp -d /tmp/r1-sql-real-cloudflare.XXXXXXXX)"
 allocation_dir="${tmp}/cloudflare"
 certs_dir="${tmp}/certs"
@@ -53,24 +56,6 @@ public = {
     for tunnel in state["tunnels"]
   ],
 }
-
-preserve_cleanup_state() {
-  local state="${allocation_dir}/state.json"
-  local destination
-  [[ -f "${state}" ]] || return 1
-  # Tunnel tokens are not required for API cleanup and must never be retained.
-  find "${allocation_dir}" -maxdepth 1 -name '*.token' -delete
-  if [[ -n "${evidence_dir}" ]]; then
-    mkdir -p "${evidence_dir}"
-    chmod 700 "${evidence_dir}"
-    destination="${evidence_dir}/cloudflare-cleanup-state.json"
-  else
-    destination="$(mktemp /tmp/r1-sql-cloudflare-cleanup-state.XXXXXXXX.json)"
-  fi
-  cp "${state}" "${destination}"
-  chmod 600 "${destination}"
-  echo "Cloudflare cleanup state preserved at ${destination}" >&2
-}
 Path(sys.argv[2]).write_text(json.dumps(public, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
   fi
@@ -94,6 +79,24 @@ Path(sys.argv[3]).write_text(logs, encoding="utf-8")
 PY
     rm -f "${raw_logs}"
   done
+}
+
+preserve_cleanup_state() {
+  local state="${allocation_dir}/state.json"
+  local destination
+  [[ -f "${state}" ]] || return 1
+  # Tunnel tokens are not required for API cleanup and must never be retained.
+  find "${allocation_dir}" -maxdepth 1 -name '*.token' -delete
+  if [[ -n "${evidence_dir}" ]]; then
+    mkdir -p "${evidence_dir}"
+    chmod 700 "${evidence_dir}"
+    destination="${evidence_dir}/cloudflare-cleanup-state.json"
+  else
+    destination="$(mktemp /tmp/r1-sql-cloudflare-cleanup-state.XXXXXXXX.json)"
+  fi
+  cp "${state}" "${destination}"
+  chmod 600 "${destination}"
+  echo "Cloudflare cleanup state preserved at ${destination}" >&2
 }
 
 cleanup() {

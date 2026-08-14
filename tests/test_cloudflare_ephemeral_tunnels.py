@@ -16,6 +16,8 @@ from scripts.cloudflare_ephemeral_tunnels import (
   CloudflareError,
   allocate,
   cleanup_allocations,
+  cleanup_run_prefix,
+  cleanup_state_allocations,
   load_state,
 )
 
@@ -61,10 +63,17 @@ class FakeCloudflare:
       if self.lose_tunnel_response_at == self.created:
         raise error.URLError("response lost after tunnel creation")
     elif req.method == "GET" and parsed.path.endswith("/cfd_tunnel"):
-      result = [
-        tunnel for tunnel in self.tunnels.values()
-        if tunnel["name"] == query.get("name", [None])[0]
-      ]
+      if "include_prefix" in query:
+        prefix = query["include_prefix"][0]
+        result = [
+          tunnel for tunnel in self.tunnels.values()
+          if tunnel["name"].startswith(prefix)
+        ]
+      else:
+        result = [
+          tunnel for tunnel in self.tunnels.values()
+          if tunnel["name"] == query.get("name", [None])[0]
+        ]
     elif req.method == "POST" and parsed.path.endswith("/dns_records"):
       if self.fail_dns_at == self.created:
         raise error.HTTPError(req.full_url, 400, "bad request", {}, None)
@@ -73,13 +82,26 @@ class FakeCloudflare:
       if self.lose_dns_response_at == self.created:
         raise error.URLError("response lost after DNS creation")
     elif req.method == "GET" and parsed.path.endswith("/dns_records"):
-      result = [
-        record for record in self.dns_records.values()
-        if record["name"] == query.get("name", [None])[0]
-        and record["content"] == query.get("content", [None])[0]
-      ]
-    elif req.method == "DELETE" and "/cfd_tunnel/" in req.full_url and self.fail_tunnel_delete:
-      raise error.HTTPError(req.full_url, 409, "connector active", {}, None)
+      if "name.startswith" in query:
+        prefix = query["name.startswith"][0]
+        result = [
+          record for record in self.dns_records.values()
+          if record["name"].startswith(prefix)
+        ]
+      else:
+        result = [
+          record for record in self.dns_records.values()
+          if record["name"] == query.get("name", [None])[0]
+          and record["content"] == query.get("content", [None])[0]
+        ]
+    elif req.method == "DELETE" and "/cfd_tunnel/" in req.full_url:
+      if self.fail_tunnel_delete:
+        raise error.HTTPError(req.full_url, 409, "connector active", {}, None)
+      self.tunnels.pop(parsed.path.rsplit("/", 1)[-1], None)
+      result = {"id": "deleted"}
+    elif req.method == "DELETE" and "/dns_records/" in req.full_url:
+      self.dns_records.pop(parsed.path.rsplit("/", 1)[-1], None)
+      result = {"id": "deleted"}
     else:
       result = {"id": "deleted"}
     return Response(json.dumps({"success": True, "result": result}).encode())
@@ -199,6 +221,152 @@ class EphemeralTunnelTests(unittest.TestCase):
       state_path.chmod(0o600)
       with self.assertRaisesRegex(CloudflareError, "invalid tunnel id"):
         load_state(state_path)
+
+  def test_load_state_binds_recovery_to_the_expected_run_prefix(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      state_path = Path(tmp) / "state.json"
+      name = "r1-sql-ci-12345-2-1-deadbeef"
+      state_path.write_text(json.dumps({
+        "schemaVersion": 1,
+        "accountId": "account",
+        "zoneId": "zone",
+        "baseDomain": "ci.example.com",
+        "tunnels": [{
+          "id": "tunnel-1",
+          "name": name,
+          "hostname": f"{name}.ci.example.com",
+          "nodeIndex": 1,
+        }],
+      }))
+      state_path.chmod(0o600)
+      self.assertEqual(
+        load_state(state_path, expected_run_prefix="r1-sql-ci-12345-2")["tunnels"][0]["id"],
+        "tunnel-1",
+      )
+      with self.assertRaisesRegex(CloudflareError, "requested run prefix"):
+        load_state(state_path, expected_run_prefix="r1-sql-ci-12345-3")
+
+  def test_cleanup_run_prefix_deletes_only_the_exact_attempt_namespace(self):
+    fake = FakeCloudflare()
+    exact_name = "r1-sql-ci-12345-2-1-deadbeef"
+    exact_id = "tunnel-exact"
+    fake.tunnels = {
+      exact_id: {"id": exact_id, "name": exact_name, "config_src": "local"},
+      "tunnel-next-attempt": {
+        "id": "tunnel-next-attempt",
+        "name": "r1-sql-ci-12345-20-1-feedface",
+        "config_src": "local",
+      },
+      "tunnel-other-run": {
+        "id": "tunnel-other-run",
+        "name": "r1-sql-ci-123456-2-1-cafebabe",
+        "config_src": "local",
+      },
+    }
+    fake.dns_records = {
+      "dns-exact": {
+        "id": "dns-exact",
+        "name": f"{exact_name}.ci.example.com",
+        "content": f"{exact_id}.cfargotunnel.com",
+      },
+    }
+
+    self.assertEqual(cleanup_run_prefix(client(fake), "r1-sql-ci-12345-2", retries=1), 1)
+    deletes = [url for method, url, _body, _timeout in fake.calls if method == "DELETE"]
+    self.assertEqual(
+      deletes,
+      [
+        "https://mock.invalid/zones/zone/dns_records/dns-exact",
+        "https://mock.invalid/accounts/account/cfd_tunnel/tunnel-exact",
+      ],
+    )
+    self.assertIn("tunnel-next-attempt", fake.tunnels)
+    self.assertIn("tunnel-other-run", fake.tunnels)
+
+    self.assertEqual(cleanup_run_prefix(client(fake), "r1-sql-ci-12345-2", retries=1), 0)
+
+  def test_cleanup_run_prefix_rejects_ambiguous_or_oversized_matches(self):
+    fake = FakeCloudflare()
+    with self.assertRaisesRegex(CloudflareError, "run prefix"):
+      cleanup_run_prefix(client(fake), "r1-sql-ci-12345", retries=1)
+    self.assertFalse(fake.calls)
+
+    fake.tunnels = {
+      f"tunnel-{index}": {
+        "id": f"tunnel-{index}",
+        "name": f"r1-sql-ci-12345-2-{index}-deadbeef",
+        "config_src": "local",
+      }
+      for index in range(1, 5)
+    }
+    with self.assertRaisesRegex(CloudflareError, "more than three"):
+      cleanup_run_prefix(client(fake), "r1-sql-ci-12345-2", retries=1)
+    self.assertFalse([call for call in fake.calls if call[0] == "DELETE"])
+
+  def test_cleanup_run_prefix_removes_dns_orphan_without_deleting_its_target(self):
+    fake = FakeCloudflare()
+    name = "r1-sql-ci-12345-2-1-deadbeef"
+    fake.tunnels = {
+      "unrelated-tunnel": {
+        "id": "unrelated-tunnel",
+        "name": "unrelated-production-tunnel",
+        "config_src": "local",
+      },
+    }
+    fake.dns_records = {
+      "dns-orphan": {
+        "id": "dns-orphan",
+        "name": f"{name}.ci.example.com",
+        "content": "unrelated-tunnel.cfargotunnel.com",
+      },
+    }
+    self.assertEqual(cleanup_run_prefix(client(fake), "r1-sql-ci-12345-2", retries=1), 1)
+    deletes = [url for method, url, _body, _timeout in fake.calls if method == "DELETE"]
+    self.assertEqual(
+      deletes,
+      ["https://mock.invalid/zones/zone/dns_records/dns-orphan"],
+    )
+    self.assertIn("unrelated-tunnel", fake.tunnels)
+
+  def test_recovery_state_ids_never_drive_deletion(self):
+    fake = FakeCloudflare()
+    name = "r1-sql-ci-12345-2-1-deadbeef"
+    fake.tunnels = {
+      "actual-tunnel": {
+        "id": "actual-tunnel",
+        "name": name,
+        "config_src": "local",
+      },
+      "unrelated-tunnel": {
+        "id": "unrelated-tunnel",
+        "name": "unrelated-production-tunnel",
+        "config_src": "local",
+      },
+    }
+    state = {
+      "tunnels": [{
+        "id": "unrelated-tunnel",
+        "name": name,
+        "hostname": f"{name}.ci.example.com",
+        "nodeIndex": 1,
+      }],
+    }
+    self.assertEqual(
+      cleanup_state_allocations(
+        client(fake),
+        state,
+        expected_run_prefix="r1-sql-ci-12345-2",
+        retries=1,
+      ),
+      1,
+    )
+    deleted_tunnels = [
+      url.rsplit("/", 1)[-1]
+      for method, url, _body, _timeout in fake.calls
+      if method == "DELETE" and "/cfd_tunnel/" in url
+    ]
+    self.assertEqual(deleted_tunnels, ["actual-tunnel"])
+    self.assertIn("unrelated-tunnel", fake.tunnels)
 
 
 if __name__ == "__main__":

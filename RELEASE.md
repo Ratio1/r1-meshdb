@@ -35,8 +35,15 @@ fail-closed: release promotion stops if any DNS record or tunnel cannot be
 removed.
 If remote cleanup fails, the workflow deletes tunnel tokens but retains the
 non-secret tunnel/DNS identifiers as `cloudflare-cleanup-state.json` in the
-release evidence. Re-run `scripts/cloudflare_ephemeral_tunnels.py cleanup`
-with that state and fresh protected Cloudflare credentials.
+attempt-scoped `r1-distributed-sql-cloudflare-cleanup-<run ID>-<run attempt>`
+artifact for seven days. The Cloudflare cleanup recovery workflow, **Recover
+ephemeral Cloudflare resources**, runs automatically after a failed, cancelled,
+or timed-out release. An operator can also dispatch it from `main` with the
+source run ID and, when needed, its run attempt. The recovery validates the
+source run and re-discovers only resources in that exact attempt namespace;
+identifiers from the artifact never select resources for deletion.
+Release-environment approval rules can delay cleanup, so operators must confirm
+that the recovery run completes.
 
 ## First Package Publication
 
