@@ -39,6 +39,11 @@ def go_purl(module: str, version: str) -> str:
   return f"pkg:golang/{module}@{quote(version, safe='.-_~')}"
 
 
+SOURCE_ROOT_MODULE = "github.com/cockroachdb/cockroach"
+SOURCE_ROOT_PURL = f"pkg:golang/{SOURCE_ROOT_MODULE}"
+SOURCE_ROOT_LOCATION = "/engine/go.mod"
+
+
 def spdx_package(identifier: str, name: str, version: str, purl: str, location: str = "") -> dict:
   package = {
     "SPDXID": identifier,
@@ -95,6 +100,21 @@ def source_fixture(format_name: str) -> dict:
       "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-source-root",
     })
+    source_module = spdx_package(
+      "SPDXRef-source-module",
+      SOURCE_ROOT_MODULE,
+      "UNKNOWN",
+      SOURCE_ROOT_PURL,
+    )
+    source_module["sourceInfo"] = (
+      f"acquired package info from go module information: {SOURCE_ROOT_LOCATION}"
+    )
+    document["packages"].append(source_module)
+    document["relationships"].append({
+      "spdxElementId": "SPDXRef-source-root",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": source_module["SPDXID"],
+    })
     for index, (name, version) in enumerate(modules):
       identifier = f"SPDXRef-vendor-{index}"
       document["packages"].append(
@@ -107,8 +127,19 @@ def source_fixture(format_name: str) -> dict:
       })
     return document
 
-  components = []
-  module_refs = []
+  source_module_ref = f"{SOURCE_ROOT_PURL}?package-id=source-root-module"
+  components = [{
+    "type": "library",
+    "bom-ref": source_module_ref,
+    "name": SOURCE_ROOT_MODULE,
+    "version": "UNKNOWN",
+    "purl": SOURCE_ROOT_PURL,
+    "properties": [
+      {"name": "syft:package:foundBy", "value": "go-module-file-cataloger"},
+      {"name": "syft:location:0:path", "value": SOURCE_ROOT_LOCATION},
+    ],
+  }]
+  module_refs = [source_module_ref]
   for index, (name, version) in enumerate(modules):
     purl = go_purl(name, version)
     reference = f"{purl}?package-id={index:016x}"
@@ -307,6 +338,10 @@ class SbomContractTests(unittest.TestCase):
 
         if format_name == "spdx":
           module = next(item for item in complete["packages"] if item.get("SPDXID") == "SPDXRef-vendor-0")
+          source_module = next(
+            item for item in complete["packages"]
+            if any(ref.get("referenceLocator") == SOURCE_ROOT_PURL for ref in item.get("externalRefs", []))
+          )
           source_file = next(item for item in complete["files"] if item.get("fileName", "").startswith("engine/"))
           application = next(
             item for item in complete["packages"]
@@ -328,8 +363,38 @@ class SbomContractTests(unittest.TestCase):
           duplicate_module = copy.deepcopy(module)
           duplicate_module["SPDXID"] = "SPDXRef-vendor-duplicate"
           duplicate["packages"].append(duplicate_module)
+          wrong_root_identity = copy.deepcopy(complete)
+          next(
+            item for item in wrong_root_identity["packages"]
+            if item.get("SPDXID") == source_module["SPDXID"]
+          )["name"] = "example.com/impostor"
+          wrong_root_location = copy.deepcopy(complete)
+          next(
+            item for item in wrong_root_location["packages"]
+            if item.get("SPDXID") == source_module["SPDXID"]
+          )["sourceInfo"] = "acquired package info from go module information: /other/go.mod"
+          unexpected_module = copy.deepcopy(complete)
+          extra = spdx_package(
+            "SPDXRef-unexpected-module",
+            "example.com/unexpected",
+            "v1.0.0",
+            go_purl("example.com/unexpected", "v1.0.0"),
+            "/engine/vendor/example.com/unexpected",
+          )
+          unexpected_module["packages"].append(extra)
+          unexpected_module["relationships"].append({
+            "spdxElementId": application["SPDXID"],
+            "relationshipType": "DEPENDS_ON",
+            "relatedSpdxElement": extra["SPDXID"],
+          })
         else:
-          module = next(item for item in complete["components"] if item.get("purl", "").startswith("pkg:golang/"))
+          module = next(
+            item for item in complete["components"]
+            if item.get("purl", "").startswith("pkg:golang/") and "@" in item["purl"]
+          )
+          source_module = next(
+            item for item in complete["components"] if item.get("purl") == SOURCE_ROOT_PURL
+          )
           source_file = next(
             item for item in complete["components"]
             if any(prop.get("name") == "io.ratio1.source.path" for prop in item.get("properties", []))
@@ -351,6 +416,36 @@ class SbomContractTests(unittest.TestCase):
           duplicate_module = copy.deepcopy(module)
           duplicate_module["bom-ref"] += "&duplicate=true"
           duplicate["components"].append(duplicate_module)
+          wrong_root_identity = copy.deepcopy(complete)
+          next(
+            item for item in wrong_root_identity["components"]
+            if item.get("bom-ref") == source_module["bom-ref"]
+          )["name"] = "example.com/impostor"
+          wrong_root_location = copy.deepcopy(complete)
+          root = next(
+            item for item in wrong_root_location["components"]
+            if item.get("bom-ref") == source_module["bom-ref"]
+          )
+          next(
+            item for item in root["properties"] if item.get("name") == "syft:location:0:path"
+          )["value"] = "/other/go.mod"
+          unexpected_module = copy.deepcopy(complete)
+          extra_purl = go_purl("example.com/unexpected", "v1.0.0")
+          extra_ref = f"{extra_purl}?package-id=unexpected"
+          unexpected_module["components"].append({
+            "type": "library",
+            "bom-ref": extra_ref,
+            "name": "example.com/unexpected",
+            "version": "v1.0.0",
+            "purl": extra_purl,
+            "properties": [
+              {"name": "syft:location:0:path", "value": "/engine/vendor/example.com/unexpected"},
+            ],
+          })
+          next(
+            item for item in unexpected_module["dependencies"]
+            if item.get("ref") == application["bom-ref"]
+          )["dependsOn"].append(extra_ref)
 
         mutations = {
           "missing-module": missing_module,
@@ -358,6 +453,9 @@ class SbomContractTests(unittest.TestCase):
           "wrong-hash": wrong_hash,
           "wrong-identity": wrong_identity,
           "duplicate": duplicate,
+          "wrong-root-identity": wrong_root_identity,
+          "wrong-root-location": wrong_root_location,
+          "unexpected-module": unexpected_module,
         }
         for name, document in mutations.items():
           with self.subTest(format=format_name, mutation=name):

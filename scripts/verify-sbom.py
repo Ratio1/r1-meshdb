@@ -22,6 +22,10 @@ APPLICATION_SUPPLIER = "Organization: Ratio1"
 APPLICATION_SOURCE = "https://github.com/Ratio1/r1-distributed-sql"
 EXPECTED_LICENSE_FILE_COUNT = 11_948
 EXPECTED_VENDOR_MODULE_COUNT = 211
+SOURCE_ROOT_MODULE_NAME = "github.com/cockroachdb/cockroach"
+SOURCE_ROOT_MODULE_PURL = f"pkg:golang/{SOURCE_ROOT_MODULE_NAME}"
+SOURCE_ROOT_MODULE_VERSION = "UNKNOWN"
+SOURCE_ROOT_MODULE_LOCATION = "/engine/go.mod"
 RUNTIME_BINARY_PATHS = ("/cockroach/cockroach", "/usr/local/bin/cloudflared")
 
 
@@ -385,6 +389,30 @@ def verify_source_modules(view: dict, format_name: str) -> None:
     for purl, records in view["by_purl"].items()
     if purl.startswith("pkg:golang/")
   }
+  source_root = found.pop(SOURCE_ROOT_MODULE_PURL, [])
+  if len(source_root) != 1:
+    fail(f"{format_name} source root Go module is missing or duplicated")
+  root = source_root[0]
+  actual_version = root.get("versionInfo") if format_name == "SPDX" else root.get("version")
+  if root.get("name") != SOURCE_ROOT_MODULE_NAME or actual_version != SOURCE_ROOT_MODULE_VERSION:
+    fail(f"{format_name} source root Go module identity differs")
+  # Syft's inferred package license/CPE fields are observational. The exact
+  # source-file license inventory and pinned provenance remain authoritative.
+  if format_name == "SPDX":
+    expected_source_info = (
+      f"acquired package info from go module information: {SOURCE_ROOT_MODULE_LOCATION}"
+    )
+    location_matches = root.get("sourceInfo") == expected_source_info
+    identifier = root.get("SPDXID")
+  else:
+    location_matches = root.get("type") == "library" and cdx_locations(root) == (
+      SOURCE_ROOT_MODULE_LOCATION,
+    )
+    identifier = root.get("bom-ref")
+  if not location_matches:
+    fail(f"{format_name} source root Go module location differs")
+  if identifier not in view["outgoing"][view["application_id"]]:
+    fail(f"{format_name} source root Go module is disconnected from the application")
   if set(found) != set(expected):
     missing = sorted(set(expected) - set(found))
     extra = sorted(set(found) - set(expected))
@@ -505,7 +533,7 @@ def main() -> None:
       verify_source_cyclonedx(view)
     print(
       f"verified {format_name} source SBOM: {EXPECTED_VENDOR_MODULE_COUNT} vendored Go modules, "
-      f"{EXPECTED_LICENSE_FILE_COUNT} licensed files"
+      f"1 source root Go module, {EXPECTED_LICENSE_FILE_COUNT} licensed files"
     )
 
 
