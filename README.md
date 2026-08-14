@@ -1,8 +1,9 @@
 # R1 Distributed SQL
 
-R1 Distributed SQL is an independently maintained Ratio1 distribution of the
-CockroachDB v23.1.28 open-source core. It packages the OSS database engine with
-the runtime entrypoint used by the Ratio1 Deeploy service.
+R1 Distributed SQL is an independently maintained Ratio1 distribution of a
+source-derived OSS runtime closure from CockroachDB v23.1.28. It packages the
+OSS database engine with the runtime entrypoint used by the Ratio1 Deeploy
+service.
 
 This project is not affiliated with or endorsed by Cockroach Labs. CockroachDB
 is a trademark of Cockroach Labs, Inc. The original engine source and its
@@ -59,7 +60,7 @@ docker run --rm --entrypoint /cockroach/cockroach \
 Run source and release-contract checks with:
 
 ```bash
-python3 -m unittest tests.test_release_contract
+python3 -m unittest tests.test_release_contract tests.test_sbom_contract
 python3 scripts/verify-source-boundary.py --worktree-only
 python3 scripts/generate-license-inventory.py --check
 python3 scripts/verify-provenance.py
@@ -97,5 +98,6 @@ version as indefinitely supported.
 
 Ratio1-authored files and upstream engine files whose change license has taken
 effect are distributed under Apache License 2.0. Included third-party
-components retain their own licenses. See [LICENSE](LICENSE), [NOTICE](NOTICE),
+components retain their own licenses. See
+[LICENSE-OVERVIEW.md](LICENSE-OVERVIEW.md), [LICENSE](LICENSE), [NOTICE](NOTICE),
 and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -33,6 +33,10 @@ the immutable legacy service image, plus a three-node test using the unchanged
 candidate image and three ephemeral real Cloudflare tunnels. Cleanup is
 fail-closed: release promotion stops if any DNS record or tunnel cannot be
 removed.
+An untagged candidate digest is not a release and must not be used by consumers.
+Only a published immutable digest that passes `scripts/verify-image.sh` is an
+approved release artifact. Failed candidate digests may remain addressable in
+GHCR, but they receive no version tag, source release, or `latest` tag.
 If remote cleanup fails, the workflow deletes tunnel tokens but retains the
 non-secret tunnel/DNS identifiers as `cloudflare-cleanup-state.json` in the
 attempt-scoped `r1-distributed-sql-cloudflare-cleanup-<run ID>-<run attempt>`

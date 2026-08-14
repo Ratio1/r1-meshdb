@@ -20,6 +20,10 @@ APPLICATION_NAME = "R1 Distributed SQL"
 APPLICATION_PURL = "pkg:generic/r1-distributed-sql"
 APPLICATION_SUPPLIER = "Organization: Ratio1"
 APPLICATION_SOURCE = "https://github.com/Ratio1/r1-distributed-sql"
+DISTRIBUTION_THIRD_PARTY_LICENSE_ID = "LicenseRef-R1-Distributed-SQL-Third-Party"
+DISTRIBUTION_LICENSE_EXPRESSION = (
+  f"Apache-2.0 AND {DISTRIBUTION_THIRD_PARTY_LICENSE_ID}"
+)
 EXPECTED_LICENSE_FILE_COUNT = 11_948
 EXPECTED_VENDOR_MODULE_COUNT = 211
 SOURCE_ROOT_MODULE_NAME = "github.com/cockroachdb/cockroach"
@@ -209,9 +213,26 @@ def verify_spdx(document: dict) -> dict:
     application.get("name") != APPLICATION_NAME
     or application.get("supplier") != APPLICATION_SUPPLIER
     or application.get("downloadLocation") != APPLICATION_SOURCE
-    or application.get("licenseDeclared") != "Apache-2.0"
+    or application.get("licenseConcluded") != DISTRIBUTION_LICENSE_EXPRESSION
+    or application.get("licenseDeclared") != DISTRIBUTION_LICENSE_EXPRESSION
   ):
     fail("SPDX application identity differs from the release contract")
+  license_infos = document.get("hasExtractedLicensingInfos", [])
+  definitions = [
+    item for item in license_infos
+    if item.get("licenseId") == DISTRIBUTION_THIRD_PARTY_LICENSE_ID
+  ] if isinstance(license_infos, list) else []
+  if len(definitions) != 1:
+    fail("SPDX distribution third-party license reference is missing or duplicated")
+  definition = definitions[0]
+  if (
+    "third-party" not in definition.get("extractedText", "").lower()
+    or not any(
+      value.endswith("/THIRD_PARTY_NOTICES.md")
+      for value in definition.get("seeAlsos", [])
+    )
+  ):
+    fail("SPDX distribution third-party license reference is incomplete")
   if application["SPDXID"] not in outgoing[document["SPDXID"]]:
     fail("SPDX application identity is disconnected from the document")
 
@@ -285,7 +306,7 @@ def verify_cyclonedx(document: dict) -> dict:
     application.get("type") != "application"
     or application.get("name") != APPLICATION_NAME
     or suppliers.get("name") != "Ratio1"
-    or "Apache-2.0" not in licenses
+    or licenses != {DISTRIBUTION_LICENSE_EXPRESSION}
     or APPLICATION_SOURCE not in source_references
   ):
     fail("CycloneDX application identity differs from the release contract")

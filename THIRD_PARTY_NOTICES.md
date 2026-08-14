@@ -33,6 +33,10 @@ text itself is also not used as a license for any distributed component.
 | libedit | BSD-3-Clause; `engine/c-deps/libedit/COPYING` |
 | PROJ | MIT; `engine/c-deps/proj/COPYING` |
 
+GEOS is built and shipped as replaceable shared libraries loaded at runtime.
+Its exact corresponding source is retained under `engine/c-deps/geos/` in each
+public source tag, and the LGPL-2.1-only terms continue to apply to GEOS.
+
 GEOS carries the MIT-licensed Artistic Style helper under
 `engine/c-deps/geos/tools/astyle/`; its separate text is retained at
 `engine/c-deps/geos/tools/astyle/LICENSE.md`. It is source/build tooling and is
@@ -70,15 +74,17 @@ The top-level Cloudflared license is retained at
 embedded Go module graph and `source/cloudflared-compiled-packages.txt` records
 the 603-package compile closure. `source/cloudflared-license-inventory.csv`
 maps every compiled component to a non-empty SPDX conclusion and immutable
-source URL. All 95 LICENSE, COPYING, NOTICE, and PATENTS files from the exact
-vendored source are retained under `licenses/cloudflared/dependencies/` and
-embedded in the runtime image.
+source URL. All 95 notice files named LICENSE, COPYING, NOTICE, or PATENTS from
+the exact vendored source are retained under
+`licenses/cloudflared/dependencies/` and embedded in the runtime image.
 
 Cloudflare's vendor snapshot omits the lowercase MIT license file for compiled
 module `github.com/facebookgo/grace`. Ratio1 separately retains that exact file
-at `licenses/cloudflared/dependencies/github.com/facebookgo/grace/license`;
-its source commit and hash are enforced by the compliance verifier. Replacement
-modules `github.com/chungthuang/quic-go` and `github.com/ipostelnik/cli/v2` are
+as one additional MIT license at
+`licenses/cloudflared/dependencies/github.com/facebookgo/grace/license`, making
+96 retained dependency notice/license files in total. Its source commit and
+hash are enforced by the compliance verifier. Replacement modules
+`github.com/chungthuang/quic-go` and `github.com/ipostelnik/cli/v2` are
 represented explicitly in the inventory rather than only by their original
 import paths.
 

@@ -279,6 +279,61 @@ def remove_reference(document: dict, reference: str) -> None:
 
 class SbomContractTests(unittest.TestCase):
 
+  def test_spdx_defines_distribution_third_party_license_reference(self):
+    expected_id = "LicenseRef-R1-Distributed-SQL-Third-Party"
+    with tempfile.TemporaryDirectory() as directory:
+      engine = Path(directory) / "cockroach.buildinfo.txt"
+      cloud = Path(directory) / "cloudflared.buildinfo.txt"
+      engine.write_text(
+        "\tdep\texample.com/engine\tv1.2.3\n\tdep\texample.com/shared\tv1.0.0\n",
+        encoding="utf-8",
+      )
+      cloud.write_text(
+        "\tdep\texample.com/cloud\tv2.3.4\n\tdep\texample.com/shared\tv1.0.0\n",
+        encoding="utf-8",
+      )
+      verify_args = [
+        "--require-runtime", "--go-buildinfo", str(engine), "--go-buildinfo", str(cloud),
+      ]
+      path = Path(directory) / "runtime.spdx.json"
+      path.write_text(json.dumps(runtime_fixture("spdx")), encoding="utf-8")
+      run_script("scripts/augment-sbom.py", str(path))
+      document = json.loads(path.read_text(encoding="utf-8"))
+
+      definitions = [
+        item for item in document.get("hasExtractedLicensingInfos", [])
+        if item.get("licenseId") == expected_id
+      ]
+      self.assertEqual(len(definitions), 1)
+      self.assertIn("third-party", definitions[0].get("extractedText", "").lower())
+      self.assertTrue(any(
+        value.endswith("/THIRD_PARTY_NOTICES.md")
+        for value in definitions[0].get("seeAlsos", [])
+      ))
+
+      application = next(
+        item for item in document["packages"]
+        if any(
+          ref.get("referenceLocator") == "pkg:generic/r1-distributed-sql"
+          for ref in item.get("externalRefs", [])
+        )
+      )
+      expected_expression = f"Apache-2.0 AND {expected_id}"
+      self.assertEqual(application.get("licenseDeclared"), expected_expression)
+      self.assertEqual(application.get("licenseConcluded"), expected_expression)
+
+      result = run_script("scripts/verify-sbom.py", *verify_args, str(path), check=False)
+      self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+      missing = copy.deepcopy(document)
+      missing["hasExtractedLicensingInfos"] = []
+      self.assert_rejected(missing, path, verify_args)
+      apache_only = copy.deepcopy(document)
+      next(
+        item for item in apache_only["packages"]
+        if item.get("SPDXID") == application["SPDXID"]
+      )["licenseDeclared"] = "Apache-2.0"
+      self.assert_rejected(apache_only, path, verify_args)
+
   def assert_rejected(self, document: dict, path: Path, verify_args: list[str] | None = None) -> None:
     path.write_text(json.dumps(document), encoding="utf-8")
     result = run_script(

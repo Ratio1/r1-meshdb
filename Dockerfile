@@ -103,7 +103,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH}" \
   scripts/build-engine.sh \
   && mkdir -p /out/licenses/cloudflared /out/licenses/engine /out/licenses/security /out/licenses/source \
-  && cp LICENSE NOTICE THIRD_PARTY_NOTICES.md UPSTREAM.md RATIO1_PATCHES.md SECURITY.md /out/licenses/ \
+  && cp LICENSE LICENSE-OVERVIEW.md NOTICE THIRD_PARTY_NOTICES.md UPSTREAM.md RATIO1_PATCHES.md SECURITY.md /out/licenses/ \
   && cp security/openvex.json /out/licenses/security/ \
   && cp source/provenance.json source/license-inventory.json \
        source/cloudflared-buildinfo.txt source/cloudflared-license-inventory.csv \
@@ -152,7 +152,7 @@ LABEL org.opencontainers.image.title="R1 Distributed SQL" \
       org.opencontainers.image.url="https://github.com/Ratio1/r1-distributed-sql" \
       org.opencontainers.image.source="https://github.com/Ratio1/r1-distributed-sql" \
       org.opencontainers.image.documentation="https://github.com/Ratio1/r1-distributed-sql/blob/main/README.md" \
-      org.opencontainers.image.licenses="Apache-2.0 AND LicenseRef-ThirdParty" \
+      org.opencontainers.image.licenses="Apache-2.0 AND LicenseRef-R1-Distributed-SQL-Third-Party" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${RATIO1_REVISION}" \
       org.opencontainers.image.version="${RATIO1_VERSION}" \

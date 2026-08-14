@@ -60,6 +60,7 @@ func value() string {
   def test_required_compliance_and_provenance_files_exist(self):
     required = (
       "LICENSE",
+      "LICENSE-OVERVIEW.md",
       ".gitattributes",
       "NOTICE",
       "THIRD_PARTY_NOTICES.md",
@@ -127,6 +128,50 @@ func value() string {
     license_text = read("LICENSE")
     self.assertIn("Apache License", license_text)
     self.assertIn("Version 2.0", license_text)
+
+  def test_public_mixed_license_and_candidate_status_are_explicit(self):
+    overview = read("LICENSE-OVERVIEW.md")
+    self.assertIn("mixed-license distribution", overview)
+    self.assertIn("THIRD_PARTY_NOTICES.md", overview)
+    self.assertIn("source/license-inventory.json", overview)
+    self.assertIn("companion SPDX SBOM", overview)
+
+    readme = read("README.md")
+    self.assertIn(
+      "source-derived OSS runtime closure from CockroachDB v23.1.28",
+      readme,
+    )
+    self.assertNotIn("CockroachDB v23.1.28 open-source core", readme)
+    self.assertIn("LICENSE-OVERVIEW.md", readme)
+    self.assertIn(
+      "python3 -m unittest tests.test_release_contract tests.test_sbom_contract",
+      readme,
+    )
+
+    notices = read("THIRD_PARTY_NOTICES.md")
+    self.assertIn("replaceable shared libraries", notices)
+    self.assertIn("engine/c-deps/geos", notices)
+    self.assertIn("95 notice files", notices)
+    self.assertIn("one additional MIT license", notices)
+
+    release = read("RELEASE.md")
+    self.assertIn("An untagged candidate digest is not a release", release)
+    self.assertIn("verify-image.sh", release)
+    workflow = read(".github/workflows/release.yml")
+    self.assertGreaterEqual(workflow.count("LICENSE-OVERVIEW.md"), 3)
+    self.assertIn(
+      "LicenseRef-R1-Distributed-SQL-Third-Party",
+      read("scripts/verify-image.sh"),
+    )
+
+  def test_oci_license_label_uses_specific_distribution_reference(self):
+    dockerfile = read("Dockerfile")
+    self.assertIn(
+      'org.opencontainers.image.licenses="Apache-2.0 AND '
+      'LicenseRef-R1-Distributed-SQL-Third-Party"',
+      dockerfile,
+    )
+    self.assertNotIn("LicenseRef-ThirdParty", dockerfile)
 
   def test_git_does_not_normalize_manifested_source_bytes(self):
     self.assertIn("* -text", read(".gitattributes"))
@@ -410,6 +455,11 @@ func value() string {
     workflows = list((ROOT / ".github/workflows").glob("*.yml"))
     self.assertTrue(workflows)
     workflow_text = "\n".join(path.read_text(encoding="utf-8") for path in workflows)
+    for workflow in (".github/workflows/ci.yml", ".github/workflows/release.yml"):
+      self.assertIn(
+        "python3 -m unittest tests.test_release_contract tests.test_sbom_contract",
+        read(workflow),
+      )
     self.assertIn("./cockroach version | grep -F 'Distribution:     OSS'", workflow_text)
     self.assertIn("spdx-json", workflow_text)
     self.assertIn("cyclonedx-json", workflow_text)

@@ -121,6 +121,9 @@ import sys
 
 labels = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 expected = {
+  "org.opencontainers.image.licenses": (
+    "Apache-2.0 AND LicenseRef-R1-Distributed-SQL-Third-Party"
+  ),
   "org.opencontainers.image.source": "https://github.com/Ratio1/r1-distributed-sql",
   "org.opencontainers.image.version": sys.argv[2],
   "org.opencontainers.image.revision": sys.argv[3],

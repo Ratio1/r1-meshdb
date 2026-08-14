@@ -48,7 +48,7 @@ jobs:
           python3 scripts/verify-public-test-fixtures.py
           python3 scripts/verify-security-vex.py
           python3 scripts/generate-source-manifest.py --check
-          python3 -m unittest tests.test_release_contract
+          python3 -m unittest tests.test_release_contract tests.test_sbom_contract
           bash -n entrypoint.sh scripts/*.sh testbed/*.sh
 
       - name: Prepare pristine source snapshot and evidence directory
@@ -418,6 +418,8 @@ jobs:
             artifacts/real-cloudflare/node-*.log
             artifacts/rolling-upgrade/
             image-reference.txt
+            LICENSE
+            LICENSE-OVERVIEW.md
             NOTICE
             RATIO1_PATCHES.md
             THIRD_PARTY_NOTICES.md
@@ -509,7 +511,8 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           gh release create "$RELEASE_TAG" \
-            artifacts/*.json artifacts/*.txt image-reference.txt NOTICE RATIO1_PATCHES.md \
+            artifacts/*.json artifacts/*.txt image-reference.txt LICENSE LICENSE-OVERVIEW.md \
+            NOTICE RATIO1_PATCHES.md \
             THIRD_PARTY_NOTICES.md UPSTREAM.md source/license-inventory.json \
             source/manifest.sha256 source/provenance.json SECURITY.md \
             source/runtime-packages.txt security/openvex.json \
@@ -530,6 +533,8 @@ jobs:
             artifacts/*.json
             artifacts/*.txt
             image-reference.txt
+            LICENSE
+            LICENSE-OVERVIEW.md
             NOTICE
             RATIO1_PATCHES.md
             THIRD_PARTY_NOTICES.md

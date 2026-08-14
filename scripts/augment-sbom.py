@@ -20,6 +20,24 @@ LICENSE_INVENTORY = ROOT / "source/license-inventory.json"
 APPLICATION_NAME = "R1 Distributed SQL"
 APPLICATION_PURL = "pkg:generic/r1-distributed-sql"
 APPLICATION_SOURCE = "https://github.com/Ratio1/r1-distributed-sql"
+DISTRIBUTION_THIRD_PARTY_LICENSE_ID = "LicenseRef-R1-Distributed-SQL-Third-Party"
+DISTRIBUTION_LICENSE_EXPRESSION = (
+  f"Apache-2.0 AND {DISTRIBUTION_THIRD_PARTY_LICENSE_ID}"
+)
+DISTRIBUTION_THIRD_PARTY_LICENSE_INFO = {
+  "licenseId": DISTRIBUTION_THIRD_PARTY_LICENSE_ID,
+  "name": "R1 Distributed SQL third-party license set",
+  "extractedText": (
+    "This reference identifies the third-party licenses that apply to software "
+    "included in the R1 Distributed SQL source and image. It does not replace "
+    "or modify those licenses. Exact component-level SPDX conclusions and full "
+    "license texts are recorded in this SBOM, THIRD_PARTY_NOTICES.md, the source "
+    "license inventory, and the license files shipped with the distribution."
+  ),
+  "seeAlsos": [
+    "https://github.com/Ratio1/r1-distributed-sql/blob/main/THIRD_PARTY_NOTICES.md",
+  ],
+}
 RUNTIME_BINARY_PATHS = ("/cockroach/cockroach", "/usr/local/bin/cloudflared")
 
 
@@ -74,6 +92,16 @@ def augment_spdx(document: dict, components: list[dict]) -> None:
   files = document.setdefault("files", [])
   relationships = document.setdefault("relationships", [])
   document_id = document.get("SPDXID", "SPDXRef-DOCUMENT")
+  license_infos = document.setdefault("hasExtractedLicensingInfos", [])
+  matches = [
+    item for item in license_infos
+    if item.get("licenseId") == DISTRIBUTION_THIRD_PARTY_LICENSE_ID
+  ]
+  if len(matches) > 1 or (matches and matches[0] != DISTRIBUTION_THIRD_PARTY_LICENSE_INFO):
+    raise SystemExit("SPDX distribution third-party license reference conflicts")
+  if not matches:
+    license_infos.append(dict(DISTRIBUTION_THIRD_PARTY_LICENSE_INFO))
+  license_infos.sort(key=lambda item: item.get("licenseId", ""))
 
   by_purl: dict[str, list[dict]] = defaultdict(list)
   for package in packages:
@@ -93,8 +121,8 @@ def augment_spdx(document: dict, components: list[dict]) -> None:
       "supplier": "Organization: Ratio1",
       "downloadLocation": APPLICATION_SOURCE,
       "filesAnalyzed": False,
-      "licenseConcluded": "Apache-2.0",
-      "licenseDeclared": "Apache-2.0",
+      "licenseConcluded": DISTRIBUTION_LICENSE_EXPRESSION,
+      "licenseDeclared": DISTRIBUTION_LICENSE_EXPRESSION,
       "copyrightText": "Copyright 2026 Ratio1",
       "externalRefs": [{
         "referenceCategory": "PACKAGE-MANAGER",
@@ -105,6 +133,8 @@ def augment_spdx(document: dict, components: list[dict]) -> None:
     }
     packages.append(application)
     by_purl[APPLICATION_PURL].append(application)
+  application["licenseConcluded"] = DISTRIBUTION_LICENSE_EXPRESSION
+  application["licenseDeclared"] = DISTRIBUTION_LICENSE_EXPRESSION
   application_id = application["SPDXID"]
   add_spdx_relationship(relationships, document_id, "DESCRIBES", application_id)
 
@@ -278,11 +308,12 @@ def augment_cyclonedx(document: dict, components: list[dict]) -> None:
       "name": APPLICATION_NAME,
       "purl": APPLICATION_PURL,
       "supplier": {"name": "Ratio1"},
-      "licenses": [{"license": {"id": "Apache-2.0"}}],
+      "licenses": [{"expression": DISTRIBUTION_LICENSE_EXPRESSION}],
       "externalReferences": [{"type": "vcs", "url": APPLICATION_SOURCE}],
     }
     output_components.append(application)
     by_purl[APPLICATION_PURL].append(application)
+  application["licenses"] = [{"expression": DISTRIBUTION_LICENSE_EXPRESSION}]
   application_ref = application["bom-ref"]
   application_dependency = dependencies_by_ref.setdefault(
     application_ref, {"ref": application_ref, "dependsOn": []}
