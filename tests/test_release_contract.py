@@ -142,7 +142,7 @@ func value() string {
     self.assertEqual(provenance["upstream"]["changeDate"], "2026-04-01")
     self.assertEqual(
       provenance["buildInputs"]["goBuilder"],
-      "golang:1.26.5-bookworm@sha256:0d327c83532d3cdeeeebab56ce85962bf09cb89545355b10207c7771b0c3713f",
+      "golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36",
     )
     dependencies = {item["name"]: item for item in provenance["nativeDependencies"]}
     self.assertEqual(set(dependencies), {"geos", "jemalloc", "libedit", "proj"})
@@ -157,7 +157,7 @@ func value() string {
     )
     self.assertEqual(
       cloudflared["binarySha256"],
-      "ab478b502bc27dc33180df190483ba84f941e18266d0ae382e85c49fc19ede29",
+      "77d66f9223e8ec418ef31613ee861e2e9067f6b2544ec93d185a2e468fcb2e47",
     )
     self.assertEqual(
       provenance["buildInputs"]["releaseTooling"],
@@ -222,7 +222,7 @@ func value() string {
     self.assertTrue((ROOT / "licenses/cloudflared/dependencies/gopkg.in/yaml.v2/LICENSE.libyaml").is_file())
     build_info = read("source/cloudflared-buildinfo.txt")
     self.assertIn("github.com/cloudflare/cloudflared/cmd/cloudflared", build_info)
-    self.assertIn("/cloudflared: go1.26.5", build_info)
+    self.assertIn("/cloudflared: go1.26.6", build_info)
     self.assertIn("google.golang.org/grpc\tv1.83.0", build_info)
     self.assertNotIn("vcs.modified=true", build_info)
     self.assertEqual(len(read("source/cloudflared-compiled-packages.txt").splitlines()), 603)
@@ -374,7 +374,7 @@ func value() string {
     self.assertIn("github.com/jackc/pgx/v4/internal/sanitize", dockerfile)
     self.assertIn("./pkg/util/ctxutil", dockerfile)
     self.assertIn("./pkg/util/goschedstats", dockerfile)
-    self.assertIn("ab478b502bc27dc33180df190483ba84f941e18266d0ae382e85c49fc19ede29", dockerfile)
+    self.assertIn("77d66f9223e8ec418ef31613ee861e2e9067f6b2544ec93d185a2e468fcb2e47", dockerfile)
     self.assertIn("ADD --checksum=sha256:e897f2cdb6f63964bb7b5841df80087489a65ab9fda356ef48dd13202bba59c0", dockerfile)
     self.assertNotRegex(lowered, r"from\s+cloudflare/cloudflared")
     self.assertIn("scripts/verify-cloudflared-source.py", dockerfile)

@@ -1,4 +1,4 @@
-/cloudflared: go1.26.5
+/cloudflared: go1.26.6
 	path	github.com/cloudflare/cloudflared/cmd/cloudflared
 	mod	github.com/cloudflare/cloudflared	(devel)	
 	dep	github.com/BurntSushi/toml	v1.2.0	

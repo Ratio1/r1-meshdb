@@ -81,7 +81,7 @@
     "runtimePackages": "source/runtime-packages.txt"
   },
   "buildInputs": {
-    "goBuilder": "golang:1.26.5-bookworm@sha256:0d327c83532d3cdeeeebab56ce85962bf09cb89545355b10207c7771b0c3713f",
+    "goBuilder": "golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36",
     "runtime": "debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241",
     "releaseTooling": {
       "buildx": "v0.36.1",
@@ -108,7 +108,7 @@
       "sourceArchiveSha256": "e897f2cdb6f63964bb7b5841df80087489a65ab9fda356ef48dd13202bba59c0",
       "sourceDateEpoch": 1786553853,
       "version": "2026.7.3-r1.b4f47e2",
-      "binarySha256": "ab478b502bc27dc33180df190483ba84f941e18266d0ae382e85c49fc19ede29",
+      "binarySha256": "77d66f9223e8ec418ef31613ee861e2e9067f6b2544ec93d185a2e468fcb2e47",
       "goModSha256": "00e9b735fef2b05a1830734f12987ff6ea653958909bc59417af5a22daaf2b9d",
       "goSumSha256": "cbc8ab59b002a5efc843e2c8470cc9b7ee717f1b24a9049f6acfad65e232da85",
       "vendorModulesSha256": "1f1cdee78c7b5e841d10a5f8b9c73537c12dcc4f5026638ed62d569347c9553c",

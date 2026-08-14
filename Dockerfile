@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 
-FROM golang:1.26.5-bookworm@sha256:0d327c83532d3cdeeeebab56ce85962bf09cb89545355b10207c7771b0c3713f AS cloudflared-builder
+FROM golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 AS cloudflared-builder
 
 ARG CLOUDFLARED_COMMIT=b4f47e2ab538ab6e31d3dc6adc5489455ad446de
 ARG CLOUDFLARED_VERSION=2026.7.3-r1.b4f47e2
@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     -ldflags="-s -w -X main.Version=${CLOUDFLARED_VERSION} -X main.BuildTime=2026-08-12-16:57_UTC -X github.com/cloudflare/cloudflared/metrics.Runtime=virtual" \
     -o /out/cloudflared ./cmd/cloudflared \
   && printf '%s  %s\n' \
-      'ab478b502bc27dc33180df190483ba84f941e18266d0ae382e85c49fc19ede29' \
+      '77d66f9223e8ec418ef31613ee861e2e9067f6b2544ec93d185a2e468fcb2e47' \
       '/out/cloudflared' \
     | sha256sum -c -
 
@@ -37,7 +37,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 \
   go build -trimpath -buildvcs=false -ldflags='-s -w' \
     -o /out/r1-atomic-replace /tmp/atomic-replace.go
 
-FROM golang:1.26.5-bookworm@sha256:0d327c83532d3cdeeeebab56ce85962bf09cb89545355b10207c7771b0c3713f AS engine-builder
+FROM golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 AS engine-builder
 
 ARG RATIO1_VERSION=v23.1.28-r1.0.0
 ARG SOURCE_DATE_EPOCH=1727820937

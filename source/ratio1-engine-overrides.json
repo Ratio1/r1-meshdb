@@ -74,7 +74,7 @@
       "goSumSha256": "26b437b7767e83074cb270517dc77c52140b273a775d76aa193fbdbd7d8f9dbb",
       "vendorModulesSha256": "68bcd68d46b3ae82160b70c1e202c86ee404d77434ed079942107caeda3b81bd"
     },
-    "reason": "Refresh the retained OSS runtime dependency closure for the pinned Go 1.26.5 toolchain and published security fixes."
+    "reason": "Refresh the retained OSS runtime dependency closure for the pinned Go 1.26.6 toolchain and published security fixes."
   },
   "dependencyCompatibilityBackports": [
     {

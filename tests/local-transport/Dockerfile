@@ -3,7 +3,7 @@
 
 ARG BASE_IMAGE
 
-FROM golang:1.26.5-bookworm@sha256:0d327c83532d3cdeeeebab56ce85962bf09cb89545355b10207c7771b0c3713f AS tcp-proxy-builder
+FROM golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 AS tcp-proxy-builder
 
 WORKDIR /src
 COPY tests/local-transport/tcp-proxy.go .

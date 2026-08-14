@@ -245,8 +245,8 @@ func main() {
 	}
 	command := exec.Command(goBinary, "version")
 	versionOutput, err := command.Output()
-	if err != nil || !strings.Contains(string(versionOutput), "go1.26.5 ") {
-		fail("vendor verification requires Go 1.26.5, got %q", strings.TrimSpace(string(versionOutput)))
+	if err != nil || !strings.Contains(string(versionOutput), "go1.26.6 ") {
+		fail("vendor verification requires Go 1.26.6, got %q", strings.TrimSpace(string(versionOutput)))
 	}
 	if err := downloadModules(items, goBinary); err != nil {
 		fail("cannot download checksum-verified modules: %v", err)

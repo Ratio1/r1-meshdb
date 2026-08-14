@@ -211,7 +211,7 @@ def verify_binary(build_info: str, binary: Path) -> None:
   if cloudflared.get("binarySha256") != sha256(binary):
     fail("Cloudflared binary hash differs from provenance")
   required = (
-    "/cloudflared: go1.26.5",
+    "/cloudflared: go1.26.6",
     "\tdep\tgoogle.golang.org/grpc\tv1.83.0\t",
     "\tdep\tgolang.org/x/net\tv0.56.0\t",
     "\tdep\tgolang.org/x/text\tv0.40.0\t",

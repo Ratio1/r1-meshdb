@@ -37,7 +37,7 @@ gate to reject enterprise paths and license markers without exceptions.
 
 ### Dependency snapshot and neutral direct build
 
-The retained runtime dependency snapshot is refreshed for the pinned Go 1.26.5
+The retained runtime dependency snapshot is refreshed for the pinned Go 1.26.6
 toolchain. `engine/go.mod`, `engine/go.sum`, and
 `engine/vendor/modules.txt` are hash-pinned in `source/provenance.json` and
 `source/ratio1-engine-overrides.json`; every vendored file remains covered by
@@ -64,7 +64,7 @@ part of the checksum-backed upstream module archive.
 
 `scripts/build-engine.sh` replaces the omitted mixed-tree Make/Bazel entrypoints.
 It builds the four checked-in native dependencies and then compiles only
-`pkg/cmd/cockroach-oss` with Go 1.26.5, `GOPROXY=off`, `-mod=vendor`, a fixed
+`pkg/cmd/cockroach-oss` with Go 1.26.6, `GOPROXY=off`, `-mod=vendor`, a fixed
 source timestamp, and deterministic Ratio1 build metadata. It preserves the
 upstream commit as `Build Commit ID` and requires all of:
 
@@ -92,6 +92,10 @@ non-cancellable contexts.
 
 ### Security backports
 
+- `CVE-2026-39821` and `CVE-2026-46600`: all Go runtime binaries are rebuilt
+  with Go 1.26.6 instead of Go 1.26.5. The patch release supplies the standard
+  library fixes used by the database, Cloudflared, and the atomic replacement
+  helper without changing their source-level behavior.
 - `GO-2026-4518`: `engine/vendor/github.com/jackc/pgproto3/v2/data_row.go`
   rejects negative non-null field lengths. The regression is in
   `data_row_r1_test.go` and covers direct decoding plus a complete frontend

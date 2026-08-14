@@ -59,7 +59,7 @@ The repository retains only files required by the transitive dependency graph
 of `pkg/cmd/cockroach-oss`, plus the four native dependency source trees and
 their applicable license and notice files. `source/runtime-files.txt` records
 the exact Go package, assembly, C/C++, embedded-data, and generated-file closure
-reported by the pinned Go 1.26.5 builder in offline vendor mode. CI recomputes
+reported by the pinned Go 1.26.6 builder in offline vendor mode. CI recomputes
 that closure and fails on either a missing file or an unexpected runtime file.
 The list also includes the nested C source tree consumed through local
 preprocessor includes by the selected `go-libedit/unix` package; `go list`
