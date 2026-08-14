@@ -798,6 +798,22 @@ process_has_exited() {
   [[ "${state}" == "Z" ]]
 }
 
+process_group_has_live_members() {
+  local process_group="$1"
+  local proc stat state member_process_group
+
+  for proc in /proc/[0-9]*; do
+    [[ -r "${proc}/stat" ]] || continue
+    IFS= read -r stat < "${proc}/stat" || continue
+    stat="${stat##*) }"
+    read -r state _ member_process_group _ <<< "${stat}"
+    if [[ "${member_process_group}" == "${process_group}" && "${state}" != "Z" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 collect_process_status() {
   PROCESS_STATUS=0
   wait "$1" || PROCESS_STATUS=$?
@@ -863,22 +879,24 @@ terminate_recovery_handler() {
     kill -TERM "${handler_pid}" >/dev/null 2>&1 || true
   monotonic_millis
   deadline=$((MONOTONIC_MILLIS + 500))
-  while ! process_has_exited "${handler_pid}"; do
+  while process_group_has_live_members "${handler_pid}"; do
     monotonic_millis
     [[ "${MONOTONIC_MILLIS}" -ge "${deadline}" ]] && break
     sleep 0.1
   done
 
-  kill -KILL -- "-${handler_pid}" >/dev/null 2>&1 || \
-    kill -KILL "${handler_pid}" >/dev/null 2>&1 || true
+  if process_group_has_live_members "${handler_pid}"; then
+    kill -KILL -- "-${handler_pid}" >/dev/null 2>&1 || \
+      kill -KILL "${handler_pid}" >/dev/null 2>&1 || true
+  fi
   monotonic_millis
   deadline=$((MONOTONIC_MILLIS + 1000))
-  while ! process_has_exited "${handler_pid}"; do
+  while process_group_has_live_members "${handler_pid}"; do
     monotonic_millis
     [[ "${MONOTONIC_MILLIS}" -ge "${deadline}" ]] && break
     sleep 0.1
   done
-  if process_has_exited "${handler_pid}"; then
+  if ! process_group_has_live_members "${handler_pid}"; then
     wait "${handler_pid}" >/dev/null 2>&1 || true
   else
     log "corrupt-store classifier did not exit after KILL; leaving final teardown to the container runtime"
