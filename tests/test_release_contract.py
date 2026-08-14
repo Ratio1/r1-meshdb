@@ -963,6 +963,18 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
     self.assertIn("array_length(voting_replicas, 1) < 3", testbed)
     self.assertIn("array_length(learner_replicas, 1) > 0", testbed)
     self.assertNotIn("ranges.underreplicated", testbed)
+    self.assertIn("password_cleanup_complete=false", testbed)
+    self.assertIn("password_cleanup_deadline=$((SECONDS + 30))", testbed)
+    self.assertIn("while true; do", testbed)
+    self.assertIn(
+      'if ! password_file="$(find /tmp -xdev -type f -name database-password -print -quit)"; then',
+      testbed,
+    )
+    self.assertIn("database bootstrap password cleanup scan failed", testbed)
+    self.assertIn("database bootstrap password file was not removed after bounded wait", testbed)
+    self.assertIn('if ! certificate_file="$(find /tmp -xdev -type f', testbed)
+    self.assertIn("staged certificate cleanup scan failed", testbed)
+    self.assertIn('if [[ -n "$certificate_file" ]]; then', testbed)
     direct_test = read("scripts/direct-engine-three-node-smoke.sh")
     self.assertIn("--max-offset=500ms", direct_test)
     self.assertIn("generate_series(1, 10000)", direct_test)

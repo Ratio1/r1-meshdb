@@ -143,16 +143,38 @@ for name in "${node1}" "${node2}" "${node3}"; do
         exit 1
       fi
     done
-    if find /tmp -xdev -type f -name database-password | grep -q .; then
-      echo "database bootstrap password file was not removed" >&2
+    password_cleanup_complete=false
+    password_cleanup_deadline=$((SECONDS + 30))
+    while true; do
+      password_file=""
+      if ! password_file="$(find /tmp -xdev -type f -name database-password -print -quit)"; then
+        echo "database bootstrap password cleanup scan failed" >&2
+        exit 1
+      fi
+      if [[ -z "$password_file" ]]; then
+        password_cleanup_complete=true
+        break
+      fi
+      if (( SECONDS >= password_cleanup_deadline )); then
+        break
+      fi
+      sleep 1
+    done
+    if [[ "$password_cleanup_complete" != "true" ]]; then
+      echo "database bootstrap password file was not removed after bounded wait" >&2
       exit 1
     fi
     token_file="$(find /tmp -xdev -type f -name cloudflare-token | head -n 1)"
     [[ -n "$token_file" && "$(stat -c "%u:%a" "$token_file")" == "0:600" ]]
-    if find /tmp -xdev -type f \
+    certificate_file=""
+    if ! certificate_file="$(find /tmp -xdev -type f \
         \( -name ca-crt -o -name node-crt -o -name node-key \
            -o -name client-root-crt -o -name client-root-key \) \
-        -print -quit | grep -q .; then
+        -print -quit)"; then
+      echo "staged certificate cleanup scan failed" >&2
+      exit 1
+    fi
+    if [[ -n "$certificate_file" ]]; then
       echo "staged certificate material was not removed" >&2
       exit 1
     fi
