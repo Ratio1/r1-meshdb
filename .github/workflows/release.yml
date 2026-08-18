@@ -127,7 +127,7 @@ jobs:
       - name: Prove corresponding source is anonymously available
         run: |
           set -euo pipefail
-          public_remote='https://github.com/Ratio1/r1-distributed-sql.git'
+          public_remote='https://github.com/Ratio1/r1-meshdb.git'
           public_sha="$(GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0 \
             git -C "$RUNNER_TEMP" -c credential.helper= -c http.extraHeader= ls-remote \
             "$public_remote" refs/heads/main | awk '{print $1}')"
@@ -139,7 +139,7 @@ jobs:
           archive="$RUNNER_TEMP/r1-meshdb-${GITHUB_SHA}.tar.gz"
           extracted="$RUNNER_TEMP/public-source"
           curl --fail --location --silent --show-error \
-            "https://github.com/Ratio1/r1-distributed-sql/archive/${GITHUB_SHA}.tar.gz" \
+            "https://github.com/Ratio1/r1-meshdb/archive/${GITHUB_SHA}.tar.gz" \
             --output "$archive"
           mkdir "$extracted"
           tar -xzf "$archive" --strip-components=1 -C "$extracted"

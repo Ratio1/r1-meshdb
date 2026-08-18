@@ -134,7 +134,7 @@ reproducible release citation.
   title   = {{R1 MeshDB}},
   version = {1.0.0},
   date    = {2026-08-18},
-  url     = {https://github.com/Ratio1/r1-distributed-sql},
+  url     = {https://github.com/Ratio1/r1-meshdb},
   note    = {Source-derived Ratio1 distribution based on CockroachDB v23.1.28}
 }
 ```

@@ -1,6 +1,6 @@
 {
   "@context": "https://openvex.dev/ns/v0.2.0",
-  "@id": "https://github.com/Ratio1/r1-distributed-sql/security/vex/2",
+  "@id": "https://github.com/Ratio1/r1-meshdb/security/vex/2",
   "author": "Ratio1",
   "role": "Project Maintainer",
   "timestamp": "2026-08-13T00:00:00Z",

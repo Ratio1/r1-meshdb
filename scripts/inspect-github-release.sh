@@ -32,7 +32,7 @@ trap cleanup EXIT
 
 response="${tmp}/response.json"
 status="$({
-  printf 'url = "https://api.github.com/repos/Ratio1/r1-distributed-sql/releases/tags/%s"\n' "${release_tag}"
+  printf 'url = "https://api.github.com/repos/Ratio1/r1-meshdb/releases/tags/%s"\n' "${release_tag}"
   printf 'header = "Authorization: Bearer %s"\n' "${GH_TOKEN}"
   printf 'header = "Accept: application/vnd.github+json"\n'
   printf 'header = "X-GitHub-Api-Version: 2022-11-28"\n'

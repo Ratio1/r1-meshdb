@@ -385,7 +385,7 @@ def check_source_dependency_baseline(baseline: dict, upstream_root: Path | None)
   baseline_source_path = baseline.get("path", "")
   baseline_artifact = baseline.get("artifact", "")
   baseline_sha256 = baseline.get("vendorModulesSha256", "")
-  if baseline_repository != "https://github.com/Ratio1/r1-distributed-sql.git":
+  if baseline_repository != "https://github.com/Ratio1/r1-meshdb.git":
     fail("source dependency baseline repository is invalid")
   if not re.fullmatch(r"[0-9a-f]{40}", baseline_commit):
     fail("source dependency baseline commit is invalid")

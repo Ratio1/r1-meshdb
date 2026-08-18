@@ -162,9 +162,9 @@ ARG RATIO1_VERSION="v1.0.0"
 
 LABEL org.opencontainers.image.title="R1 MeshDB" \
       org.opencontainers.image.description="Distributed SQL database runtime for Ratio1 edge nodes" \
-      org.opencontainers.image.url="https://github.com/Ratio1/r1-distributed-sql" \
-      org.opencontainers.image.source="https://github.com/Ratio1/r1-distributed-sql" \
-      org.opencontainers.image.documentation="https://github.com/Ratio1/r1-distributed-sql/blob/main/README.md" \
+      org.opencontainers.image.url="https://github.com/Ratio1/r1-meshdb" \
+      org.opencontainers.image.source="https://github.com/Ratio1/r1-meshdb" \
+      org.opencontainers.image.documentation="https://github.com/Ratio1/r1-meshdb/blob/main/README.md" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${RATIO1_REVISION}" \

@@ -434,7 +434,7 @@ root cause, recommend next steps, and improve R1 MeshDB based on your report.
 
 Please submit a crash report by following the instructions here:
 
-    https://github.com/Ratio1/r1-distributed-sql/issues/new/choose
+    https://github.com/Ratio1/r1-meshdb/issues/new/choose
 
 Do not include credentials, private SQL data, or other secrets in reports.
 
