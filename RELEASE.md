@@ -16,17 +16,25 @@ Before the first release, repository administrators must:
 5. Add `CF_ACCOUNT_ID`, `CF_ZONE_ID`, `CF_API_TOKEN`, and `CF_BASE_DOMAIN` as
    protected release-environment secrets. Use a dedicated token restricted to
    Cloudflare Tunnel edit plus DNS edit and zone read for one disposable zone.
-6. Make the source repository public before dispatching a release. It may stay
+6. Make the source repository public before merging a `VERSION` change. It may stay
    private while changes are staged and reviewed, but a public image is not
    published from source that anonymous recipients cannot retrieve. Keep the
    corresponding tagged source public for as long as that image is distributed.
 
-An administrator manually dispatches the workflow from `main` with a version
-matching `v1.0.<patch>`. The workflow requires its source SHA to
-equal `origin/main` and byte-compares that checkout with an anonymously
-downloaded source archive before it publishes even an untagged candidate. It
+Merging a canonical `MAJOR.MINOR.PATCH` change to `VERSION` on `main`
+automatically starts the release workflow and derives the immutable `v<version>`
+tag. The workflow rejects malformed, unchanged, decreasing, or reused versions.
+Manual dispatch has no version input and exists only to resume the current
+`VERSION` after an interrupted run. A push-triggered source SHA must remain an
+ancestor of current `origin/main`; manual recovery must equal current `main`.
+The workflow binds public `main` to `origin/main` and byte-compares the exact
+release SHA with an anonymously downloaded source archive before it publishes even an untagged candidate. It
 creates no Git or OCI release tag until the candidate has passed validation,
 signing, and anonymous digest pull.
+
+The workflow uses one repository-wide concurrency group with its maximum queue,
+so release promotion cannot overlap and pending version releases are retained
+up to GitHub's concurrency-group limit.
 
 The candidate also has to pass a persisted rolling upgrade and rollback against
 the immutable legacy service image, plus a three-node test using the unchanged
@@ -60,8 +68,8 @@ GitHub does not expose a supported API for changing a package's visibility.
 After the source repository is public, a package administrator must open the
 `r1-meshdb` package settings and set **Package visibility** to
 **Public**. The first release run is expected to stop at the anonymous-pull
-gate after creating the package. Change visibility in the GitHub UI and rerun
-the same release tag; no source or OCI version tag has been created at that
+gate after creating the package. Change visibility in the GitHub UI and manually
+dispatch the workflow again from `main`; no source or OCI version tag has been created at that
 point. Later releases need no visibility action.
 
 Do not make the package public while the source repository is private. The
@@ -92,7 +100,7 @@ Consumers verify a release with:
 ```bash
 scripts/verify-image.sh \
   ghcr.io/ratio1/r1-meshdb@sha256:<digest> \
-  v1.0.<patch>
+  v1.0.0
 ```
 
 Do not move an existing version tag. Publish a new patch tag and document

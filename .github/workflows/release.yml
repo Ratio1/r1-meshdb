@@ -1,15 +1,16 @@
 name: Release signed image
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - VERSION
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: Immutable R1 MeshDB release version (v1.0.X)
-        required: true
-        type: string
 
 concurrency:
   group: r1-meshdb-release
+  queue: max
   cancel-in-progress: false
 
 permissions:
@@ -33,15 +34,49 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Validate release tag and source contracts
+      - name: Resolve and validate release version
+        id: version
         env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          BEFORE_SHA: ${{ github.event.before }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          args=(--allow-current-tag --github-output "$GITHUB_OUTPUT")
+          if [[ "$EVENT_NAME" == "push" && -n "$BEFORE_SHA" &&
+                ! "$BEFORE_SHA" =~ ^0+$ ]] &&
+              git show "$BEFORE_SHA:VERSION" > "$RUNNER_TEMP/previous-version" 2>/dev/null; then
+            args+=(--previous-version-file "$RUNNER_TEMP/previous-version")
+          fi
+          while IFS= read -r tag; do
+            args+=(--existing-tag "$tag")
+          done < <(git tag --list 'v*')
+          python3 scripts/resolve-release-version.py "${args[@]}"
+          release_tag="v$(<VERSION)"
+          if git show-ref --verify --quiet "refs/tags/$release_tag"; then
+            [[ "$(git rev-list -n 1 "$release_tag")" == "$GITHUB_SHA" ]] || {
+              echo "existing source tag does not identify this release commit" >&2
+              exit 1
+            }
+          fi
+
+      - name: Validate release source contracts
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         run: |
           set -euo pipefail
           [[ "$GITHUB_REF" == "refs/heads/main" ]]
-          [[ "$RELEASE_TAG" =~ ^v1\.0\.[0-9]+$ ]]
+          [[ "$RELEASE_TAG" == "v$(<VERSION)" ]]
           git fetch --no-tags origin main
-          [[ "$(git rev-parse origin/main)" == "$GITHUB_SHA" ]]
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+              echo "release push commit is no longer in main history" >&2
+              exit 1
+            }
+          else
+            [[ "$(git rev-parse origin/main)" == "$GITHUB_SHA" ]]
+          fi
           python3 scripts/verify-source-boundary.py
           python3 scripts/generate-license-inventory.py --check
           python3 scripts/verify-provenance.py
@@ -50,6 +85,39 @@ jobs:
           python3 scripts/generate-source-manifest.py --check
           python3 -m unittest tests.test_release_contract tests.test_sbom_contract
           bash -n entrypoint.sh scripts/*.sh testbed/*.sh
+
+      - name: Validate immutable source release identity
+        id: source-preflight
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          release_state="$(scripts/inspect-github-release.sh "$RELEASE_TAG")"
+          case "$release_state" in
+            missing|draft|published) ;;
+            *)
+              echo "invalid GitHub release state: $release_state" >&2
+              exit 1
+              ;;
+          esac
+          tag_exists=false
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            tag_exists=true
+            [[ "$(git rev-list -n 1 "$RELEASE_TAG")" == "$GITHUB_SHA" ]] || {
+              echo "existing source tag does not identify this release commit" >&2
+              exit 1
+            }
+          fi
+          if [[ "$release_state" == "missing" && "$tag_exists" == "true" ]]; then
+            echo "source tag exists without a resumable GitHub release: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          if [[ "$release_state" != "missing" && "$tag_exists" != "true" ]]; then
+            echo "GitHub release exists without its immutable source tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          printf 'release_state=%s\n' "$release_state" >> "$GITHUB_OUTPUT"
 
       - name: Prepare pristine source snapshot and evidence directory
         run: |
@@ -63,8 +131,8 @@ jobs:
           public_sha="$(GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0 \
             git -C "$RUNNER_TEMP" -c credential.helper= -c http.extraHeader= ls-remote \
             "$public_remote" refs/heads/main | awk '{print $1}')"
-          [[ "$public_sha" == "$GITHUB_SHA" ]] || {
-            echo 'The exact release source is not anonymously available from main.' >&2
+          [[ "$public_sha" == "$(git rev-parse origin/main)" ]] || {
+            echo 'The public and workflow main branches do not identify the same source.' >&2
             echo 'Make the staged source repository public before publishing any image digest.' >&2
             exit 1
           }
@@ -149,7 +217,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
         env:
           SOURCE_DATE_EPOCH: 1727820937
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         with:
           context: .
           platforms: linux/amd64
@@ -157,7 +225,7 @@ jobs:
           build-args: |
             BUILD_DATE=${{ steps.metadata.outputs.build_date }}
             RATIO1_REVISION=${{ github.sha }}
-            RATIO1_VERSION=${{ inputs.release_tag }}
+            RATIO1_VERSION=${{ steps.version.outputs.release_tag }}
             SOURCE_DATE_EPOCH=1727820937
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -178,7 +246,7 @@ jobs:
       - name: Prove candidate binary and compatibility paths
         env:
           IMAGE_REF: ${{ steps.image.outputs.ref }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         run: |
           set -euo pipefail
           docker pull "$IMAGE_REF"
@@ -418,7 +486,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: r1-meshdb-${{ inputs.release_tag }}-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          name: r1-meshdb-${{ steps.version.outputs.release_tag }}-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             artifacts/*.json
             artifacts/*.txt
@@ -458,7 +526,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IMAGE_REF: ${{ steps.image.outputs.ref }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
           GHCR_USERNAME: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -515,11 +583,26 @@ jobs:
             exit 1
           fi
 
+      - name: Verify published release immutability
+        if: steps.preflight.outputs.release_state == 'published'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          downloaded="$(mktemp -d)"
+          trap 'find "$downloaded" -mindepth 1 -depth -delete; rmdir "$downloaded"' EXIT
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern image-reference.txt \
+            --dir "$downloaded"
+          cmp image-reference.txt "$downloaded/image-reference.txt"
+
       - name: Prepare draft release and immutable source tag
         if: steps.preflight.outputs.release_state == 'missing'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         run: |
           gh release create "$RELEASE_TAG" \
             artifacts/*.json artifacts/*.txt artifacts/*.tar.gz image-reference.txt LICENSE LICENSE-OVERVIEW.md \
@@ -533,11 +616,20 @@ jobs:
             --generate-notes \
             --title "R1 MeshDB $RELEASE_TAG"
 
+      - name: Verify the created source tag
+        if: steps.preflight.outputs.release_state == 'missing'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          git fetch --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+          [[ "$(git rev-list -n 1 "$RELEASE_TAG")" == "$GITHUB_SHA" ]]
+
       - name: Refresh and verify resumable draft release assets
         if: steps.preflight.outputs.release_state == 'draft'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         run: |
           set -euo pipefail
           release_assets=(
@@ -590,7 +682,7 @@ jobs:
         if: steps.preflight.outputs.image_tag_exists != 'true'
         env:
           IMAGE_REF: ${{ steps.image.outputs.ref }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
           GHCR_USERNAME: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -610,7 +702,7 @@ jobs:
         if: steps.preflight.outputs.release_state != 'published'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
 
       - name: Update latest only after release publication

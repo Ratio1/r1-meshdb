@@ -57,6 +57,13 @@ jobs:
           version: v0.36.1
           driver-opts: image=moby/buildkit:v0.32.2@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8
 
+      - name: Resolve CI build version
+        id: version
+        run: |
+          set -euo pipefail
+          python3 scripts/resolve-release-version.py --github-output "$GITHUB_OUTPUT"
+          printf 'build_tag=v%s-ci.%s\n' "$(<VERSION)" "$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
       - name: Build candidate image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
         with:
@@ -68,7 +75,7 @@ jobs:
           build-args: |
             BUILD_DATE=2024-10-01T22:15:37Z
             RATIO1_REVISION=${{ github.sha }}
-            RATIO1_VERSION=v1.0.0-ci.${{ github.run_number }}
+            RATIO1_VERSION=${{ steps.version.outputs.build_tag }}
             SOURCE_DATE_EPOCH=1727820937
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -89,7 +96,7 @@ jobs:
           go version -m ./cockroach > cockroach.buildinfo.txt
           go version -m ./cloudflared > cloudflared.buildinfo.txt
           ./cockroach version | grep -F 'Distribution:     OSS'
-          ./cockroach version | grep -F 'Build Tag:        v1.0.0-ci.${{ github.run_number }}'
+          ./cockroach version | grep -F 'Build Tag:        ${{ steps.version.outputs.build_tag }}'
           docker run --rm --entrypoint /usr/bin/test r1-meshdb:ci \
             -x /usr/local/bin/deeploy-crdb-entrypoint
           docker run --rm --entrypoint /usr/local/bin/cloudflared \

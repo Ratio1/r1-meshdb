@@ -22,15 +22,15 @@ if [[ ! -f "${meshdb_version_file}" ]]; then
   exit 1
 fi
 meshdb_version="$(<"${meshdb_version_file}")"
-if [[ ! "${meshdb_version}" =~ ^[0-9]+\.[0-9]+$ ]]; then
-  printf 'R1 MeshDB VERSION must use <major>.<minor>: %s\n' "${meshdb_version}" >&2
+if [[ ! "${meshdb_version}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+  printf 'R1 MeshDB VERSION must use canonical MAJOR.MINOR.PATCH: %s\n' "${meshdb_version}" >&2
   exit 1
 fi
-ratio1_version="${ratio1_version:-v${meshdb_version}.0}"
+ratio1_version="${ratio1_version:-v${meshdb_version}}"
 
-if [[ ! "${ratio1_version}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ||
-      "${ratio1_version}" != "v${meshdb_version}."* ]]; then
-  printf 'RATIO1_VERSION must match VERSION as v%s.<patch> with an optional prerelease: %s\n' \
+if [[ ! "${ratio1_version}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ||
+      ( "${ratio1_version}" != "v${meshdb_version}" && "${ratio1_version}" != "v${meshdb_version}-"* ) ]]; then
+  printf 'RATIO1_VERSION must match VERSION as v%s with an optional prerelease: %s\n' \
     "${meshdb_version}" "${ratio1_version}" >&2
   exit 1
 fi

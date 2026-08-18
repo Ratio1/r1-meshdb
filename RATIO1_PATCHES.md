@@ -107,7 +107,7 @@ upstream commit as `Build Commit ID` and requires all of:
 
 ```text
 Distribution:     OSS
-Build Tag:        v1.0.<patch>
+Build Tag:        v1.0.0
 Build Type:       release
 ```
 

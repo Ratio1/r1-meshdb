@@ -58,8 +58,8 @@ def resolve_cleanup_run(
     raise RecoveryError("GitHub run id does not match the requested run")
   if run.get("path") != RELEASE_WORKFLOW:
     raise RecoveryError("GitHub run is not the release workflow")
-  if run.get("event") != "workflow_dispatch" or run.get("head_branch") != "main":
-    raise RecoveryError("GitHub run is not a manually dispatched main release")
+  if run.get("event") not in {"push", "workflow_dispatch"} or run.get("head_branch") != "main":
+    raise RecoveryError("GitHub run is not a trusted main release")
   if not repository_matches(run, "repository", repository):
     raise RecoveryError("GitHub run belongs to a different repository")
   if not repository_matches(run, "head_repository", repository):

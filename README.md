@@ -1,4 +1,4 @@
-# R1 MeshDB v1.0
+# R1 MeshDB v1.0.0
 
 R1 MeshDB is an independently maintained Ratio1 distribution of a
 source-derived OSS runtime closure from CockroachDB v23.1.28. It packages the
@@ -11,10 +11,11 @@ copyright notices are retained under `engine/`.
 
 ## Version
 
-The current R1 MeshDB product version is `1.0`. [`VERSION`](VERSION) is the
+The current R1 MeshDB product version is `1.0.0`. [`VERSION`](VERSION) is the
 single source of truth: the build validates it, installs it in the image at
 `/usr/share/r1-meshdb/VERSION`, and records it in generated SPDX and CycloneDX
-SBOM application metadata.
+SBOM application metadata. A merged `VERSION` change automatically starts the
+signed release workflow; the file must contain canonical `MAJOR.MINOR.PATCH`.
 
 ## Image
 
@@ -93,7 +94,7 @@ Repository and package promotion controls are documented in
 ```bash
 scripts/verify-image.sh \
   ghcr.io/ratio1/r1-meshdb@sha256:<digest> \
-  v1.0.<patch>
+  v1.0.0
 ```
 
 ## Support
@@ -128,10 +129,10 @@ reproducible release citation.
   note    = {Tag v23.1.28; commit 76e598c9b1c100fd9280b979140b5e377c330a20}
 }
 
-@software{ratio1_meshdb_1_0,
+@software{ratio1_meshdb_1_0_0,
   author  = {{Ratio1}},
   title   = {{R1 MeshDB}},
-  version = {1.0},
+  version = {1.0.0},
   date    = {2026-08-18},
   url     = {https://github.com/Ratio1/r1-distributed-sql},
   note    = {Source-derived Ratio1 distribution based on CockroachDB v23.1.28}

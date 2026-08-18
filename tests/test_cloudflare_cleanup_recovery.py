@@ -52,6 +52,12 @@ def source_jobs(step_conclusion="failure", job_conclusion="failure"):
 
 
 class CloudflareCleanupRecoveryTests(unittest.TestCase):
+  def test_resolves_automatic_main_push_release(self):
+    result = resolve_cleanup_run(
+      source_run(event="push"), source_jobs(), REPOSITORY, str(RUN_ID), str(ATTEMPT)
+    )
+    self.assertTrue(result["cleanupNeeded"])
+
   def test_resolves_exact_failed_attempt(self):
     result = resolve_cleanup_run(
       source_run(), source_jobs(), REPOSITORY, str(RUN_ID), str(ATTEMPT)

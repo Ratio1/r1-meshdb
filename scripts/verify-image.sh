@@ -15,7 +15,7 @@ expected_identity="https://github.com/Ratio1/r1-distributed-sql/.github/workflow
   exit 1
 }
 
-if [[ ! "${release_tag}" =~ ^v1\.0\.[0-9]+$ ]]; then
+if [[ ! "${release_tag}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
   printf 'invalid R1 MeshDB release tag: %s\n' "${release_tag}" >&2
   exit 1
 fi

@@ -26,7 +26,53 @@ def load_script(path: str):
   return module
 
 
+def source_baseline(repository: Path, commit: str, content: bytes) -> dict:
+  artifact = repository / "source" / "engine-v23.1.28-vendor-modules.baseline.txt"
+  artifact.parent.mkdir(parents=True, exist_ok=True)
+  artifact.write_bytes(content)
+  return {
+    "repository": "https://github.com/Ratio1/r1-distributed-sql.git",
+    "commit": commit,
+    "path": "engine/vendor/modules.txt",
+    "artifact": "source/engine-v23.1.28-vendor-modules.baseline.txt",
+    "vendorModulesSha256": hashlib.sha256(content).hexdigest(),
+  }
+
+
 class ReleaseContractTests(unittest.TestCase):
+
+  def test_release_version_resolution_is_strict_and_monotonic(self):
+    resolver = load_script("scripts/resolve-release-version.py")
+    resolved = resolver.resolve_release_version(
+      "1.2.3", previous_version="1.2.2", existing_tags=("v1.2.1",)
+    )
+    self.assertEqual(resolved, {"version": "1.2.3", "release_tag": "v1.2.3"})
+
+    for invalid in ("1.2", "v1.2.3", "01.2.3", "1.02.3", "1.2.03", "1.2.3-rc.1"):
+      with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+        resolver.resolve_release_version(invalid)
+
+    for previous in ("1.2.3", "1.2.4"):
+      with self.subTest(previous=previous), self.assertRaises(ValueError):
+        resolver.resolve_release_version("1.2.3", previous_version=previous)
+
+    with self.assertRaises(ValueError):
+      resolver.resolve_release_version("1.2.3", existing_tags=("v1.3.0",))
+    with self.assertRaises(ValueError):
+      resolver.resolve_release_version("1.2.3", existing_tags=("v1.2.3",))
+    self.assertEqual(
+      resolver.resolve_release_version(
+        "1.2.3", existing_tags=("v1.2.3",), allow_current_tag=True
+      )["release_tag"],
+      "v1.2.3",
+    )
+
+  def test_release_version_resolution_supports_first_version_file(self):
+    resolver = load_script("scripts/resolve-release-version.py")
+    self.assertEqual(
+      resolver.resolve_release_version("1.0.0"),
+      {"version": "1.0.0", "release_tag": "v1.0.0"},
+    )
 
   def test_comments_only_projection_accepts_comments_but_rejects_code_changes(self):
     verifier = load_script("scripts/verify-provenance.py")
@@ -60,13 +106,10 @@ func value() string {
 
   def test_source_baseline_validation_survives_squash_history(self):
     verifier = load_script("scripts/verify-provenance.py")
-    baseline = {
-      "commit": "a" * 40,
-      "vendorModulesSha256": "b" * 64,
-    }
     with tempfile.TemporaryDirectory() as directory:
       repository = Path(directory)
       subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+      baseline = source_baseline(repository, "a" * 40, b"# baseline vendor modules\n")
       original_root = verifier.ROOT
       verifier.ROOT = repository
       try:
@@ -99,10 +142,7 @@ func value() string {
         text=True,
         stdout=subprocess.PIPE,
       ).stdout.strip()
-      baseline = {
-        "commit": commit,
-        "vendorModulesSha256": verifier.hashlib.sha256(content).hexdigest(),
-      }
+      baseline = source_baseline(repository, commit, content)
       original_root = verifier.ROOT
       verifier.ROOT = repository
       try:
@@ -137,12 +177,13 @@ func value() string {
         text=True,
         stdout=subprocess.PIPE,
       ).stdout.strip()
+      baseline = source_baseline(repository, commit, b"# baseline vendor modules\n")
       original_root = verifier.ROOT
       verifier.ROOT = repository
       try:
         with self.assertRaises(SystemExit):
           verifier.check_source_dependency_baseline(
-            {"commit": commit, "vendorModulesSha256": "0" * 64},
+            baseline,
             None,
           )
       finally:
@@ -156,16 +197,20 @@ func value() string {
       target = upstream_root / "vendor" / "modules.txt"
       target.parent.mkdir(parents=True)
       target.write_bytes(content)
-      baseline = {
-        "commit": "a" * 40,
-        "vendorModulesSha256": verifier.hashlib.sha256(content).hexdigest(),
-      }
-      verifier.check_source_dependency_baseline(baseline, upstream_root)
-      with self.assertRaises(SystemExit):
-        verifier.check_source_dependency_baseline(
-          {**baseline, "vendorModulesSha256": "0" * 64},
-          upstream_root,
-        )
+      with tempfile.TemporaryDirectory() as directory:
+        repository = Path(directory)
+        baseline = source_baseline(repository, "a" * 40, content)
+        original_root = verifier.ROOT
+        verifier.ROOT = repository
+        try:
+          verifier.check_source_dependency_baseline(baseline, upstream_root)
+          with self.assertRaises(SystemExit):
+            verifier.check_source_dependency_baseline(
+              {**baseline, "vendorModulesSha256": "0" * 64},
+              upstream_root,
+            )
+        finally:
+          verifier.ROOT = original_root
 
   def test_hosted_provenance_paths_require_exact_upstream_verification(self):
     for workflow_path in (
@@ -346,13 +391,13 @@ func value() string {
 
   def test_meshdb_version_is_valid_single_source_and_build_input(self):
     version = read("VERSION").strip()
-    self.assertRegex(version, r"^[0-9]+\.[0-9]+$")
+    self.assertRegex(version, r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
     self.assertEqual(read("VERSION"), f"{version}\n")
     build_script = read("scripts/build-engine.sh")
     self.assertIn("R1_MESHDB_VERSION_FILE", build_script)
     self.assertIn("R1_MESHDB_VERSION", build_script)
-    self.assertIn('ratio1_version="${ratio1_version:-v${meshdb_version}.0}"', build_script)
-    self.assertIn('"${ratio1_version}" != "v${meshdb_version}."*', build_script)
+    self.assertIn('ratio1_version="${ratio1_version:-v${meshdb_version}}"', build_script)
+    self.assertIn('"${ratio1_version}" != "v${meshdb_version}"', build_script)
     self.assertIn(
       "COPY --from=engine-builder /out/R1_MESHDB_VERSION "
       "/usr/share/r1-meshdb/VERSION",
@@ -361,8 +406,49 @@ func value() string {
     workflows = read(".github/workflows/ci.yml") + read(".github/workflows/release.yml")
     self.assertEqual(workflows.count("/usr/share/r1-meshdb/VERSION"), 2)
     self.assertEqual(workflows.count("cmp VERSION"), 2)
-    self.assertIn("RATIO1_VERSION=v1.0.0-ci.", read(".github/workflows/ci.yml"))
-    self.assertIn('^v1\\.0\\.[0-9]+$', read(".github/workflows/release.yml"))
+    ci = read(".github/workflows/ci.yml")
+    release = read(".github/workflows/release.yml")
+    self.assertIn("Resolve CI build version", ci)
+    self.assertIn("printf 'build_tag=v%s-ci.%s", ci)
+    self.assertIn("RATIO1_VERSION=${{ steps.version.outputs.build_tag }}", ci)
+    self.assertNotIn("RATIO1_VERSION=v1.0.0-ci.", ci)
+    self.assertIn("python3 scripts/resolve-release-version.py", release)
+    self.assertNotIn("v1\\.0\\.", read("scripts/inspect-ghcr-tag.sh"))
+    self.assertNotIn("v1\\.0\\.", read("scripts/inspect-github-release.sh"))
+    self.assertNotIn("v1\\.0\\.", read("scripts/verify-image.sh"))
+
+  def test_release_runs_automatically_only_for_main_version_changes(self):
+    release = read(".github/workflows/release.yml")
+    self.assertRegex(
+      release,
+      r"on:\n  push:\n    branches:\n      - main\n    paths:\n      - VERSION\n  workflow_dispatch:\s*\n",
+    )
+    self.assertNotIn("inputs:", release.partition("concurrency:")[0])
+    self.assertIn("github.event.before", release)
+    self.assertIn("steps.version.outputs.release_tag", release)
+    self.assertIn("queue: max", release)
+    self.assertNotIn("inputs.release_tag", release)
+    self.assertLess(
+      release.index("Resolve and validate release version"),
+      release.index("Build and publish the untagged release candidate"),
+    )
+
+  def test_queued_push_release_remains_valid_after_main_advances(self):
+    release = read(".github/workflows/release.yml")
+    self.assertIn('if [[ "$EVENT_NAME" == "push" ]]; then', release)
+    self.assertIn('git merge-base --is-ancestor "$GITHUB_SHA" origin/main', release)
+    self.assertIn('[[ "$(git rev-parse origin/main)" == "$GITHUB_SHA" ]]', release)
+    self.assertIn('[[ "$public_sha" == "$(git rev-parse origin/main)" ]]', release)
+    self.assertNotIn('[[ "$public_sha" == "$GITHUB_SHA" ]]', release)
+
+  def test_release_reruns_verify_source_tag_and_published_image_reference(self):
+    release = read(".github/workflows/release.yml")
+    self.assertIn("Verify the created source tag", release)
+    self.assertIn("Verify published release immutability", release)
+    published = release[release.index("Verify published release immutability"):]
+    self.assertIn("gh release download", published)
+    self.assertIn("--pattern image-reference.txt", published)
+    self.assertIn('cmp image-reference.txt "$downloaded/image-reference.txt"', published)
 
   def test_engine_identity_support_and_telemetry_defaults_are_meshdb_owned(self):
     self.assertIn('return fmt.Sprintf("R1 MeshDB %s %s', read("engine/pkg/build/info.go"))

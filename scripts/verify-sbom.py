@@ -19,8 +19,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 APPLICATION_NAME = "R1 MeshDB"
 APPLICATION_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-if not re.fullmatch(r"[0-9]+\.[0-9]+", APPLICATION_VERSION):
-  raise RuntimeError("VERSION must use <major>.<minor>")
+if not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", APPLICATION_VERSION):
+  raise RuntimeError("VERSION must use canonical MAJOR.MINOR.PATCH")
 APPLICATION_PURL = f"pkg:generic/r1-meshdb@{APPLICATION_VERSION}"
 APPLICATION_SUPPLIER = "Organization: Ratio1"
 APPLICATION_SOURCE = "https://github.com/Ratio1/r1-distributed-sql"
