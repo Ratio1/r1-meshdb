@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "project": "R1 Distributed SQL",
+  "project": "R1 MeshDB",
   "nativeTreeHashAlgorithm": "sha256 over sorted entries: type-byte, NUL, relative UTF-8 path, NUL, file SHA-256 bytes or symlink target, NUL",
   "upstream": {
     "name": "CockroachDB",

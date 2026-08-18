@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-R1 Distributed SQL includes third-party source and binaries. Each component
+R1 MeshDB includes third-party source and binaries. Each component
 retains its original copyright and license. The SPDX and CycloneDX release
 SBOMs are the machine-readable component inventory; this file points to the
 corresponding full notice/license texts shipped in the source and image.

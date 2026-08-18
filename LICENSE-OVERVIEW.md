@@ -1,6 +1,6 @@
 # Licensing Overview
 
-R1 Distributed SQL is a mixed-license distribution. The root [LICENSE](LICENSE)
+R1 MeshDB is a mixed-license distribution. The root [LICENSE](LICENSE)
 is the Apache License 2.0 text that applies to Ratio1-authored files and to
 upstream engine files whose Business Source License change license has taken
 effect. It does not replace the licenses of included third-party source or
@@ -13,7 +13,7 @@ in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md),
 SPDX and CycloneDX SBOMs, and the license files shipped in the source and image.
 
 The OCI expression
-`Apache-2.0 AND LicenseRef-R1-Distributed-SQL-Third-Party` identifies this
+`Apache-2.0 AND LicenseRef-R1-MeshDB-Third-Party` identifies this
 combined distribution contract. The custom reference is defined in each
 generated SPDX SBOM and does not alter, replace, or sublicense any underlying
 third-party license. CycloneDX consumers can resolve the same reference through

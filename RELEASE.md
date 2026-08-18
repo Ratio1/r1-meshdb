@@ -1,6 +1,6 @@
 # Release Process
 
-R1 Distributed SQL releases are produced only by
+R1 MeshDB releases are produced only by
 `.github/workflows/release.yml`. Local builds are development evidence and are
 never production signatures.
 

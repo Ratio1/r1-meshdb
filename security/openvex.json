@@ -22,7 +22,7 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "The advisory affects Prometheus's /api/v1/read remote-read handler. R1 Distributed SQL compiles selected labels, parser, storage-interface, and TSDB utility packages, but its verified runtime closure excludes github.com/prometheus/prometheus/storage/remote and contains no remote-read HTTP handler."
+      "impact_statement": "The advisory affects Prometheus's /api/v1/read remote-read handler. R1 MeshDB compiles selected labels, parser, storage-interface, and TSDB utility packages, but its verified runtime closure excludes github.com/prometheus/prometheus/storage/remote and contains no remote-read HTTP handler."
     },
     {
       "vulnerability": {

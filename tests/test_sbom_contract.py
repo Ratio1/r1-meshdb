@@ -280,7 +280,7 @@ def remove_reference(document: dict, reference: str) -> None:
 class SbomContractTests(unittest.TestCase):
 
   def test_spdx_defines_distribution_third_party_license_reference(self):
-    expected_id = "LicenseRef-R1-Distributed-SQL-Third-Party"
+    expected_id = "LicenseRef-R1-MeshDB-Third-Party"
     with tempfile.TemporaryDirectory() as directory:
       engine = Path(directory) / "cockroach.buildinfo.txt"
       cloud = Path(directory) / "cloudflared.buildinfo.txt"
@@ -321,6 +321,8 @@ class SbomContractTests(unittest.TestCase):
       expected_expression = f"Apache-2.0 AND {expected_id}"
       self.assertEqual(application.get("licenseDeclared"), expected_expression)
       self.assertEqual(application.get("licenseConcluded"), expected_expression)
+      self.assertEqual(application.get("name"), "R1 MeshDB")
+      self.assertEqual(application.get("versionInfo"), read("VERSION").strip())
 
       result = run_script("scripts/verify-sbom.py", *verify_args, str(path), check=False)
       self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

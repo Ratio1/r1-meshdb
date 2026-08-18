@@ -17,19 +17,22 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 PROVENANCE = ROOT / "source/provenance.json"
 LICENSE_INVENTORY = ROOT / "source/license-inventory.json"
-APPLICATION_NAME = "R1 Distributed SQL"
+APPLICATION_NAME = "R1 MeshDB"
+APPLICATION_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+if not re.fullmatch(r"[0-9]+\.[0-9]+", APPLICATION_VERSION):
+  raise RuntimeError("VERSION must use <major>.<minor>")
 APPLICATION_PURL = "pkg:generic/r1-distributed-sql"
 APPLICATION_SOURCE = "https://github.com/Ratio1/r1-distributed-sql"
-DISTRIBUTION_THIRD_PARTY_LICENSE_ID = "LicenseRef-R1-Distributed-SQL-Third-Party"
+DISTRIBUTION_THIRD_PARTY_LICENSE_ID = "LicenseRef-R1-MeshDB-Third-Party"
 DISTRIBUTION_LICENSE_EXPRESSION = (
   f"Apache-2.0 AND {DISTRIBUTION_THIRD_PARTY_LICENSE_ID}"
 )
 DISTRIBUTION_THIRD_PARTY_LICENSE_INFO = {
   "licenseId": DISTRIBUTION_THIRD_PARTY_LICENSE_ID,
-  "name": "R1 Distributed SQL third-party license set",
+  "name": "R1 MeshDB third-party license set",
   "extractedText": (
     "This reference identifies the third-party licenses that apply to software "
-    "included in the R1 Distributed SQL source and image. It does not replace "
+    "included in the R1 MeshDB source and image. It does not replace "
     "or modify those licenses. Exact component-level SPDX conclusions and full "
     "license texts are recorded in this SBOM, THIRD_PARTY_NOTICES.md, the source "
     "license inventory, and the license files shipped with the distribution."
@@ -118,6 +121,7 @@ def augment_spdx(document: dict, components: list[dict]) -> None:
     application = {
       "SPDXID": "SPDXRef-Package-r1-distributed-sql",
       "name": APPLICATION_NAME,
+      "versionInfo": APPLICATION_VERSION,
       "supplier": "Organization: Ratio1",
       "downloadLocation": APPLICATION_SOURCE,
       "filesAnalyzed": False,
@@ -135,6 +139,8 @@ def augment_spdx(document: dict, components: list[dict]) -> None:
     by_purl[APPLICATION_PURL].append(application)
   application["licenseConcluded"] = DISTRIBUTION_LICENSE_EXPRESSION
   application["licenseDeclared"] = DISTRIBUTION_LICENSE_EXPRESSION
+  application["name"] = APPLICATION_NAME
+  application["versionInfo"] = APPLICATION_VERSION
   application_id = application["SPDXID"]
   add_spdx_relationship(relationships, document_id, "DESCRIBES", application_id)
 
@@ -306,6 +312,7 @@ def augment_cyclonedx(document: dict, components: list[dict]) -> None:
       "bom-ref": APPLICATION_PURL,
       "group": "Ratio1",
       "name": APPLICATION_NAME,
+      "version": APPLICATION_VERSION,
       "purl": APPLICATION_PURL,
       "supplier": {"name": "Ratio1"},
       "licenses": [{"expression": DISTRIBUTION_LICENSE_EXPRESSION}],
@@ -314,6 +321,8 @@ def augment_cyclonedx(document: dict, components: list[dict]) -> None:
     output_components.append(application)
     by_purl[APPLICATION_PURL].append(application)
   application["licenses"] = [{"expression": DISTRIBUTION_LICENSE_EXPRESSION}]
+  application["name"] = APPLICATION_NAME
+  application["version"] = APPLICATION_VERSION
   application_ref = application["bom-ref"]
   application_dependency = dependencies_by_ref.setdefault(
     application_ref, {"ref": application_ref, "dependsOn": []}

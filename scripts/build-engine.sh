@@ -4,6 +4,8 @@ set -euo pipefail
 engine_root="${ENGINE_ROOT:-/workspace/engine}"
 build_root="${BUILD_ROOT:-/build}"
 output_root="${OUTPUT_ROOT:-/out}"
+repository_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+meshdb_version_file="${R1_MESHDB_VERSION_FILE:-${repository_root}/VERSION}"
 source_date_epoch="${SOURCE_DATE_EPOCH:-1727820937}"
 ratio1_version="${RATIO1_VERSION:-v23.1.28-r1.0.0}"
 upstream_revision="76e598c9b1c100fd9280b979140b5e377c330a20"
@@ -14,6 +16,16 @@ parallelism="${BUILD_JOBS:-4}"
 export LC_ALL=C
 export SOURCE_DATE_EPOCH="${source_date_epoch}"
 export TZ=UTC
+
+if [[ ! -f "${meshdb_version_file}" ]]; then
+  printf 'R1 MeshDB version file does not exist: %s\n' "${meshdb_version_file}" >&2
+  exit 1
+fi
+meshdb_version="$(<"${meshdb_version_file}")"
+if [[ ! "${meshdb_version}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+  printf 'R1 MeshDB VERSION must use <major>.<minor>: %s\n' "${meshdb_version}" >&2
+  exit 1
+fi
 
 case "${ratio1_version}" in
   v23.1.28-r1.*.*) ;;
@@ -31,6 +43,7 @@ case "${parallelism}" in
 esac
 
 mkdir -p "${native_root}" "${source_root}" "${output_root}/lib"
+printf '%s\n' "${meshdb_version}" > "${output_root}/R1_MESHDB_VERSION"
 cp -a "${engine_root}/c-deps/jemalloc" "${source_root}/jemalloc"
 cp -a "${engine_root}/c-deps/libedit" "${source_root}/libedit"
 

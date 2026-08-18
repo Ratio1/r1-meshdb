@@ -10,7 +10,7 @@ tagged_ref="${1:?usage: inspect-ghcr-tag.sh <ghcr-version-tag>}"
 : "${GHCR_TOKEN:?GHCR_TOKEN is required}"
 
 if [[ ! "${tagged_ref}" =~ ^ghcr\.io/ratio1/r1-distributed-sql:(v23\.1\.28-r1\.[0-9]+\.[0-9]+)$ ]]; then
-  echo "invalid R1 Distributed SQL GHCR version tag: ${tagged_ref}" >&2
+  echo "invalid R1 MeshDB GHCR version tag: ${tagged_ref}" >&2
   exit 2
 fi
 tag="${BASH_REMATCH[1]}"

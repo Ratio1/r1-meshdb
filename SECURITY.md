@@ -2,7 +2,7 @@
 
 ## Supported Releases
 
-Ratio1 supports only the newest published R1 Distributed SQL patch release.
+Ratio1 supports only the newest published R1 MeshDB patch release.
 The underlying CockroachDB v23.1 line is no longer supported upstream, so
 Ratio1 independently assesses and backports applicable fixes. Support for this
 engine line is transitional and does not promise indefinite maintenance or

@@ -186,6 +186,8 @@ jobs:
           trap 'docker rm "$container_id" >/dev/null 2>&1 || true' EXIT
           docker cp "$container_id:/cockroach/cockroach" ./cockroach
           docker cp "$container_id:/usr/local/bin/cloudflared" ./cloudflared
+          docker cp "$container_id:/usr/share/r1-meshdb/VERSION" "$RUNNER_TEMP/image-version.txt"
+          cmp VERSION "$RUNNER_TEMP/image-version.txt"
           chmod 755 ./cockroach
           ./cockroach version | grep -F 'Distribution:     OSS'
           ./cockroach version | grep -F "Build Tag:        $RELEASE_TAG"
@@ -520,7 +522,7 @@ jobs:
             --target "$GITHUB_SHA" \
             --draft \
             --generate-notes \
-            --title "R1 Distributed SQL $RELEASE_TAG"
+            --title "R1 MeshDB $RELEASE_TAG"
 
       - name: Refresh and verify resumable draft release assets
         if: steps.preflight.outputs.release_state == 'draft'

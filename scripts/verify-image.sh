@@ -16,7 +16,7 @@ expected_identity="https://github.com/Ratio1/r1-distributed-sql/.github/workflow
 }
 
 if [[ ! "${release_tag}" =~ ^v23\.1\.28-r1\.[0-9]+\.[0-9]+$ ]]; then
-  printf 'invalid R1 Distributed SQL release tag: %s\n' "${release_tag}" >&2
+  printf 'invalid R1 MeshDB release tag: %s\n' "${release_tag}" >&2
   exit 1
 fi
 
@@ -122,7 +122,7 @@ import sys
 labels = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 expected = {
   "org.opencontainers.image.licenses": (
-    "Apache-2.0 AND LicenseRef-R1-Distributed-SQL-Third-Party"
+    "Apache-2.0 AND LicenseRef-R1-MeshDB-Third-Party"
   ),
   "org.opencontainers.image.source": "https://github.com/Ratio1/r1-distributed-sql",
   "org.opencontainers.image.version": sys.argv[2],
@@ -133,4 +133,4 @@ for key, value in expected.items():
   if labels.get(key) != value:
     raise SystemExit(f"image label mismatch: {key}")
 PY
-printf 'verified signed R1 Distributed SQL image: %s\n' "${image_ref}"
+printf 'verified signed R1 MeshDB image: %s\n' "${image_ref}"

@@ -147,7 +147,7 @@ if ! diff -u "${expected_packages}" \
 fi
 
 cut -d= -f1 "${expected_packages}" | while IFS= read -r package; do
-  dpkg-query -W -f='Package: ${Package}\nStatus: install ok installed\nArchitecture: ${Architecture}\nVersion: ${Version}\nDescription: retained files for the R1 Distributed SQL minimal runtime\n\n' \
+  dpkg-query -W -f='Package: ${Package}\nStatus: install ok installed\nArchitecture: ${Architecture}\nVersion: ${Version}\nDescription: retained files for the R1 MeshDB minimal runtime\n\n' \
     "${package}"
   copyright="/usr/share/doc/${package}/copyright"
   [[ ! -e "${copyright}" && ! -L "${copyright}" ]] || copy_path "${copyright}"

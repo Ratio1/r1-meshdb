@@ -16,11 +16,14 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APPLICATION_NAME = "R1 Distributed SQL"
+APPLICATION_NAME = "R1 MeshDB"
+APPLICATION_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+if not re.fullmatch(r"[0-9]+\.[0-9]+", APPLICATION_VERSION):
+  raise RuntimeError("VERSION must use <major>.<minor>")
 APPLICATION_PURL = "pkg:generic/r1-distributed-sql"
 APPLICATION_SUPPLIER = "Organization: Ratio1"
 APPLICATION_SOURCE = "https://github.com/Ratio1/r1-distributed-sql"
-DISTRIBUTION_THIRD_PARTY_LICENSE_ID = "LicenseRef-R1-Distributed-SQL-Third-Party"
+DISTRIBUTION_THIRD_PARTY_LICENSE_ID = "LicenseRef-R1-MeshDB-Third-Party"
 DISTRIBUTION_LICENSE_EXPRESSION = (
   f"Apache-2.0 AND {DISTRIBUTION_THIRD_PARTY_LICENSE_ID}"
 )
@@ -211,6 +214,7 @@ def verify_spdx(document: dict) -> dict:
   application = applications[0]
   if (
     application.get("name") != APPLICATION_NAME
+    or application.get("versionInfo") != APPLICATION_VERSION
     or application.get("supplier") != APPLICATION_SUPPLIER
     or application.get("downloadLocation") != APPLICATION_SOURCE
     or application.get("licenseConcluded") != DISTRIBUTION_LICENSE_EXPRESSION
@@ -305,6 +309,7 @@ def verify_cyclonedx(document: dict) -> dict:
   if (
     application.get("type") != "application"
     or application.get("name") != APPLICATION_NAME
+    or application.get("version") != APPLICATION_VERSION
     or suppliers.get("name") != "Ratio1"
     or licenses != {DISTRIBUTION_LICENSE_EXPRESSION}
     or APPLICATION_SOURCE not in source_references

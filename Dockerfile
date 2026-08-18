@@ -147,12 +147,12 @@ ARG BUILD_DATE=""
 ARG RATIO1_REVISION="unknown"
 ARG RATIO1_VERSION="v23.1.28-r1.0.0"
 
-LABEL org.opencontainers.image.title="R1 Distributed SQL" \
+LABEL org.opencontainers.image.title="R1 MeshDB" \
       org.opencontainers.image.description="Distributed SQL database runtime for Ratio1 edge nodes" \
       org.opencontainers.image.url="https://github.com/Ratio1/r1-distributed-sql" \
       org.opencontainers.image.source="https://github.com/Ratio1/r1-distributed-sql" \
       org.opencontainers.image.documentation="https://github.com/Ratio1/r1-distributed-sql/blob/main/README.md" \
-      org.opencontainers.image.licenses="Apache-2.0 AND LicenseRef-R1-Distributed-SQL-Third-Party" \
+      org.opencontainers.image.licenses="Apache-2.0 AND LicenseRef-R1-MeshDB-Third-Party" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${RATIO1_REVISION}" \
       org.opencontainers.image.version="${RATIO1_VERSION}" \
@@ -165,6 +165,7 @@ COPY --from=runtime-rootfs-builder /minimal-rootfs/ /
 COPY --chmod=755 --from=cloudflared-builder /out/cloudflared /usr/local/bin/cloudflared
 COPY --chmod=755 --from=cloudflared-builder /out/r1-atomic-replace /usr/local/bin/r1-atomic-replace
 COPY --chmod=755 --from=engine-builder /out/cockroach /cockroach/cockroach
+COPY --from=engine-builder /out/R1_MESHDB_VERSION /usr/share/r1-meshdb/VERSION
 COPY --from=engine-builder /out/lib/ /usr/local/lib/r1-distributed-sql/
 COPY --from=engine-builder /out/licenses/ /usr/share/doc/r1-distributed-sql/
 COPY --chmod=755 entrypoint.sh /usr/local/bin/deeploy-crdb-entrypoint

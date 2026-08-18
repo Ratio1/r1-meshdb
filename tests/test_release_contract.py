@@ -183,6 +183,7 @@ func value() string {
   def test_required_compliance_and_provenance_files_exist(self):
     required = (
       "LICENSE",
+      "VERSION",
       "LICENSE-OVERVIEW.md",
       ".gitattributes",
       "NOTICE",
@@ -283,7 +284,7 @@ func value() string {
     workflow = read(".github/workflows/release.yml")
     self.assertGreaterEqual(workflow.count("LICENSE-OVERVIEW.md"), 3)
     self.assertIn(
-      "LicenseRef-R1-Distributed-SQL-Third-Party",
+      "LicenseRef-R1-MeshDB-Third-Party",
       read("scripts/verify-image.sh"),
     )
 
@@ -291,13 +292,29 @@ func value() string {
     dockerfile = read("Dockerfile")
     self.assertIn(
       'org.opencontainers.image.licenses="Apache-2.0 AND '
-      'LicenseRef-R1-Distributed-SQL-Third-Party"',
+      'LicenseRef-R1-MeshDB-Third-Party"',
       dockerfile,
     )
     self.assertNotIn("LicenseRef-ThirdParty", dockerfile)
 
   def test_git_does_not_normalize_manifested_source_bytes(self):
     self.assertIn("* -text", read(".gitattributes"))
+
+  def test_meshdb_version_is_valid_single_source_and_build_input(self):
+    version = read("VERSION").strip()
+    self.assertRegex(version, r"^[0-9]+\.[0-9]+$")
+    self.assertEqual(read("VERSION"), f"{version}\n")
+    build_script = read("scripts/build-engine.sh")
+    self.assertIn("R1_MESHDB_VERSION_FILE", build_script)
+    self.assertIn("R1_MESHDB_VERSION", build_script)
+    self.assertIn(
+      "COPY --from=engine-builder /out/R1_MESHDB_VERSION "
+      "/usr/share/r1-meshdb/VERSION",
+      read("Dockerfile"),
+    )
+    workflows = read(".github/workflows/ci.yml") + read(".github/workflows/release.yml")
+    self.assertEqual(workflows.count("/usr/share/r1-meshdb/VERSION"), 2)
+    self.assertEqual(workflows.count("cmp VERSION"), 2)
 
   def test_source_provenance_pins_upstream_and_native_dependencies(self):
     provenance = json.loads(read("source/provenance.json"))

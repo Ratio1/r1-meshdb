@@ -82,6 +82,8 @@ jobs:
           trap 'docker rm "$container_id" >/dev/null 2>&1 || true' EXIT
           docker cp "$container_id:/cockroach/cockroach" ./cockroach
           docker cp "$container_id:/usr/local/bin/cloudflared" ./cloudflared
+          docker cp "$container_id:/usr/share/r1-meshdb/VERSION" ./image-version.txt
+          cmp VERSION image-version.txt
           chmod 755 ./cockroach
           chmod 755 ./cloudflared
           go version -m ./cockroach > cockroach.buildinfo.txt

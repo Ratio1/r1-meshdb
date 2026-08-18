@@ -1,6 +1,6 @@
-# R1 Distributed SQL
+# R1 MeshDB v1.0
 
-R1 Distributed SQL is an independently maintained Ratio1 distribution of a
+R1 MeshDB is an independently maintained Ratio1 distribution of a
 source-derived OSS runtime closure from CockroachDB v23.1.28. It packages the
 OSS database engine with the runtime entrypoint used by the Ratio1 Deeploy
 service.
@@ -8,6 +8,13 @@ service.
 This project is not affiliated with or endorsed by Cockroach Labs. CockroachDB
 is a trademark of Cockroach Labs, Inc. The original engine source and its
 copyright notices are retained under `engine/`.
+
+## Version
+
+The current R1 MeshDB product version is `1.0`. [`VERSION`](VERSION) is the
+single source of truth: the build validates it, installs it in the image at
+`/usr/share/r1-meshdb/VERSION`, and records it in generated SPDX and CycloneDX
+SBOM application metadata.
 
 ## Image
 
@@ -102,3 +109,29 @@ effect are distributed under Apache License 2.0. Included third-party
 components retain their own licenses. See
 [LICENSE-OVERVIEW.md](LICENSE-OVERVIEW.md), [LICENSE](LICENSE), [NOTICE](NOTICE),
 and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Citation
+
+The R1 MeshDB entry below is the recommended citation for the current source
+snapshot. Publish it with an immutable `v1.0` tag before treating it as a
+reproducible release citation.
+
+```bibtex
+@software{cockroachdb_23_1_28,
+  author  = {{Cockroach Labs, Inc.} and {The Cockroach Authors}},
+  title   = {{CockroachDB}},
+  version = {23.1.28},
+  date    = {2024-10-10},
+  url     = {https://www.cockroachlabs.com/docs/releases/v23.1#v23-1-28},
+  note    = {Tag v23.1.28; commit 76e598c9b1c100fd9280b979140b5e377c330a20}
+}
+
+@software{ratio1_meshdb_1_0,
+  author  = {{Ratio1}},
+  title   = {{R1 MeshDB}},
+  version = {1.0},
+  date    = {2026-08-18},
+  url     = {https://github.com/Ratio1/r1-distributed-sql},
+  note    = {Source-derived Ratio1 distribution based on CockroachDB v23.1.28}
+}
+```
