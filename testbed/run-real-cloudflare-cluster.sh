@@ -30,6 +30,7 @@ stores=("r1-meshdb-real-store-1-${run_id}" "r1-meshdb-real-store-2-${run_id}" "r
 db_password="r1_real_cloudflare_validation_password"
 cleanup_started=false
 evidence_dir="${R1_MESHDB_EVIDENCE_DIR:-${R1_SQL_EVIDENCE_DIR:-}}"
+replication_incomplete="not-started"
 
 record_evidence() {
   local status="$1"
@@ -40,6 +41,7 @@ record_evidence() {
     printf 'status=%s\n' "${status}"
     printf 'image=%s\n' "${image}"
     printf 'run_id=%s\n' "${run_id}"
+    printf 'replication_incomplete=%s\n' "${replication_incomplete}"
   } > "${evidence_dir}/summary.txt"
   if [[ -f "${allocation_dir}/state.json" ]]; then
     python3 - "${allocation_dir}/state.json" "${evidence_dir}/topology.json" <<'PY'
@@ -62,6 +64,15 @@ PY
   for index in 1 2 3; do
     raw_logs="${tmp}/node-${index}.evidence.raw"
     docker logs "${nodes[$((index - 1))]}" > "${raw_logs}" 2>&1 || true
+    if [[ "${status}" != "0" ]]; then
+      docker exec "${nodes[$((index - 1))]}" /bin/bash -c '
+        for log in /cockroach/cockroach-data/logs/*.log; do
+          [[ -f "$log" ]] || continue
+          printf "\n===== %s =====\n" "$log"
+          tail -n 500 "$log"
+        done
+      ' >> "${raw_logs}" 2>&1 || true
+    fi
     python3 - "${raw_logs}" "${allocation_dir}/node-${index}.token" \
       "${evidence_dir}/node-${index}.log" <<'PY'
 from pathlib import Path
@@ -285,18 +296,37 @@ docker exec -e "PGPASSWORD=${db_password}" "${nodes[0]}" \
   -e "upsert into cloudflare_smoke select i, 'row-' || i::string from generate_series(1, 10000) as g(i);" >/dev/null
 
 replication_ready=false
-for _ in $(seq 1 180); do
-  incomplete="$(docker exec "${nodes[1]}" timeout --kill-after=2s 30s /cockroach/cockroach sql \
-    --certs-dir=/cockroach/certs --host=roach2:26257 --format=csv \
-    -e 'select count(*) from crdb_internal.ranges_no_leases where array_length(voting_replicas, 1) < 3 or array_length(learner_replicas, 1) > 0;' \
-    2>/dev/null | tail -n 1 | tr -d '\r' || true)"
-  if [[ "${incomplete}" == "0" ]]; then
+replication_query_error="${tmp}/replication-query.err"
+replication_deadline=$(( $(date +%s) + 600 ))
+while [[ "$(date +%s)" -lt "${replication_deadline}" ]]; do
+  if replication_output="$(docker exec "${nodes[1]}" \
+      timeout --kill-after=2s 30s /cockroach/cockroach sql \
+      --certs-dir=/cockroach/certs --host=roach2:26257 --format=csv \
+      -e 'select count(*) from crdb_internal.ranges_no_leases where array_length(voting_replicas, 1) < 3 or array_length(learner_replicas, 1) > 0;' \
+      2>"${replication_query_error}")"; then
+    replication_incomplete="$(printf '%s\n' "${replication_output}" | tail -n 1 | tr -d '\r')"
+  else
+    replication_incomplete="query-error"
+  fi
+  if [[ "${replication_incomplete}" == "0" ]]; then
     replication_ready=true
     break
   fi
   sleep 2
 done
-[[ "${replication_ready}" == "true" ]] || { echo "real Cloudflare cluster did not reach full replication" >&2; exit 1; }
+if [[ "${replication_ready}" != "true" ]]; then
+  echo "real Cloudflare cluster did not reach full replication: ${replication_incomplete}" >&2
+  if [[ -s "${replication_query_error}" ]]; then
+    echo "last replication query error:" >&2
+    cat "${replication_query_error}" >&2
+  fi
+  echo "range replication diagnostics:" >&2
+  docker exec "${nodes[1]}" timeout --kill-after=2s 30s /cockroach/cockroach sql \
+    --certs-dir=/cockroach/certs --host=roach2:26257 \
+    -e 'select coalesce(array_length(voting_replicas, 1), 0) as voters, coalesce(array_length(learner_replicas, 1), 0) as learners, count(*) as ranges from crdb_internal.ranges_no_leases group by voters, learners order by voters, learners;' \
+    >&2 || true
+  exit 1
+fi
 
 count="$(docker exec -e "PGPASSWORD=${db_password}" "${nodes[2]}" \
   timeout --kill-after=2s 30s /cockroach/cockroach sql \

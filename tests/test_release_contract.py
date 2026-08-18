@@ -1437,6 +1437,15 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
       self.assertIn("process environment scan failed", script, path)
       self.assertNotIn('[[ -r "$environment" ]] || continue', script, path)
 
+  def test_real_cloudflare_replication_wait_is_bounded_and_diagnostic(self):
+    testbed = read("testbed/run-real-cloudflare-cluster.sh")
+    self.assertIn("replication_deadline=$(( $(date +%s) + 600 ))", testbed)
+    self.assertIn('replication_incomplete="not-started"', testbed)
+    self.assertIn("printf 'replication_incomplete=%s\\n'", testbed)
+    self.assertIn("replication-query.err", testbed)
+    self.assertIn("range replication diagnostics", testbed)
+    self.assertIn("/cockroach/cockroach-data/logs", testbed)
+
   def test_generated_parser_outputs_are_declared(self):
     generated = set(read("source/generated-files.txt").splitlines())
     self.assertIn("pkg/sql/parser/sql.go", generated)
