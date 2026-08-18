@@ -143,9 +143,7 @@ jobs:
             --output "$archive"
           mkdir "$extracted"
           tar -xzf "$archive" --strip-components=1 -C "$extracted"
-          while IFS= read -r -d '' path; do
-            cmp "$path" "$extracted/$path"
-          done < <(git ls-files -z)
+          diff --no-dereference --recursive source-snapshot "$extracted"
           sha256sum "$archive" > artifacts/public-source-archive.sha256.txt
 
       - name: Verify Ratio1 overrides against exact upstream source
