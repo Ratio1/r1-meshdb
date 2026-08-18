@@ -970,6 +970,11 @@ func value() string {
       release.index("Prove corresponding source is anonymously available"),
       release.index("Build and publish the untagged release candidate"),
     )
+    self.assertIn(
+      'diff --no-dereference --recursive source-snapshot "$extracted"',
+      release,
+    )
+    self.assertNotIn('cmp "$path" "$extracted/$path"', release)
     self.assertLess(
       release.index("Prepare draft release and immutable source tag"),
       release.index("Promote the single immutable version tag"),
