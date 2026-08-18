@@ -277,6 +277,7 @@ func value() string {
     dockerfile = read("Dockerfile")
     assembler = read("scripts/assemble-runtime-rootfs.sh")
     collector = read("scripts/collect-debian-corresponding-source.sh")
+    ci = read(".github/workflows/ci.yml")
     release = read(".github/workflows/release.yml")
     for required in (
       "deb-src [check-valid-until=no]",
@@ -292,6 +293,8 @@ func value() string {
     self.assertIn("r1-meshdb-debian-corresponding-source.tar.gz", release)
     self.assertGreaterEqual(release.count("source/runtime-package-sources.tsv"), 3)
     self.assertIn("docker cp", release)
+    self.assertIn("--entrypoint /bin/bash r1-meshdb:ci", ci)
+    self.assertNotIn("--entrypoint /usr/bin/bash", ci)
 
   def test_root_license_is_apache_2(self):
     license_text = read("LICENSE")

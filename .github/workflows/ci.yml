@@ -94,7 +94,7 @@ jobs:
             -x /usr/local/bin/deeploy-crdb-entrypoint
           docker run --rm --entrypoint /usr/local/bin/cloudflared \
             r1-meshdb:ci --version
-          docker run --rm --entrypoint /usr/bin/bash r1-meshdb:ci -ec \
+          docker run --rm --entrypoint /bin/bash r1-meshdb:ci -ec \
             'cd /usr/share/src/r1-meshdb/debian && sha256sum -c SHA256SUMS'
           docker image inspect r1-meshdb:ci \
             --format '{{json .Config.Labels}}' \
