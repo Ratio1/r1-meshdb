@@ -1439,12 +1439,23 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
 
   def test_real_cloudflare_replication_wait_is_bounded_and_diagnostic(self):
     testbed = read("testbed/run-real-cloudflare-cluster.sh")
+    replication_start = testbed.index("replication_ready=false")
+    replication_end = testbed.index(
+      'count="$(docker exec -e "PGPASSWORD=${db_password}"',
+      replication_start,
+    )
+    replication_block = testbed[replication_start:replication_end]
     self.assertIn("replication_deadline=$(( $(date +%s) + 600 ))", testbed)
     self.assertIn('replication_incomplete="not-started"', testbed)
     self.assertIn("printf 'replication_incomplete=%s\\n'", testbed)
     self.assertIn("replication-query.err", testbed)
     self.assertIn("range replication diagnostics", testbed)
     self.assertIn("/cockroach/cockroach-data/logs", testbed)
+    self.assertIn('docker exec "${nodes[0]}"', replication_block)
+    self.assertIn("--host=roach1:26257", replication_block)
+    self.assertNotIn('${nodes[1]}', replication_block)
+    self.assertNotIn("--host=roach2:26257", replication_block)
+    self.assertIn('replication_incomplete="query-error"\n    break', replication_block)
 
   def test_generated_parser_outputs_are_declared(self):
     generated = set(read("source/generated-files.txt").splitlines())
