@@ -299,14 +299,15 @@ replication_ready=false
 replication_query_error="${tmp}/replication-query.err"
 replication_deadline=$(( $(date +%s) + 600 ))
 while [[ "$(date +%s)" -lt "${replication_deadline}" ]]; do
-  if replication_output="$(docker exec "${nodes[1]}" \
+  if replication_output="$(docker exec "${nodes[0]}" \
       timeout --kill-after=2s 30s /cockroach/cockroach sql \
-      --certs-dir=/cockroach/certs --host=roach2:26257 --format=csv \
+      --certs-dir=/cockroach/certs --host=roach1:26257 --format=csv \
       -e 'select count(*) from crdb_internal.ranges_no_leases where array_length(voting_replicas, 1) < 3 or array_length(learner_replicas, 1) > 0;' \
       2>"${replication_query_error}")"; then
     replication_incomplete="$(printf '%s\n' "${replication_output}" | tail -n 1 | tr -d '\r')"
   else
     replication_incomplete="query-error"
+    break
   fi
   if [[ "${replication_incomplete}" == "0" ]]; then
     replication_ready=true
@@ -321,8 +322,8 @@ if [[ "${replication_ready}" != "true" ]]; then
     cat "${replication_query_error}" >&2
   fi
   echo "range replication diagnostics:" >&2
-  docker exec "${nodes[1]}" timeout --kill-after=2s 30s /cockroach/cockroach sql \
-    --certs-dir=/cockroach/certs --host=roach2:26257 \
+  docker exec "${nodes[0]}" timeout --kill-after=2s 30s /cockroach/cockroach sql \
+    --certs-dir=/cockroach/certs --host=roach1:26257 \
     -e 'select coalesce(array_length(voting_replicas, 1), 0) as voters, coalesce(array_length(learner_replicas, 1), 0) as learners, count(*) as ranges from crdb_internal.ranges_no_leases group by voters, learners order by voters, learners;' \
     >&2 || true
   exit 1
