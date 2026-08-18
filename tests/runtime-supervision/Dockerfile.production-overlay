@@ -1,0 +1,5 @@
+ARG BASE_IMAGE=ghcr.io/ratio1/deeploy-cockroachdb-service:main
+
+FROM ${BASE_IMAGE}
+
+COPY --chmod=755 entrypoint.sh /usr/local/bin/deeploy-crdb-entrypoint

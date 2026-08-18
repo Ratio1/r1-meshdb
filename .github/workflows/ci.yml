@@ -1,0 +1,214 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-and-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Verify source and release contracts
+        run: |
+          python3 scripts/verify-source-boundary.py
+          python3 scripts/generate-license-inventory.py --check
+          python3 scripts/verify-provenance.py
+          python3 scripts/verify-public-test-fixtures.py
+          python3 scripts/verify-security-vex.py
+          python3 scripts/generate-source-manifest.py --check
+          python3 -m unittest tests.test_release_contract tests.test_sbom_contract
+          bash -n entrypoint.sh scripts/*.sh testbed/*.sh
+
+      - name: Verify Ratio1 overrides against exact upstream source
+        run: scripts/verify-upstream-provenance.sh
+
+      - name: Prepare pristine source snapshot
+        run: |
+          mkdir source-snapshot
+          git archive "$GITHUB_SHA" | tar -x -C source-snapshot
+
+      - name: Verify the offline OSS runtime closure
+        run: |
+          docker run --rm \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            --entrypoint python3 \
+            golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 \
+            scripts/verify-runtime-closure.py
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+        with:
+          version: v0.36.1
+          driver-opts: image=moby/buildkit:v0.32.2@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8
+
+      - name: Build candidate image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: .
+          load: true
+          push: false
+          platforms: linux/amd64
+          tags: r1-distributed-sql:ci
+          build-args: |
+            BUILD_DATE=2024-10-01T22:15:37Z
+            RATIO1_REVISION=${{ github.sha }}
+            RATIO1_VERSION=v23.1.28-r1.0.0-ci.${{ github.run_number }}
+            SOURCE_DATE_EPOCH=1727820937
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
+
+      - name: Verify OSS binary and image contract
+        run: |
+          set -euo pipefail
+          container_id="$(docker create r1-distributed-sql:ci)"
+          trap 'docker rm "$container_id" >/dev/null 2>&1 || true' EXIT
+          docker cp "$container_id:/cockroach/cockroach" ./cockroach
+          docker cp "$container_id:/usr/local/bin/cloudflared" ./cloudflared
+          chmod 755 ./cockroach
+          chmod 755 ./cloudflared
+          go version -m ./cockroach > cockroach.buildinfo.txt
+          go version -m ./cloudflared > cloudflared.buildinfo.txt
+          ./cockroach version | grep -F 'Distribution:     OSS'
+          ./cockroach version | grep -F 'Build Tag:        v23.1.28-r1.0.0-ci.${{ github.run_number }}'
+          docker run --rm --entrypoint /usr/bin/test r1-distributed-sql:ci \
+            -x /usr/local/bin/deeploy-crdb-entrypoint
+          docker run --rm --entrypoint /usr/local/bin/cloudflared \
+            r1-distributed-sql:ci --version
+          docker image inspect r1-distributed-sql:ci \
+            --format '{{json .Config.Labels}}' \
+            | grep -F 'https://github.com/Ratio1/r1-distributed-sql'
+
+      - name: Run the bounded local three-node testbed
+        run: |
+          R1_SQL_REQUIRE_DIGEST=false \
+            timeout --signal=TERM --kill-after=60s 20m \
+            testbed/run-local-cluster.sh r1-distributed-sql:ci
+
+      - name: Prove persisted rolling upgrade and rollback compatibility
+        run: |
+          R1_SQL_REQUIRE_DIGEST=false \
+          R1_SQL_EVIDENCE_DIR="$PWD/artifacts/rolling-upgrade" \
+            timeout --signal=TERM --kill-after=120s 35m \
+            testbed/run-rolling-upgrade.sh r1-distributed-sql:ci
+
+      - name: Prove runtime supervision and corrupt-store recovery
+        run: |
+          timeout --signal=TERM --kill-after=120s 45m \
+            scripts/runtime-supervision-smoke.sh r1-distributed-sql:ci fixed
+
+      - name: Generate image SPDX SBOM
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
+        with:
+          image: r1-distributed-sql:ci
+          format: spdx-json
+          syft-version: v1.51.0
+          upload-artifact: false
+          output-file: r1-distributed-sql-image.spdx.json
+
+      - name: Generate image CycloneDX SBOM
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
+        with:
+          image: r1-distributed-sql:ci
+          format: cyclonedx-json
+          syft-version: v1.51.0
+          upload-artifact: false
+          output-file: r1-distributed-sql-image.cdx.json
+
+      - name: Generate source SPDX SBOM
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
+        with:
+          path: source-snapshot
+          format: spdx-json
+          syft-version: v1.51.0
+          upload-artifact: false
+          output-file: r1-distributed-sql-source.spdx.json
+
+      - name: Generate source CycloneDX SBOM
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
+        with:
+          path: source-snapshot
+          format: cyclonedx-json
+          syft-version: v1.51.0
+          upload-artifact: false
+          output-file: r1-distributed-sql-source.cdx.json
+
+      - name: Verify SBOM schemas and component coverage
+        env:
+          JSONSCHEMA_VERSION: 4.25.1
+        run: |
+          set -euo pipefail
+          for sbom in r1-distributed-sql-*.json; do
+            python3 scripts/augment-sbom.py "$sbom"
+          done
+          docker run --rm \
+            --env JSONSCHEMA_VERSION \
+            --volume "$PWD:/workspace:ro" \
+            --workdir /workspace \
+            python:3.13.7-slim@sha256:5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689 \
+            sh -ec 'python -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: -r source/sbom-validation-requirements.txt >/dev/null && python -c '\''import importlib.metadata, os; assert importlib.metadata.version("jsonschema") == os.environ["JSONSCHEMA_VERSION"]'\'' && python scripts/validate-sbom-schema.py r1-distributed-sql-*.json'
+          python3 scripts/verify-sbom.py --require-runtime \
+            --go-buildinfo cockroach.buildinfo.txt \
+            --go-buildinfo cloudflared.buildinfo.txt \
+            r1-distributed-sql-image.spdx.json
+          python3 scripts/verify-sbom.py --require-runtime \
+            --go-buildinfo cockroach.buildinfo.txt \
+            --go-buildinfo cloudflared.buildinfo.txt \
+            r1-distributed-sql-image.cdx.json
+          python3 scripts/verify-sbom.py r1-distributed-sql-source.spdx.json
+          python3 scripts/verify-sbom.py r1-distributed-sql-source.cdx.json
+
+      - name: Record raw candidate findings
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          version: v0.73.0
+          image-ref: r1-distributed-sql:ci
+          format: json
+          output: trivy-raw.json
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+
+      - name: Scan candidate image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        env:
+          TRIVY_VEX: security/openvex.json
+        with:
+          version: v0.73.0
+          image-ref: r1-distributed-sql:ci
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+
+      - name: Upload CI supply-chain evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r1-distributed-sql-ci-${{ github.run_id }}
+          path: |
+            r1-distributed-sql-image.spdx.json
+            r1-distributed-sql-image.cdx.json
+            r1-distributed-sql-source.spdx.json
+            r1-distributed-sql-source.cdx.json
+            cockroach.buildinfo.txt
+            cloudflared.buildinfo.txt
+            trivy-raw.json
+            artifacts/rolling-upgrade/
+          if-no-files-found: error
+          retention-days: 30

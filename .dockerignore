@@ -1,0 +1,10 @@
+.git
+.playwright
+artifacts
+source-snapshot
+__pycache__
+*.py[cod]
+source/*.cdx.json
+source/*.spdx.json
+source/*.tar.gz
+*.log

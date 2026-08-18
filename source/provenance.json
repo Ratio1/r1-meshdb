@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "project": "R1 Distributed SQL",
+  "nativeTreeHashAlgorithm": "sha256 over sorted entries: type-byte, NUL, relative UTF-8 path, NUL, file SHA-256 bytes or symlink target, NUL",
+  "upstream": {
+    "name": "CockroachDB",
+    "sourceUrl": "https://github.com/cockroachdb/cockroach.git",
+    "tag": "v23.1.28",
+    "commit": "76e598c9b1c100fd9280b979140b5e377c330a20",
+    "changeDate": "2026-04-01",
+    "changeLicense": "Apache-2.0",
+    "ossEntryPoint": "pkg/cmd/cockroach-oss",
+    "runtimeClosure": "source/runtime-files.txt",
+    "generatedFiles": "source/generated-files.txt",
+    "generatedSourceValidation": {
+      "method": "make",
+      "validatorDockerfile": "tests/generated-source/Dockerfile",
+      "baseImage": "golang:1.19.10-bullseye@sha256:08defd390a65f3a72cfde1d04a538c6dc2d48d1f0f443ff99a8862c11c19572c",
+      "goVersion": "go1.19.10",
+      "debianSnapshot": "20260701T000000Z",
+      "targets": "vendor/modules.txt, protobuf, and every non-protobuf path in source/generated-files.txt"
+    },
+    "licenseInventory": "source/license-inventory.json",
+    "ratio1Overrides": "source/ratio1-engine-overrides.json",
+    "dependencySnapshot": {
+      "goVersion": "1.25.0",
+      "goModSha256": "18fae0e5364792cda8d276e4aed3f4d274e113f588e06a3914f96b22de9b3a10",
+      "goSumSha256": "26b437b7767e83074cb270517dc77c52140b273a775d76aa193fbdbd7d8f9dbb",
+      "vendorModulesSha256": "68bcd68d46b3ae82160b70c1e202c86ee404d77434ed079942107caeda3b81bd"
+    },
+    "excludedPaths": [
+      "pkg/ccl",
+      "pkg/ui/distccl",
+      "pkg/ui/workspaces/db-console/ccl",
+      "c-deps/krb5"
+    ]
+  },
+  "nativeDependencies": [
+    {
+      "name": "geos",
+      "sourceUrl": "https://github.com/cockroachdb/geos.git",
+      "commit": "ac79ef98b6a7bd26c87bf069f1e0685dbb648ba2",
+      "license": "LGPL-2.1-only",
+      "treeSha256": "baf3beb54c2cea6deb671c5fed2461509db0cc59b24d9e1ece1479ef02335bf1",
+      "licenseFile": "engine/c-deps/geos/COPYING",
+      "role": "geometry runtime"
+    },
+    {
+      "name": "jemalloc",
+      "sourceUrl": "https://github.com/cockroachdb/jemalloc.git",
+      "commit": "54eaed1d8b56b1aa528be3bdd1877e59c56fa90c",
+      "license": "BSD-2-Clause",
+      "treeSha256": "61cc4bc75f4c163820e976c1894aa640c1e2a79c9fec2daf77a8176afbbf88b3",
+      "licenseFile": "engine/c-deps/jemalloc/COPYING",
+      "role": "memory allocator"
+    },
+    {
+      "name": "libedit",
+      "sourceUrl": "https://github.com/cockroachdb/libedit.git",
+      "commit": "9dc73e7879592ba49de2cae5019a15da706422b1",
+      "license": "BSD-3-Clause",
+      "treeSha256": "8edbf34392989600a82fcd6af45ec2d764f1b93c7ca0927a2e7e6c4e453169cf",
+      "licenseFile": "engine/c-deps/libedit/COPYING",
+      "role": "SQL shell line editing"
+    },
+    {
+      "name": "proj",
+      "sourceUrl": "https://github.com/cockroachdb/PROJ.git",
+      "commit": "c8ff95857beb3027b5aa3d15726795570f38eccb",
+      "license": "MIT",
+      "treeSha256": "8c93754b0cfbc6bb5d7f6fb63c16810e85d67bc9a22623266f349ecca0f60984",
+      "licenseFile": "engine/c-deps/proj/COPYING",
+      "role": "coordinate transforms"
+    }
+  ],
+  "runtimeLayer": {
+    "sourceUrl": "https://github.com/Ratio1/deeploy-cockroachdb-service.git",
+    "commit": "89f1760c29b8d37bdac3ac4f274797e261db2811",
+    "baseEntrypointSha256": "0e70768bf4f4125f2e171cf544ca1304ac0a83774e97c115b2efbaa0de3a4698",
+    "entrypointSha256": "806594c01fc405d78bd6dc5ff7ed8256a8485ec5e28f22fa83b27c91c49fb558",
+    "runtimePackages": "source/runtime-packages.txt"
+  },
+  "buildInputs": {
+    "goBuilder": "golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36",
+    "runtime": "debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241",
+    "releaseTooling": {
+      "buildx": "v0.36.1",
+      "buildkit": "moby/buildkit:v0.32.2@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8",
+      "cosign": "v3.1.3",
+      "gh": "v2.97.0",
+      "syft": "v1.51.0",
+      "trivy": "v0.73.0"
+    },
+    "schemaValidation": {
+      "pythonImage": "python:3.13.7-slim@sha256:5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689",
+      "jsonschema": "4.25.1",
+      "requirementsSha256": "f8536716e919368051d3c87df416e89575d11a2c682882c266474345a644f2fa",
+      "spdxSchemaCommit": "aadf3b0b8dbbabdb4d880b0fc714255fea436ff7",
+      "spdxSchemaSha256": "239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b",
+      "cycloneDxSchemaCommit": "b29bae660048e0ad2fbc5f2972927b442ce951c4",
+      "cycloneDxSchemaSha256": "73308edec3ab2d38bfffd993e96a042b594314143b6971a6e9ed98bbb6bd76ce"
+    },
+    "cloudflared": {
+      "sourceUrl": "https://github.com/cloudflare/cloudflared.git",
+      "commit": "b4f47e2ab538ab6e31d3dc6adc5489455ad446de",
+      "gitTree": "5ad9ad6f658088660c54089b1dc54f6f15b88349",
+      "sourceArchiveUrl": "https://github.com/cloudflare/cloudflared/archive/b4f47e2ab538ab6e31d3dc6adc5489455ad446de.tar.gz",
+      "sourceArchiveSha256": "e897f2cdb6f63964bb7b5841df80087489a65ab9fda356ef48dd13202bba59c0",
+      "sourceDateEpoch": 1786553853,
+      "version": "2026.7.3-r1.b4f47e2",
+      "binarySha256": "77d66f9223e8ec418ef31613ee861e2e9067f6b2544ec93d185a2e468fcb2e47",
+      "goModSha256": "00e9b735fef2b05a1830734f12987ff6ea653958909bc59417af5a22daaf2b9d",
+      "goSumSha256": "cbc8ab59b002a5efc843e2c8470cc9b7ee717f1b24a9049f6acfad65e232da85",
+      "vendorModulesSha256": "1f1cdee78c7b5e841d10a5f8b9c73537c12dcc4f5026638ed62d569347c9553c",
+      "licenseSha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+      "buildInfo": "source/cloudflared-buildinfo.txt",
+      "compiledPackages": "source/cloudflared-compiled-packages.txt",
+      "licenseInventory": "source/cloudflared-license-inventory.csv"
+    },
+    "debianSnapshot": "20260701T000000Z",
+    "sourceDateEpoch": 1727820937
+  }
+}

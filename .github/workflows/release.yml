@@ -1,0 +1,612 @@
+name: Release signed image
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Immutable release version (v23.1.28-r1.X.Y)
+        required: true
+        type: string
+
+concurrency:
+  group: r1-distributed-sql-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    permissions:
+      artifact-metadata: write
+      attestations: write
+      contents: write
+      id-token: write
+      packages: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release tag and source contracts
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]]
+          [[ "$RELEASE_TAG" =~ ^v23\.1\.28-r1\.[0-9]+\.[0-9]+$ ]]
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse origin/main)" == "$GITHUB_SHA" ]]
+          python3 scripts/verify-source-boundary.py
+          python3 scripts/generate-license-inventory.py --check
+          python3 scripts/verify-provenance.py
+          python3 scripts/verify-public-test-fixtures.py
+          python3 scripts/verify-security-vex.py
+          python3 scripts/generate-source-manifest.py --check
+          python3 -m unittest tests.test_release_contract tests.test_sbom_contract
+          bash -n entrypoint.sh scripts/*.sh testbed/*.sh
+
+      - name: Prepare pristine source snapshot and evidence directory
+        run: |
+          mkdir -p artifacts source-snapshot
+          git archive "$GITHUB_SHA" | tar -x -C source-snapshot
+
+      - name: Prove corresponding source is anonymously available
+        run: |
+          set -euo pipefail
+          public_remote='https://github.com/Ratio1/r1-distributed-sql.git'
+          public_sha="$(GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0 \
+            git -C "$RUNNER_TEMP" -c credential.helper= -c http.extraHeader= ls-remote \
+            "$public_remote" refs/heads/main | awk '{print $1}')"
+          [[ "$public_sha" == "$GITHUB_SHA" ]] || {
+            echo 'The exact release source is not anonymously available from main.' >&2
+            echo 'Make the staged source repository public before publishing any image digest.' >&2
+            exit 1
+          }
+          archive="$RUNNER_TEMP/r1-distributed-sql-${GITHUB_SHA}.tar.gz"
+          extracted="$RUNNER_TEMP/public-source"
+          curl --fail --location --silent --show-error \
+            "https://github.com/Ratio1/r1-distributed-sql/archive/${GITHUB_SHA}.tar.gz" \
+            --output "$archive"
+          mkdir "$extracted"
+          tar -xzf "$archive" --strip-components=1 -C "$extracted"
+          while IFS= read -r -d '' path; do
+            cmp "$path" "$extracted/$path"
+          done < <(git ls-files -z)
+          sha256sum "$archive" > artifacts/public-source-archive.sha256.txt
+
+      - name: Verify Ratio1 overrides against exact upstream source
+        run: scripts/verify-upstream-provenance.sh
+
+      - name: Verify every vendored file against checksum-backed modules
+        run: |
+          docker run --rm \
+            --volume "$PWD:/workspace:ro" \
+            --workdir /workspace \
+            --env GOPROXY=https://proxy.golang.org \
+            --env GOSUMDB=sum.golang.org \
+            --env GOTOOLCHAIN=local \
+            golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 \
+            /usr/local/go/bin/go run ./scripts/verify-vendor-provenance.go
+
+      - name: Verify the offline OSS runtime closure
+        run: |
+          docker run --rm \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            --entrypoint python3 \
+            golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 \
+            scripts/verify-runtime-closure.py
+
+      - name: Resolve deterministic release metadata
+        id: metadata
+        run: |
+          set -euo pipefail
+          printf 'build_date=%s\n' "$(git show -s --format=%cI "$GITHUB_SHA")" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned GitHub CLI
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/gh_2.97.0_linux_amd64.tar.gz"
+          curl --fail --location --silent --show-error \
+            https://github.com/cli/cli/releases/download/v2.97.0/gh_2.97.0_linux_amd64.tar.gz \
+            --output "$archive"
+          printf '%s  %s\n' \
+            a2c9b8497e1f85b1ad0dfcb78b5a622e098801b8e461e459e88e1ee12f018112 \
+            "$archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          printf '%s\n' "$RUNNER_TEMP/gh_2.97.0_linux_amd64/bin" >> "$GITHUB_PATH"
+
+      - name: Record release control tool identities
+        run: |
+          {
+            gh version | head -n 1
+            git --version
+            docker version --format 'docker client={{.Client.Version}} server={{.Server.Version}}'
+            python3 --version
+          } > artifacts/release-tools.txt
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+        with:
+          version: v0.36.1
+          driver-opts: image=moby/buildkit:v0.32.2@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8
+
+      - name: Log in to GHCR for candidate publication
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish the untagged release candidate
+        id: candidate
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        env:
+          SOURCE_DATE_EPOCH: 1727820937
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        with:
+          context: .
+          platforms: linux/amd64
+          outputs: type=image,name=ghcr.io/ratio1/r1-distributed-sql,push-by-digest=true,name-canonical=true,push=true
+          build-args: |
+            BUILD_DATE=${{ steps.metadata.outputs.build_date }}
+            RATIO1_REVISION=${{ github.sha }}
+            RATIO1_VERSION=${{ inputs.release_tag }}
+            SOURCE_DATE_EPOCH=1727820937
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
+
+      - name: Record the immutable candidate reference
+        id: image
+        env:
+          CANDIDATE_DIGEST: ${{ steps.candidate.outputs.digest }}
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          image_ref="ghcr.io/ratio1/r1-distributed-sql@${CANDIDATE_DIGEST}"
+          printf 'ref=%s\n' "$image_ref" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$image_ref" > image-reference.txt
+
+      - name: Prove candidate binary and compatibility paths
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE_REF"
+          container_id="$(docker create "$IMAGE_REF")"
+          trap 'docker rm "$container_id" >/dev/null 2>&1 || true' EXIT
+          docker cp "$container_id:/cockroach/cockroach" ./cockroach
+          docker cp "$container_id:/usr/local/bin/cloudflared" ./cloudflared
+          chmod 755 ./cockroach
+          ./cockroach version | grep -F 'Distribution:     OSS'
+          ./cockroach version | grep -F "Build Tag:        $RELEASE_TAG"
+          docker run --rm --entrypoint /usr/bin/test "$IMAGE_REF" \
+            -x /usr/local/bin/deeploy-crdb-entrypoint
+          docker run --rm --entrypoint /usr/bin/test "$IMAGE_REF" \
+            ! -e /usr/bin/mv
+          docker run --rm --entrypoint /usr/bin/test "$IMAGE_REF" \
+            ! -e /usr/lib/x86_64-linux-gnu/libacl.so.1
+          docker run --rm \
+            --volume "$PWD:/workspace:ro" \
+            --workdir /workspace \
+            golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 \
+            /usr/local/go/bin/go version -m ./cockroach > artifacts/cockroach.buildinfo.txt
+          docker run --rm \
+            --volume "$PWD:/workspace:ro" \
+            --workdir /workspace \
+            golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 \
+            /usr/local/go/bin/go version -m ./cloudflared > artifacts/cloudflared.buildinfo.txt
+
+      - name: Run the bounded local three-node testbed
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          timeout --signal=TERM --kill-after=60s 20m \
+            testbed/run-local-cluster.sh "$IMAGE_REF"
+
+      - name: Prove persisted rolling upgrade and rollback compatibility
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+          R1_SQL_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/rolling-upgrade
+        run: |
+          timeout --signal=TERM --kill-after=120s 35m \
+            testbed/run-rolling-upgrade.sh "$IMAGE_REF"
+
+      - name: Prove runtime supervision and corrupt-store recovery
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          timeout --signal=TERM --kill-after=120s 45m \
+            scripts/runtime-supervision-smoke.sh "$IMAGE_REF" fixed
+
+      - name: Run unchanged candidate through real ephemeral Cloudflare tunnels
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_BASE_DOMAIN: ${{ secrets.CF_BASE_DOMAIN }}
+          R1_SQL_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/real-cloudflare
+        run: |
+          timeout --signal=TERM --kill-after=10m 30m \
+            testbed/run-real-cloudflare-cluster.sh "$IMAGE_REF"
+
+      - name: Record raw candidate findings
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          version: v0.73.0
+          image-ref: ${{ steps.image.outputs.ref }}
+          format: json
+          output: artifacts/trivy-raw.json
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+
+      - name: Gate candidate findings through reviewed VEX
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        env:
+          TRIVY_VEX: security/openvex.json
+        with:
+          version: v0.73.0
+          image-ref: ${{ steps.image.outputs.ref }}
+          format: json
+          output: artifacts/trivy-vex.json
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+
+      - name: Generate image SPDX SBOM
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
+        with:
+          image: ${{ steps.image.outputs.ref }}
+          format: spdx-json
+          syft-version: v1.51.0
+          upload-artifact: false
+          upload-release-assets: false
+          output-file: artifacts/r1-distributed-sql-image.spdx.json
+
+      - name: Generate image CycloneDX SBOM
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
+        with:
+          image: ${{ steps.image.outputs.ref }}
+          format: cyclonedx-json
+          syft-version: v1.51.0
+          upload-artifact: false
+          upload-release-assets: false
+          output-file: artifacts/r1-distributed-sql-image.cdx.json
+
+      - name: Generate source SPDX SBOM
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
+        with:
+          path: source-snapshot
+          format: spdx-json
+          syft-version: v1.51.0
+          upload-artifact: false
+          upload-release-assets: false
+          output-file: artifacts/r1-distributed-sql-source.spdx.json
+
+      - name: Generate source CycloneDX SBOM
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
+        with:
+          path: source-snapshot
+          format: cyclonedx-json
+          syft-version: v1.51.0
+          upload-artifact: false
+          upload-release-assets: false
+          output-file: artifacts/r1-distributed-sql-source.cdx.json
+
+      - name: Verify SBOM component coverage
+        env:
+          JSONSCHEMA_VERSION: 4.25.1
+        run: |
+          set -euo pipefail
+          for sbom in artifacts/r1-distributed-sql-*.json; do
+            python3 scripts/augment-sbom.py "$sbom"
+          done
+          docker run --rm \
+            --env JSONSCHEMA_VERSION \
+            --volume "$PWD:/workspace:ro" \
+            --workdir /workspace \
+            python:3.13.7-slim@sha256:5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689 \
+            sh -ec 'python -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: -r source/sbom-validation-requirements.txt >/dev/null && python -c '\''import importlib.metadata, os; assert importlib.metadata.version("jsonschema") == os.environ["JSONSCHEMA_VERSION"]'\'' && python scripts/validate-sbom-schema.py artifacts/r1-distributed-sql-*.json'
+          python3 scripts/verify-sbom.py --require-runtime \
+            --go-buildinfo artifacts/cockroach.buildinfo.txt \
+            --go-buildinfo artifacts/cloudflared.buildinfo.txt \
+            artifacts/r1-distributed-sql-image.spdx.json
+          python3 scripts/verify-sbom.py --require-runtime \
+            --go-buildinfo artifacts/cockroach.buildinfo.txt \
+            --go-buildinfo artifacts/cloudflared.buildinfo.txt \
+            artifacts/r1-distributed-sql-image.cdx.json
+          python3 scripts/verify-sbom.py artifacts/r1-distributed-sql-source.spdx.json
+          python3 scripts/verify-sbom.py artifacts/r1-distributed-sql-source.cdx.json
+
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-name: ghcr.io/ratio1/r1-distributed-sql
+          subject-digest: ${{ steps.candidate.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest image SPDX SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-name: ghcr.io/ratio1/r1-distributed-sql
+          subject-digest: ${{ steps.candidate.outputs.digest }}
+          sbom-path: artifacts/r1-distributed-sql-image.spdx.json
+          push-to-registry: true
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac
+        with:
+          cosign-release: v3.1.3
+
+      - name: Sign and verify the exact digest
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          set -euo pipefail
+          expected_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/heads/main"
+          cosign sign --yes "$IMAGE_REF"
+          cosign attest --yes \
+            --type spdxjson \
+            --predicate artifacts/r1-distributed-sql-image.spdx.json \
+            "$IMAGE_REF"
+          cosign attest --yes \
+            --type openvex \
+            --predicate security/openvex.json \
+            "$IMAGE_REF"
+          cosign verify \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            --certificate-identity "$expected_identity" \
+            "$IMAGE_REF"
+          cosign verify-attestation \
+            --type spdxjson \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            --certificate-identity "$expected_identity" \
+            "$IMAGE_REF"
+          cosign verify-attestation \
+            --type openvex \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            --certificate-identity "$expected_identity" \
+            "$IMAGE_REF"
+          gh attestation verify "oci://${IMAGE_REF}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --cert-identity "$expected_identity" \
+            --source-ref 'refs/heads/main' \
+            --predicate-type 'https://slsa.dev/provenance/v1'
+          gh attestation verify "oci://${IMAGE_REF}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --cert-identity "$expected_identity" \
+            --source-ref 'refs/heads/main' \
+            --predicate-type 'https://spdx.dev/Document/v2.3'
+
+      - name: Prove public anonymous pull before tag promotion
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          set -euo pipefail
+          anonymous_config="$(mktemp -d)"
+          cleanup_anonymous_config() {
+            find "$anonymous_config" -mindepth 1 -depth -delete
+            rmdir "$anonymous_config"
+          }
+          trap cleanup_anonymous_config EXIT
+          docker image rm --force "$IMAGE_REF" >/dev/null 2>&1 || true
+          if ! DOCKER_CONFIG="$anonymous_config" docker pull "$IMAGE_REF"; then
+            echo 'Anonymous pull failed. A package administrator must set the' >&2
+            echo 'r1-distributed-sql GHCR package visibility to Public, then rerun this workflow.' >&2
+            exit 1
+          fi
+
+      - name: Upload validation evidence even on gate failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r1-distributed-sql-${{ inputs.release_tag }}-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/*.json
+            artifacts/*.txt
+            artifacts/real-cloudflare/summary.txt
+            artifacts/real-cloudflare/topology.json
+            artifacts/real-cloudflare/node-*.log
+            artifacts/rolling-upgrade/
+            image-reference.txt
+            LICENSE
+            LICENSE-OVERVIEW.md
+            NOTICE
+            RATIO1_PATCHES.md
+            THIRD_PARTY_NOTICES.md
+            UPSTREAM.md
+            SECURITY.md
+            security/openvex.json
+            source/license-inventory.json
+            source/manifest.sha256
+            source/provenance.json
+            source/runtime-packages.txt
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Upload non-secret Cloudflare cleanup state on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r1-distributed-sql-cloudflare-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/real-cloudflare/cloudflare-cleanup-state.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Preflight resumable immutable release identifiers
+        id: preflight
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          release_state="$(scripts/inspect-github-release.sh "$RELEASE_TAG")"
+          case "$release_state" in
+            missing|draft|published) ;;
+            *)
+              echo "invalid GitHub release state: $release_state" >&2
+              exit 1
+              ;;
+          esac
+          if [[ "$release_state" != "missing" ]]; then
+            git fetch --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+            [[ "$(git rev-list -n 1 "$RELEASE_TAG")" == "$GITHUB_SHA" ]] || {
+              echo "existing source tag does not identify this release commit" >&2
+              exit 1
+            }
+          else
+            set +e
+            tag_output="$(git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG")"
+            tag_status=$?
+            set -e
+            case "$tag_status" in
+              0)
+                echo "source tag exists without a resumable GitHub release: $RELEASE_TAG" >&2
+                exit 1
+                ;;
+              2)
+                [[ -z "$tag_output" ]]
+                ;;
+              *)
+                echo "could not determine whether source tag exists: $RELEASE_TAG" >&2
+                exit 1
+                ;;
+            esac
+          fi
+          printf 'release_state=%s\n' "$release_state" >> "$GITHUB_OUTPUT"
+
+          tagged_ref="ghcr.io/ratio1/r1-distributed-sql:${RELEASE_TAG}"
+          image_tag_exists=false
+          tag_state="$(scripts/inspect-ghcr-tag.sh "$tagged_ref")"
+          if [[ "$tag_state" != "absent" ]]; then
+            expected_digest="${IMAGE_REF##*@}"
+            [[ "$tag_state" == "$expected_digest" ]] || {
+              echo "immutable image tag identifies a different digest: $tagged_ref" >&2
+              exit 1
+            }
+            image_tag_exists=true
+          fi
+          printf 'image_tag_exists=%s\n' "$image_tag_exists" >> "$GITHUB_OUTPUT"
+          if [[ "$release_state" == "published" && "$image_tag_exists" != "true" ]]; then
+            echo "published source release is missing its immutable image tag" >&2
+            exit 1
+          fi
+
+      - name: Prepare draft release and immutable source tag
+        if: steps.preflight.outputs.release_state == 'missing'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            artifacts/*.json artifacts/*.txt image-reference.txt LICENSE LICENSE-OVERVIEW.md \
+            NOTICE RATIO1_PATCHES.md \
+            THIRD_PARTY_NOTICES.md UPSTREAM.md source/license-inventory.json \
+            source/manifest.sha256 source/provenance.json SECURITY.md \
+            source/runtime-packages.txt security/openvex.json \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --draft \
+            --generate-notes \
+            --title "R1 Distributed SQL $RELEASE_TAG"
+
+      - name: Refresh and verify resumable draft release assets
+        if: steps.preflight.outputs.release_state == 'draft'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          release_assets=(
+            artifacts/*.json
+            artifacts/*.txt
+            image-reference.txt
+            LICENSE
+            LICENSE-OVERVIEW.md
+            NOTICE
+            RATIO1_PATCHES.md
+            THIRD_PARTY_NOTICES.md
+            UPSTREAM.md
+            source/license-inventory.json
+            source/manifest.sha256
+            source/provenance.json
+            SECURITY.md
+            source/runtime-packages.txt
+            security/openvex.json
+          )
+          gh release upload "$RELEASE_TAG" "${release_assets[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+          downloaded="$(mktemp -d)"
+          cleanup_downloaded() {
+            find "$downloaded" -mindepth 1 -depth -delete
+            rmdir "$downloaded"
+          }
+          trap cleanup_downloaded EXIT
+          printf '%s\n' "${release_assets[@]##*/}" | LC_ALL=C sort \
+            > "$downloaded/expected-assets.txt"
+          gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json assets \
+            --jq '.assets[].name' | LC_ALL=C sort \
+            > "$downloaded/actual-assets.txt"
+          if ! cmp "$downloaded/expected-assets.txt" "$downloaded/actual-assets.txt"; then
+            echo "resumable draft contains stale or missing release assets" >&2
+            diff -u "$downloaded/expected-assets.txt" "$downloaded/actual-assets.txt" >&2 || true
+            exit 1
+          fi
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern image-reference.txt \
+            --dir "$downloaded"
+          cmp image-reference.txt "$downloaded/image-reference.txt"
+
+      - name: Promote the single immutable version tag
+        if: steps.preflight.outputs.image_tag_exists != 'true'
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          digest="${IMAGE_REF##*@}"
+          tagged_ref="ghcr.io/ratio1/r1-distributed-sql:${RELEASE_TAG}"
+          tag_state="$(scripts/inspect-ghcr-tag.sh "$tagged_ref")"
+          if [[ "$tag_state" == "absent" ]]; then
+            docker buildx imagetools create --prefer-index=false --tag "$tagged_ref" "$IMAGE_REF"
+          elif [[ "$tag_state" != "$digest" ]]; then
+            echo "immutable image tag identifies a different digest: $tagged_ref" >&2
+            exit 1
+          fi
+          [[ "$(scripts/inspect-ghcr-tag.sh "$tagged_ref")" == "$digest" ]]
+
+      - name: Publish the validated release
+        if: steps.preflight.outputs.release_state != 'published'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+
+      - name: Update latest only after release publication
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          set -euo pipefail
+          digest="${IMAGE_REF##*@}"
+          tagged_ref="ghcr.io/ratio1/r1-distributed-sql:latest"
+          docker buildx imagetools create --prefer-index=false --tag "$tagged_ref" "$IMAGE_REF"
+          resolved="sha256:$(docker buildx imagetools inspect --raw "$tagged_ref" | sha256sum | awk '{print $1}')"
+          [[ "$resolved" == "$digest" ]]

@@ -1,0 +1,118 @@
+name: Recover ephemeral Cloudflare resources
+
+on:
+  workflow_run:
+    workflows: [Release signed image]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Failed release workflow run ID
+        required: true
+        type: string
+      run_attempt:
+        description: Failed attempt number; leave empty for the latest attempt
+        required: false
+        type: string
+
+concurrency:
+  group: r1-sql-cloudflare-cleanup-${{ github.event.workflow_run.id || inputs.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  cleanup:
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       contains(fromJSON('["failure","cancelled","timed_out"]'), github.event.workflow_run.conclusion)) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out trusted cleanup implementation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Install pinned GitHub CLI
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/gh_2.97.0_linux_amd64.tar.gz"
+          curl --fail --location --silent --show-error \
+            https://github.com/cli/cli/releases/download/v2.97.0/gh_2.97.0_linux_amd64.tar.gz \
+            --output "$archive"
+          printf '%s  %s\n' \
+            a2c9b8497e1f85b1ad0dfcb78b5a622e098801b8e461e459e88e1ee12f018112 \
+            "$archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          printf '%s\n' "$RUNNER_TEMP/gh_2.97.0_linux_amd64/bin" >> "$GITHUB_PATH"
+
+      - name: Validate the exact unsuccessful release attempt
+        id: source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_RUN_ID: ${{ github.event.workflow_run.id }}
+          EVENT_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          INPUT_RUN_ID: ${{ inputs.run_id }}
+          INPUT_RUN_ATTEMPT: ${{ inputs.run_attempt }}
+        run: |
+          set -euo pipefail
+          run_id="${EVENT_RUN_ID:-${INPUT_RUN_ID:-}}"
+          run_attempt="${EVENT_RUN_ATTEMPT:-${INPUT_RUN_ATTEMPT:-}}"
+          [[ "$run_id" =~ ^[1-9][0-9]*$ ]]
+          if [[ -n "$run_attempt" ]]; then
+            [[ "$run_attempt" =~ ^[1-9][0-9]*$ ]]
+          fi
+
+          run_json="$RUNNER_TEMP/source-run.json"
+          jobs_json="$RUNNER_TEMP/source-jobs.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" > "$run_json"
+          if [[ -z "$run_attempt" ]]; then
+            run_attempt="$(jq -r '.run_attempt // empty' "$run_json")"
+            [[ "$run_attempt" =~ ^[1-9][0-9]*$ ]]
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100" \
+            > "$jobs_json"
+          python3 scripts/cloudflare_cleanup_recovery.py \
+            --run-json "$run_json" \
+            --jobs-json "$jobs_json" \
+            --repository "$GITHUB_REPOSITORY" \
+            --run-id "$run_id" \
+            --run-attempt "$run_attempt" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Recover the exact attempt's Cloudflare resources
+        if: steps.source.outputs.cleanup_needed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_BASE_DOMAIN: ${{ secrets.CF_BASE_DOMAIN }}
+          SOURCE_RUN_ID: ${{ steps.source.outputs.run_id }}
+          RUN_PREFIX: ${{ steps.source.outputs.prefix }}
+          ARTIFACT_NAME: ${{ steps.source.outputs.artifact_pattern }}
+        run: |
+          set -euo pipefail
+          recovery_dir="$RUNNER_TEMP/cloudflare-recovery"
+          mkdir -m 700 "$recovery_dir"
+          if gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "$ARTIFACT_NAME" --dir "$recovery_dir"; then
+            mapfile -d '' states < <(find "$recovery_dir" -type f \
+              -name cloudflare-cleanup-state.json -print0)
+            if [[ "${#states[@]}" == "1" ]]; then
+              chmod 600 "${states[0]}"
+              python3 scripts/cloudflare_ephemeral_tunnels.py cleanup \
+                --state "${states[0]}" --expected-run-prefix "$RUN_PREFIX" || true
+            elif [[ "${#states[@]}" -gt "1" ]]; then
+              echo "cleanup artifact contained multiple state files; using exact-prefix recovery" >&2
+            fi
+          else
+            echo "cleanup artifact unavailable; using exact-prefix recovery" >&2
+          fi
+          python3 scripts/cloudflare_ephemeral_tunnels.py cleanup-prefix --prefix "$RUN_PREFIX"
