@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0, included in the file
 // licenses/APL.txt.
 
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 package diagnostics
 
 import (
@@ -34,28 +36,35 @@ import (
 // URL is set.
 var updatesURL *url.URL
 
-const defaultUpdatesURL = `https://register.cockroachdb.com/api/clusters/updates`
+const defaultUpdatesURL = ``
 
 // reportingURL is the URL used to report diagnostics/telemetry. Can be nil if
 // an empty URL is set.
 var reportingURL *url.URL
 
-const defaultReportingURL = `https://register.cockroachdb.com/api/clusters/report`
+const defaultReportingURL = ``
 
 func init() {
 	var err error
-	updatesURL, err = url.Parse(
+	updatesURL, err = parseOptionalURL(
 		envutil.EnvOrDefaultString("COCKROACH_UPDATE_CHECK_URL", defaultUpdatesURL),
 	)
 	if err != nil {
 		panic(err)
 	}
-	reportingURL, err = url.Parse(
+	reportingURL, err = parseOptionalURL(
 		envutil.EnvOrDefaultString("COCKROACH_USAGE_REPORT_URL", defaultReportingURL),
 	)
 	if err != nil {
 		panic(err)
 	}
+}
+
+func parseOptionalURL(value string) (*url.URL, error) {
+	if value == "" {
+		return nil, nil
+	}
+	return url.Parse(value)
 }
 
 // TestingKnobs groups testing knobs for diagnostics.

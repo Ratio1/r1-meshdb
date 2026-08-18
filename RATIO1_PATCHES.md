@@ -24,16 +24,53 @@ Every released file is covered by `source/manifest.sha256`.
   the public image build never regenerates or mutates source. The temporary full
   checkout is validation input only and is never archived or distributed.
 
-### Comment-only source cleanup
+### R1 MeshDB identity, support, and privacy defaults
 
-Two comments in the retained OSS closure referred to excluded enterprise
-workloads/assets. Ratio1 replaced those references with neutral wording in:
+Ratio1 changed product-facing strings, issue/support routing, compatibility
+documentation, and telemetry defaults in these retained upstream files:
 
+- `engine/pkg/build/info.go`
 - `engine/pkg/cli/cli.go`
+- `engine/pkg/cli/clierrorplus/decorate_error.go`
+- `engine/pkg/cli/cliflags/flags.go`
+- `engine/pkg/cli/clisqlcfg/context.go`
+- `engine/pkg/cli/clisqlclient/conn.go`
+- `engine/pkg/cli/clisqlshell/sql.go`
+- `engine/pkg/cli/demo.go`
+- `engine/pkg/cli/debug_recover_loss_of_quorum.go`
+- `engine/pkg/cli/examples.go`
+- `engine/pkg/cli/flags.go`
+- `engine/pkg/cli/gen.go`
+- `engine/pkg/cli/import.go`
+- `engine/pkg/cli/init.go`
+- `engine/pkg/cli/sql_shell_cmd.go`
+- `engine/pkg/cli/start.go`
+- `engine/pkg/docs/docs.go`
+- `engine/pkg/kv/kvserver/replica_consistency.go`
+- `engine/pkg/kv/kvserver/replica_corruption.go`
+- `engine/pkg/kv/kvclient/kvcoord/txn_coord_sender.go`
+- `engine/pkg/server/api_v2_error.go`
+- `engine/pkg/server/diagnostics/diagnostics.go`
+- `engine/pkg/server/server.go`
+- `engine/pkg/settings/cluster/cluster_settings.go`
+- `engine/pkg/sql/crdb_internal.go`
+- `engine/pkg/sql/vars.go`
 - `engine/pkg/ui/ui.go`
+- `engine/pkg/util/log/clog.go`
+- `engine/pkg/util/log/logcrash/crash_reporting.go`
+- `engine/pkg/util/tracing/tracer.go`
 
-These edits do not affect compiled behavior. They allow the source-boundary
-gate to reject enterprise paths and license markers without exceptions.
+The compiled CLI, console, build metadata, logs, SQL build-info row, and
+OpenTelemetry service name now identify R1 MeshDB. Fatal errors and issue URLs
+route to Ratio1. Compatibility links are pinned explicitly to upstream v23.1
+instead of deriving a nonexistent CockroachDB v1.0 documentation path.
+
+Update checks, diagnostics reporting, and crash submission have no default
+network endpoint; diagnostics reporting is disabled and telemetry opt-out is
+enabled by default. An operator may still configure the retained explicit
+crash-report environment override. Neutral comment wording for excluded
+enterprise workloads/assets remains in `engine/pkg/cli/cli.go` and
+`engine/pkg/ui/ui.go` so source-boundary checks require no exceptions.
 
 ### Dependency snapshot and neutral direct build
 
@@ -70,12 +107,14 @@ upstream commit as `Build Commit ID` and requires all of:
 
 ```text
 Distribution:     OSS
-Build Tag:        v23.1.28-r1.<major>.<patch>
+Build Tag:        v1.0.0
 Build Type:       release
 ```
 
-No database execution, consensus, storage, wire-protocol, or on-disk-format
-source has been modified by Ratio1.
+No query-planning, query-execution, consensus, wire-protocol, or on-disk-format
+semantics have been modified by Ratio1. The one storage-source change is the
+typed corruption signal documented below; `crdb_internal` changes only the
+reported product name and one catalog description.
 
 `engine/pkg/util/goschedstats/runtime_go1.26.go` preserves the v23.1 scheduler
 load-sampling contract on Go 1.26 by reading the standard
@@ -163,13 +202,17 @@ operation is no longer supported.
   command, carrier, and tunnel RPC tests run during the image build.
 - Resolves Debian packages from a dated snapshot and pins direct package
   versions.
+- Accompanies retained Debian object code with exact binary-to-source mappings,
+  `.dsc` files, and source archives from that snapshot, both inside the image
+  and as a checksum-backed release asset.
 - Copies only the runtime executables, shared libraries, CA bundle, and OS
   metadata required by the database, Cloudflared, and compatibility entrypoint
   into a `scratch` final image. `source/runtime-packages.txt` is the exact
   package/version closure, and the image retains matching `dpkg` and copyright
   records for scanner and SBOM visibility.
 - Embeds Apache, upstream, third-party, provenance, patch, and affirmative
-  source-license records.
+  source-license records, including all current vendored Go license/notice
+  files rather than relying on the upstream v23.1.28 aggregate notice alone.
 - Publishes source/image SPDX and CycloneDX SBOMs, GitHub build provenance, an
   OCI SPDX attestation, and a keyless Cosign signature for each image digest.
 - Pins Buildx, BuildKit, Syft, Trivy, and Cosign versions in both provenance and

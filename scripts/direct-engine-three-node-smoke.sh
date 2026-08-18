@@ -3,10 +3,10 @@ set -euo pipefail
 
 image="${1:?usage: direct-engine-three-node-smoke.sh <image-ref> [run-id]}"
 run_id="${2:-$$-${RANDOM}}"
-network="r1-sql-direct-${run_id}"
-tmp="$(mktemp -d /tmp/r1-sql-direct.XXXXXX)"
-nodes=("r1-sql-direct-1-${run_id}" "r1-sql-direct-2-${run_id}" "r1-sql-direct-3-${run_id}")
-volumes=("r1-sql-direct-store-1-${run_id}" "r1-sql-direct-store-2-${run_id}" "r1-sql-direct-store-3-${run_id}")
+network="r1-meshdb-direct-${run_id}"
+tmp="$(mktemp -d /tmp/r1-meshdb-direct.XXXXXX)"
+nodes=("r1-meshdb-direct-1-${run_id}" "r1-meshdb-direct-2-${run_id}" "r1-meshdb-direct-3-${run_id}")
+volumes=("r1-meshdb-direct-store-1-${run_id}" "r1-meshdb-direct-store-2-${run_id}" "r1-meshdb-direct-store-3-${run_id}")
 
 cleanup() {
   local status=$?

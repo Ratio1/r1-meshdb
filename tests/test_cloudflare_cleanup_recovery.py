@@ -52,16 +52,22 @@ def source_jobs(step_conclusion="failure", job_conclusion="failure"):
 
 
 class CloudflareCleanupRecoveryTests(unittest.TestCase):
+  def test_resolves_automatic_main_push_release(self):
+    result = resolve_cleanup_run(
+      source_run(event="push"), source_jobs(), REPOSITORY, str(RUN_ID), str(ATTEMPT)
+    )
+    self.assertTrue(result["cleanupNeeded"])
+
   def test_resolves_exact_failed_attempt(self):
     result = resolve_cleanup_run(
       source_run(), source_jobs(), REPOSITORY, str(RUN_ID), str(ATTEMPT)
     )
     self.assertEqual(result["runId"], RUN_ID)
     self.assertEqual(result["runAttempt"], ATTEMPT)
-    self.assertEqual(result["prefix"], "r1-sql-ci-12345-2")
+    self.assertEqual(result["prefix"], "r1-meshdb-ci-12345-2")
     self.assertEqual(
       result["artifactPattern"],
-      "r1-distributed-sql-cloudflare-cleanup-12345-2",
+      "r1-meshdb-cloudflare-cleanup-12345-2",
     )
     self.assertTrue(result["cleanupNeeded"])
 
@@ -166,7 +172,7 @@ class CloudflareCleanupRecoveryTests(unittest.TestCase):
       )
       self.assertEqual(outputs["run_id"], str(RUN_ID))
       self.assertEqual(outputs["run_attempt"], str(ATTEMPT))
-      self.assertEqual(outputs["prefix"], "r1-sql-ci-12345-2")
+      self.assertEqual(outputs["prefix"], "r1-meshdb-ci-12345-2")
       self.assertEqual(outputs["cleanup_needed"], "true")
 
 

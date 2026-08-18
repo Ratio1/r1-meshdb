@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "${R1_SQL_SECRETS_REEXEC:-}" != "1" ]]; then
+if [[ "${R1_MESHDB_SECRETS_REEXEC:-}" != "1" ]]; then
   stage_secret_input() {
     local value="$1"
     local source_file="$2"
@@ -25,7 +25,7 @@ if [[ "${R1_SQL_SECRETS_REEXEC:-}" != "1" ]]; then
     echo "[deeploy-crdb] CF_TUNNEL_TOKEN or CF_TUNNEL_TOKEN_FILE is required" >&2
     exit 1
   fi
-  secret_dir="$(mktemp -d /tmp/r1-distributed-sql-secrets.XXXXXXXX)"
+  secret_dir="$(mktemp -d /tmp/r1-meshdb-secrets.XXXXXXXX)"
   chmod 700 "${secret_dir}"
   umask 077
   printf '%s' "${CRDB_PASSWORD}" > "${secret_dir}/database-password"
@@ -52,8 +52,8 @@ if [[ "${R1_SQL_SECRETS_REEXEC:-}" != "1" ]]; then
     -u CRDB_NODE_KEY -u CRDB_NODE_KEY_FILE \
     -u CRDB_CLIENT_ROOT_CRT -u CRDB_CLIENT_ROOT_CRT_FILE \
     -u CRDB_CLIENT_ROOT_KEY -u CRDB_CLIENT_ROOT_KEY_FILE \
-    R1_SQL_SECRETS_REEXEC=1 \
-    R1_SQL_SECRET_DIR="${secret_dir}" \
+    R1_MESHDB_SECRETS_REEXEC=1 \
+    R1_MESHDB_SECRET_DIR="${secret_dir}" \
     CRDB_CA_CRT_FILE="${secret_dir}/ca-crt" \
     CRDB_NODE_CRT_FILE="${secret_dir}/node-crt" \
     CRDB_NODE_KEY_FILE="${secret_dir}/node-key" \
@@ -62,27 +62,27 @@ if [[ "${R1_SQL_SECRETS_REEXEC:-}" != "1" ]]; then
     "$0" "$@"
 fi
 
-: "${R1_SQL_SECRET_DIR:?internal secret directory is required}"
-case "${R1_SQL_SECRET_DIR}" in
-  /tmp/r1-distributed-sql-secrets.*) ;;
+: "${R1_MESHDB_SECRET_DIR:?internal secret directory is required}"
+case "${R1_MESHDB_SECRET_DIR}" in
+  /tmp/r1-meshdb-secrets.*) ;;
   *) echo "[deeploy-crdb] invalid internal secret directory" >&2; exit 1 ;;
 esac
-if [[ -L "${R1_SQL_SECRET_DIR}" || ! -d "${R1_SQL_SECRET_DIR}" ||
-      "$(stat -c '%u:%a' "${R1_SQL_SECRET_DIR}" 2>/dev/null || true)" != "0:700" ]]; then
+if [[ -L "${R1_MESHDB_SECRET_DIR}" || ! -d "${R1_MESHDB_SECRET_DIR}" ||
+      "$(stat -c '%u:%a' "${R1_MESHDB_SECRET_DIR}" 2>/dev/null || true)" != "0:700" ]]; then
   echo "[deeploy-crdb] invalid internal secret directory" >&2
   exit 1
 fi
-R1_SQL_PASSWORD_FILE="${R1_SQL_SECRET_DIR}/database-password"
-R1_SQL_TUNNEL_TOKEN_FILE="${R1_SQL_SECRET_DIR}/cloudflare-token"
-R1_SQL_STAGED_CERT_FILES=(
-  "${R1_SQL_SECRET_DIR}/ca-crt"
-  "${R1_SQL_SECRET_DIR}/node-crt"
-  "${R1_SQL_SECRET_DIR}/node-key"
-  "${R1_SQL_SECRET_DIR}/client-root-crt"
-  "${R1_SQL_SECRET_DIR}/client-root-key"
+R1_MESHDB_PASSWORD_FILE="${R1_MESHDB_SECRET_DIR}/database-password"
+R1_MESHDB_TUNNEL_TOKEN_FILE="${R1_MESHDB_SECRET_DIR}/cloudflare-token"
+R1_MESHDB_STAGED_CERT_FILES=(
+  "${R1_MESHDB_SECRET_DIR}/ca-crt"
+  "${R1_MESHDB_SECRET_DIR}/node-crt"
+  "${R1_MESHDB_SECRET_DIR}/node-key"
+  "${R1_MESHDB_SECRET_DIR}/client-root-crt"
+  "${R1_MESHDB_SECRET_DIR}/client-root-key"
 )
-for secret_file in "${R1_SQL_PASSWORD_FILE}" "${R1_SQL_TUNNEL_TOKEN_FILE}" \
-    "${R1_SQL_STAGED_CERT_FILES[@]}"; do
+for secret_file in "${R1_MESHDB_PASSWORD_FILE}" "${R1_MESHDB_TUNNEL_TOKEN_FILE}" \
+    "${R1_MESHDB_STAGED_CERT_FILES[@]}"; do
   if [[ -L "${secret_file}" || ! -f "${secret_file}" ||
         "$(stat -c '%u:%a' "${secret_file}" 2>/dev/null || true)" != "0:600" ]]; then
     echo "[deeploy-crdb] invalid internal secret file" >&2
@@ -90,13 +90,13 @@ for secret_file in "${R1_SQL_PASSWORD_FILE}" "${R1_SQL_TUNNEL_TOKEN_FILE}" \
   fi
 done
 early_secret_cleanup() {
-  rm -f -- "${R1_SQL_PASSWORD_FILE}" "${R1_SQL_TUNNEL_TOKEN_FILE}" \
-    "${R1_SQL_STAGED_CERT_FILES[@]}" >/dev/null 2>&1 || true
-  rmdir "${R1_SQL_SECRET_DIR}" >/dev/null 2>&1 || true
+  rm -f -- "${R1_MESHDB_PASSWORD_FILE}" "${R1_MESHDB_TUNNEL_TOKEN_FILE}" \
+    "${R1_MESHDB_STAGED_CERT_FILES[@]}" >/dev/null 2>&1 || true
+  rmdir "${R1_MESHDB_SECRET_DIR}" >/dev/null 2>&1 || true
 }
 trap early_secret_cleanup EXIT
-CRDB_PASSWORD="$(cat "${R1_SQL_PASSWORD_FILE}")"
-export -n CRDB_PASSWORD R1_SQL_SECRET_DIR R1_SQL_PASSWORD_FILE R1_SQL_TUNNEL_TOKEN_FILE
+CRDB_PASSWORD="$(cat "${R1_MESHDB_PASSWORD_FILE}")"
+export -n CRDB_PASSWORD R1_MESHDB_SECRET_DIR R1_MESHDB_PASSWORD_FILE R1_MESHDB_TUNNEL_TOKEN_FILE
 
 : "${CRDB_NODE_ID:?CRDB_NODE_ID is required}"
 : "${CRDB_NODE_COUNT:?CRDB_NODE_COUNT is required}"
@@ -225,7 +225,7 @@ prepare_store_root() {
 
   if [[ -L "${CRDB_STORE}" || ! -d "${CRDB_STORE}" || \
         "$(stat -c '%u' "${CRDB_STORE}" 2>/dev/null || true)" != "0" ]]; then
-    log "invalid CockroachDB store directory"
+    log "invalid R1 MeshDB store directory"
     return 1
   fi
   store_mode="$(stat -c '%a' "${CRDB_STORE}" 2>/dev/null || true)"
@@ -234,7 +234,7 @@ prepare_store_root() {
     store_mode="$(stat -c '%a' "${CRDB_STORE}" 2>/dev/null || true)"
   fi
   if [[ -L "${CRDB_STORE}" || "${store_mode}" != "700" ]]; then
-    log "invalid CockroachDB store directory"
+    log "invalid R1 MeshDB store directory"
     return 1
   fi
 }
@@ -272,7 +272,7 @@ validate_positive_integer "CRDB_RECOVERY_LOG_RETENTION_RUNS" "${CRDB_RECOVERY_LO
 normalize_and_validate_store_path || exit 1
 case "${CRDB_USER,,}" in
   root|admin|node|public)
-    log "CRDB_USER must not be a reserved CockroachDB identity"
+    log "CRDB_USER must not be a reserved R1 MeshDB identity"
     exit 1
     ;;
 esac
@@ -308,7 +308,7 @@ if [[ "${CRDB_NODE_ID}" == "1" ]]; then
   write_secret_file "${CRDB_CERTS_DIR}/client.root.key" "${CRDB_CLIENT_ROOT_KEY}"
 fi
 
-rm -f -- "${R1_SQL_STAGED_CERT_FILES[@]}" || {
+rm -f -- "${R1_MESHDB_STAGED_CERT_FILES[@]}" || {
   log "could not remove staged certificate material"
   exit 1
 }
@@ -626,11 +626,11 @@ prune_old_run_logs() {
       -name 'deeploy-run.????????' -printf '%T@ %y %p\0' 2>/dev/null | \
       sort -zrn > "${run_log_list_file}" || \
      ! mapfile -d '' -t run_dirs < "${run_log_list_file}"; then
-    log "could not enumerate CockroachDB run-log entries"
+    log "could not enumerate R1 MeshDB run-log entries"
     return 1
   fi
   if ! rm -f -- "${run_log_list_file}"; then
-    log "could not remove CockroachDB run-log enumeration state"
+    log "could not remove R1 MeshDB run-log enumeration state"
     return 1
   fi
   run_log_list_file=""
@@ -643,13 +643,13 @@ prune_old_run_logs() {
     if [[ "${entry_type}" != "d" || \
           ! "${run_dir##*/}" =~ ^deeploy-run\.[A-Za-z0-9]{8}$ || \
           -L "${run_dir}" ]]; then
-      log "invalid CockroachDB run-log entry"
+      log "invalid R1 MeshDB run-log entry"
       return 1
     fi
     if [[ "$(stat -c '%u' "${run_dir}" 2>/dev/null || true)" != "0" || \
           "$(stat -c '%a' "${run_dir}" 2>/dev/null || true)" != "700" || \
           "${mount_status}" != "1" ]]; then
-      log "invalid CockroachDB run-log entry"
+      log "invalid R1 MeshDB run-log entry"
       return 1
     fi
     if [[ "${retained}" -lt "${prior_limit}" ]]; then
@@ -657,7 +657,7 @@ prune_old_run_logs() {
       continue
     fi
     if ! rm -rf -- "${run_dir}" || [[ -e "${run_dir}" || -L "${run_dir}" ]]; then
-      log "could not remove old CockroachDB run-log entry"
+      log "could not remove old R1 MeshDB run-log entry"
       return 1
     fi
   done
@@ -687,7 +687,7 @@ prepare_current_run_log_dir() {
   local log_mode log_root="${CRDB_ACTIVE_STORE}/logs"
 
   if [[ -L "${log_root}" ]]; then
-    log "invalid CockroachDB log directory"
+    log "invalid R1 MeshDB log directory"
     return 1
   fi
   if [[ ! -e "${log_root}" ]]; then
@@ -695,7 +695,7 @@ prepare_current_run_log_dir() {
   fi
   if [[ -L "${log_root}" || ! -d "${log_root}" || \
         "$(stat -c '%u' "${log_root}" 2>/dev/null || true)" != "0" ]]; then
-    log "invalid CockroachDB log directory"
+    log "invalid R1 MeshDB log directory"
     return 1
   fi
   log_mode="$(stat -c '%a' "${log_root}" 2>/dev/null || true)"
@@ -704,7 +704,7 @@ prepare_current_run_log_dir() {
     log_mode="$(stat -c '%a' "${log_root}" 2>/dev/null || true)"
   fi
   if [[ -L "${log_root}" || "${log_mode}" != "700" ]]; then
-    log "invalid CockroachDB log directory"
+    log "invalid R1 MeshDB log directory"
     return 1
   fi
 
@@ -714,7 +714,7 @@ prepare_current_run_log_dir() {
   if [[ -L "${CRDB_CURRENT_RUN_LOG_DIR}" || \
         "$(stat -c '%u' "${CRDB_CURRENT_RUN_LOG_DIR}" 2>/dev/null || true)" != "0" || \
         "$(stat -c '%a' "${CRDB_CURRENT_RUN_LOG_DIR}" 2>/dev/null || true)" != "700" ]]; then
-    log "could not establish a private current-run CockroachDB log directory"
+    log "could not establish a private current-run R1 MeshDB log directory"
     return 1
   fi
 }
@@ -1022,7 +1022,7 @@ cleanup() {
   remove_sensitive_temp_file "${bootstrap_output}"
   remove_sensitive_temp_file "${init_output_file}"
   remove_sensitive_temp_file "${run_log_list_file}"
-  remove_sensitive_temp_file "${R1_SQL_PASSWORD_FILE}"
+  remove_sensitive_temp_file "${R1_MESHDB_PASSWORD_FILE}"
 
   [[ -z "${recovery_handler_pid}" ]] || recovery_handler_was_active=true
   if [[ "${recovery_handler_was_active}" == "true" ]]; then
@@ -1030,8 +1030,8 @@ cleanup() {
     recovery_handler_pid=""
   fi
   terminate_processes "${active_operation_pid}" "${REQUIRED_PIDS[@]:-}"
-  remove_sensitive_temp_file "${R1_SQL_TUNNEL_TOKEN_FILE}"
-  rmdir "${R1_SQL_SECRET_DIR}" >/dev/null 2>&1 || true
+  remove_sensitive_temp_file "${R1_MESHDB_TUNNEL_TOKEN_FILE}"
+  rmdir "${R1_MESHDB_SECRET_DIR}" >/dev/null 2>&1 || true
   if [[ "${recovery_handler_was_active}" == "true" ]]; then
     fail_closed_interrupted_recovery "fresh-store recovery classification was interrupted"
   fi
@@ -1145,7 +1145,7 @@ done
 
 log "starting Cloudflare server tunnel for node ${CRDB_NODE_ID}"
 cloudflared tunnel --no-autoupdate run \
-  --token-file "${R1_SQL_TUNNEL_TOKEN_FILE}" \
+  --token-file "${R1_MESHDB_TUNNEL_TOKEN_FILE}" \
   --url "tcp://${CRDB_BIND_HOST}:${CRDB_SQL_PORT}" \
   >/tmp/cloudflared/server.log 2>&1 &
 register_required_process "$!" "Cloudflare server tunnel"
@@ -1214,7 +1214,7 @@ if [[ "${CRDB_NODE_COUNT}" -gt 1 ]]; then
   fi
 fi
 
-log "starting CockroachDB node ${CRDB_NODE_ID} with join ${join_list}"
+log "starting R1 MeshDB node ${CRDB_NODE_ID} with join ${join_list}"
 if ! prepare_current_run_log_dir; then
   exit 1
 fi
@@ -1239,7 +1239,7 @@ fi
 /cockroach/cockroach start \
   "${start_flags[@]}" &
 crdb_pid="$!"
-register_required_process "${crdb_pid}" "CockroachDB"
+register_required_process "${crdb_pid}" "R1 MeshDB"
 
 wait_for_sql_listener() {
   local deadline remaining_millis
@@ -1265,7 +1265,7 @@ wait_for_sql_listener() {
 wait_for_sql_listener &
 sql_readiness_pid="$!"
 if ! run_guarded_operation "SQL listener readiness" "${sql_readiness_pid}"; then
-  log "CockroachDB SQL listener did not open on ${CRDB_BIND_HOST}:${CRDB_SQL_PORT} within ${CRDB_BOOTSTRAP_TIMEOUT_SECONDS} seconds"
+  log "R1 MeshDB SQL listener did not open on ${CRDB_BIND_HOST}:${CRDB_SQL_PORT} within ${CRDB_BOOTSTRAP_TIMEOUT_SECONDS} seconds"
   exit 1
 fi
 
@@ -1274,7 +1274,7 @@ if [[ "${CRDB_NODE_ID}" == "1" ]]; then
   if [[ "${CRDB_RECOVERY_ACTIVE}" == "true" ]]; then
     log "skipping cluster initialization for a fresh-store recovery; the node must rejoin surviving peers"
   else
-    log "initializing CockroachDB cluster if needed"
+    log "initializing R1 MeshDB cluster if needed"
     init_output_file="$(mktemp /tmp/deeploy-crdb-init.XXXXXX.log)"
     timeout --signal=TERM --kill-after=5s "${CRDB_BOOTSTRAP_TIMEOUT_SECONDS}s" \
       /cockroach/cockroach init --certs-dir="${CRDB_CERTS_DIR}" --host="${CRDB_BOOTSTRAP_HOST}" \
@@ -1291,14 +1291,14 @@ if [[ "${CRDB_NODE_ID}" == "1" ]]; then
     fi
     if [[ "${init_status}" != "0" ]]; then
       if grep -qiE "already initialized|cluster has already been initialized" <<< "${init_output}"; then
-        log "CockroachDB cluster is already initialized"
+        log "R1 MeshDB cluster is already initialized"
       else
         printf '%s\n' "${init_output}" >&2
         exit "${init_status}"
       fi
     fi
   fi
-  log "waiting for CockroachDB SQL bootstrap readiness"
+  log "waiting for R1 MeshDB SQL bootstrap readiness"
   bootstrap_output="$(mktemp /tmp/deeploy-crdb-bootstrap.XXXXXX.log)"
   # shellcheck disable=SC2016  # Positional parameters are expanded by the inner shell.
   timeout --signal=TERM --kill-after=5s "${CRDB_BOOTSTRAP_TIMEOUT_SECONDS}s" \
@@ -1333,7 +1333,7 @@ GRANT ALL ON DATABASE ${CRDB_DATABASE} TO ${CRDB_USER} WITH GRANT OPTION;
 SQL
   else
     password_literal="$(sql_quote_literal "${CRDB_PASSWORD}")"
-    log "ensuring CockroachDB database and database operator exist"
+    log "ensuring R1 MeshDB database and database operator exist"
     cat > "${bootstrap_sql}" <<SQL
 CREATE DATABASE IF NOT EXISTS ${CRDB_DATABASE};
 CREATE USER IF NOT EXISTS ${CRDB_USER} WITH PASSWORD ${password_literal};
@@ -1362,7 +1362,7 @@ SQL
   fi
 fi
 
-remove_sensitive_temp_file "${R1_SQL_PASSWORD_FILE}"
+remove_sensitive_temp_file "${R1_MESHDB_PASSWORD_FILE}"
 CRDB_PASSWORD=""
 unset CRDB_PASSWORD
 

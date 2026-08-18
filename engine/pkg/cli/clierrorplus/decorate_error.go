@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0, included in the file
 // licenses/APL.txt.
 
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 package clierrorplus
 
 import (
@@ -107,7 +109,7 @@ func MaybeDecorateError(
 			// Avoid errors.Wrapf here so that we have more control over the
 			// formatting of the message with error text.
 			const format = "server closed the connection.\n" +
-				"Is this a CockroachDB node?\n%v"
+				"Is this an R1 MeshDB node?\n%v"
 			return errors.Errorf(format, err)
 		}
 
@@ -243,7 +245,7 @@ func MaybeDecorateError(
 		if strings.Contains(err.Error(), "pq: unknown authentication response: 7") {
 			return fmt.Errorf(
 				"server requires GSSAPI authentication for this user.\n" +
-					"The CockroachDB CLI does not support GSSAPI authentication; use 'psql' instead")
+					"The R1 MeshDB CLI does not support GSSAPI authentication; use 'psql' instead")
 		}
 
 		// Are we trying to re-initialize an initialized cluster?

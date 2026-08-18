@@ -1,4 +1,5 @@
 // Copyright 2017 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -28,7 +29,7 @@ var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "initialize a cluster",
 	Long: `
-Perform one-time-only initialization of a CockroachDB cluster.
+Perform one-time-only initialization of an R1 MeshDB cluster.
 
 After starting one or more nodes with --join flags, run the init
 command on one node (passing the same --host and certificate flags

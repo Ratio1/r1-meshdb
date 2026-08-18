@@ -1,4 +1,5 @@
 // Copyright 2014 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -1016,9 +1017,9 @@ func sanityCheckErrWithTxn(
 	)
 	err = errors.WithAssertionFailure(
 		errors.WithIssueLink(err, errors.IssueLink{
-			IssueURL: "https://github.com/cockroachdb/cockroach/issues/103817",
-			Detail: "you have encountered a known bug in CockroachDB, please consider " +
-				"reporting on the Github issue or reach out via Support.",
+			IssueURL: "https://github.com/Ratio1/r1-distributed-sql/issues/new",
+			Detail: "you have encountered a known bug in R1 MeshDB; please report it " +
+				"to the Ratio1 maintainers and reference upstream issue 103817.",
 		}))
 	log.Warningf(ctx, "%v", err)
 	return err

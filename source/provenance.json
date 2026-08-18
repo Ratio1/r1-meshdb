@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "project": "R1 Distributed SQL",
+  "project": "R1 MeshDB",
   "nativeTreeHashAlgorithm": "sha256 over sorted entries: type-byte, NUL, relative UTF-8 path, NUL, file SHA-256 bytes or symlink target, NUL",
   "upstream": {
     "name": "CockroachDB",
@@ -41,7 +41,15 @@
       "sourceUrl": "https://github.com/cockroachdb/geos.git",
       "commit": "ac79ef98b6a7bd26c87bf069f1e0685dbb648ba2",
       "license": "LGPL-2.1-only",
-      "treeSha256": "baf3beb54c2cea6deb671c5fed2461509db0cc59b24d9e1ece1479ef02335bf1",
+      "treeSha256": "053524d27177e8b1b7d8502035c32b203e78fd628233f403f5c267cb1aa27fb2",
+      "upstreamTreeSha256": "baf3beb54c2cea6deb671c5fed2461509db0cc59b24d9e1ece1479ef02335bf1",
+      "complianceAdditions": [
+        {
+          "path": "tests/unit/tut/LICENSE",
+          "source": "https://raw.githubusercontent.com/mrzechonek/tut-framework/69d6c126e4d2263cf2cb18eb529745ea9a2296a5/LICENSE",
+          "sha256": "c208bc4abd59b0885130cd47eb9b400480a0aeeb5f0a937d35d84393258ea6c3"
+        }
+      ],
       "licenseFile": "engine/c-deps/geos/COPYING",
       "role": "geometry runtime"
     },
@@ -77,7 +85,7 @@
     "sourceUrl": "https://github.com/Ratio1/deeploy-cockroachdb-service.git",
     "commit": "89f1760c29b8d37bdac3ac4f274797e261db2811",
     "baseEntrypointSha256": "0e70768bf4f4125f2e171cf544ca1304ac0a83774e97c115b2efbaa0de3a4698",
-    "entrypointSha256": "806594c01fc405d78bd6dc5ff7ed8256a8485ec5e28f22fa83b27c91c49fb558",
+    "entrypointSha256": "8391559a57eedba4f6bfe3fbfac78b3023c4abc25c833c6254ff8503fb971509",
     "runtimePackages": "source/runtime-packages.txt"
   },
   "buildInputs": {
@@ -117,7 +125,7 @@
       "compiledPackages": "source/cloudflared-compiled-packages.txt",
       "licenseInventory": "source/cloudflared-license-inventory.csv"
     },
-    "debianSnapshot": "20260701T000000Z",
+    "debianSnapshot": "20260812T000000Z",
     "sourceDateEpoch": 1727820937
   }
 }

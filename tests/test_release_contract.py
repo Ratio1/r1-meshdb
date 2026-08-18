@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-import json
+import hashlib
 import importlib.util
+import json
 import os
 from pathlib import Path
 import re
@@ -25,7 +26,53 @@ def load_script(path: str):
   return module
 
 
+def source_baseline(repository: Path, commit: str, content: bytes) -> dict:
+  artifact = repository / "source" / "engine-v23.1.28-vendor-modules.baseline.txt"
+  artifact.parent.mkdir(parents=True, exist_ok=True)
+  artifact.write_bytes(content)
+  return {
+    "repository": "https://github.com/Ratio1/r1-distributed-sql.git",
+    "commit": commit,
+    "path": "engine/vendor/modules.txt",
+    "artifact": "source/engine-v23.1.28-vendor-modules.baseline.txt",
+    "vendorModulesSha256": hashlib.sha256(content).hexdigest(),
+  }
+
+
 class ReleaseContractTests(unittest.TestCase):
+
+  def test_release_version_resolution_is_strict_and_monotonic(self):
+    resolver = load_script("scripts/resolve-release-version.py")
+    resolved = resolver.resolve_release_version(
+      "1.2.3", previous_version="1.2.2", existing_tags=("v1.2.1",)
+    )
+    self.assertEqual(resolved, {"version": "1.2.3", "release_tag": "v1.2.3"})
+
+    for invalid in ("1.2", "v1.2.3", "01.2.3", "1.02.3", "1.2.03", "1.2.3-rc.1"):
+      with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+        resolver.resolve_release_version(invalid)
+
+    for previous in ("1.2.3", "1.2.4"):
+      with self.subTest(previous=previous), self.assertRaises(ValueError):
+        resolver.resolve_release_version("1.2.3", previous_version=previous)
+
+    with self.assertRaises(ValueError):
+      resolver.resolve_release_version("1.2.3", existing_tags=("v1.3.0",))
+    with self.assertRaises(ValueError):
+      resolver.resolve_release_version("1.2.3", existing_tags=("v1.2.3",))
+    self.assertEqual(
+      resolver.resolve_release_version(
+        "1.2.3", existing_tags=("v1.2.3",), allow_current_tag=True
+      )["release_tag"],
+      "v1.2.3",
+    )
+
+  def test_release_version_resolution_supports_first_version_file(self):
+    resolver = load_script("scripts/resolve-release-version.py")
+    self.assertEqual(
+      resolver.resolve_release_version("1.0.0"),
+      {"version": "1.0.0", "release_tag": "v1.0.0"},
+    )
 
   def test_comments_only_projection_accepts_comments_but_rejects_code_changes(self):
     verifier = load_script("scripts/verify-provenance.py")
@@ -59,13 +106,10 @@ func value() string {
 
   def test_source_baseline_validation_survives_squash_history(self):
     verifier = load_script("scripts/verify-provenance.py")
-    baseline = {
-      "commit": "a" * 40,
-      "vendorModulesSha256": "b" * 64,
-    }
     with tempfile.TemporaryDirectory() as directory:
       repository = Path(directory)
       subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+      baseline = source_baseline(repository, "a" * 40, b"# baseline vendor modules\n")
       original_root = verifier.ROOT
       verifier.ROOT = repository
       try:
@@ -98,10 +142,7 @@ func value() string {
         text=True,
         stdout=subprocess.PIPE,
       ).stdout.strip()
-      baseline = {
-        "commit": commit,
-        "vendorModulesSha256": verifier.hashlib.sha256(content).hexdigest(),
-      }
+      baseline = source_baseline(repository, commit, content)
       original_root = verifier.ROOT
       verifier.ROOT = repository
       try:
@@ -136,12 +177,13 @@ func value() string {
         text=True,
         stdout=subprocess.PIPE,
       ).stdout.strip()
+      baseline = source_baseline(repository, commit, b"# baseline vendor modules\n")
       original_root = verifier.ROOT
       verifier.ROOT = repository
       try:
         with self.assertRaises(SystemExit):
           verifier.check_source_dependency_baseline(
-            {"commit": commit, "vendorModulesSha256": "0" * 64},
+            baseline,
             None,
           )
       finally:
@@ -155,16 +197,20 @@ func value() string {
       target = upstream_root / "vendor" / "modules.txt"
       target.parent.mkdir(parents=True)
       target.write_bytes(content)
-      baseline = {
-        "commit": "a" * 40,
-        "vendorModulesSha256": verifier.hashlib.sha256(content).hexdigest(),
-      }
-      verifier.check_source_dependency_baseline(baseline, upstream_root)
-      with self.assertRaises(SystemExit):
-        verifier.check_source_dependency_baseline(
-          {**baseline, "vendorModulesSha256": "0" * 64},
-          upstream_root,
-        )
+      with tempfile.TemporaryDirectory() as directory:
+        repository = Path(directory)
+        baseline = source_baseline(repository, "a" * 40, content)
+        original_root = verifier.ROOT
+        verifier.ROOT = repository
+        try:
+          verifier.check_source_dependency_baseline(baseline, upstream_root)
+          with self.assertRaises(SystemExit):
+            verifier.check_source_dependency_baseline(
+              {**baseline, "vendorModulesSha256": "0" * 64},
+              upstream_root,
+            )
+        finally:
+          verifier.ROOT = original_root
 
   def test_hosted_provenance_paths_require_exact_upstream_verification(self):
     for workflow_path in (
@@ -183,6 +229,7 @@ func value() string {
   def test_required_compliance_and_provenance_files_exist(self):
     required = (
       "LICENSE",
+      "VERSION",
       "LICENSE-OVERVIEW.md",
       ".gitattributes",
       "NOTICE",
@@ -195,7 +242,10 @@ func value() string {
       "source/ratio1-engine-overrides.json",
       "source/manifest.sha256",
       "source/license-inventory.json",
+      "source/engine-v23.1.28-vendor-modules.baseline.txt",
+      "source/vendor-license-manifest.json",
       "source/runtime-files.txt",
+      "source/runtime-package-sources.tsv",
       "source/generated-files.txt",
       "source/public-test-fixtures.sha256",
       "source/cloudflared-buildinfo.txt",
@@ -211,6 +261,8 @@ func value() string {
       "scripts/verify-public-test-fixtures.py",
       "scripts/verify-security-vex.py",
       "scripts/verify-vendor-provenance.go",
+      "scripts/generate-vendor-license-manifest.py",
+      "scripts/collect-debian-corresponding-source.sh",
       "scripts/verify-generated-provenance.py",
       "scripts/cloudflare_ephemeral_tunnels.py",
       "testbed/run-real-cloudflare-cluster.sh",
@@ -247,6 +299,48 @@ func value() string {
     }
     self.assertEqual(modes, {path: "100755" for path in required})
 
+  def test_current_vendor_license_closure_is_hash_pinned_and_shipped(self):
+    manifest = json.loads(read("source/vendor-license-manifest.json"))
+    records = manifest["files"]
+    self.assertEqual(len(records), 258)
+    self.assertEqual(len({record["path"] for record in records}), len(records))
+    for record in records:
+      path = ROOT / record["path"]
+      self.assertTrue(path.is_file(), record["path"])
+      self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), record["sha256"])
+    subprocess.run(
+      ["python3", "scripts/generate-vendor-license-manifest.py", "--check"],
+      cwd=ROOT,
+      check=True,
+    )
+    dockerfile = read("Dockerfile")
+    self.assertIn("generate-vendor-license-manifest.py --check", dockerfile)
+    self.assertIn("--copy-to /out/licenses/engine/vendor", dockerfile)
+    self.assertIn("/usr/share/doc/r1-meshdb/", dockerfile)
+
+  def test_debian_corresponding_source_accompanies_runtime_object_code(self):
+    dockerfile = read("Dockerfile")
+    assembler = read("scripts/assemble-runtime-rootfs.sh")
+    collector = read("scripts/collect-debian-corresponding-source.sh")
+    ci = read(".github/workflows/ci.yml")
+    release = read(".github/workflows/release.yml")
+    for required in (
+      "deb-src [check-valid-until=no]",
+      "collect-debian-corresponding-source",
+      "/usr/share/src/r1-meshdb/debian",
+    ):
+      self.assertIn(required, dockerfile)
+    self.assertIn("runtime-package-sources.tsv", assembler)
+    self.assertIn("${source:Package}", assembler)
+    self.assertIn("Source: %s (%s)", assembler)
+    self.assertIn("apt-get -o Acquire::Check-Valid-Until=false source --download-only", collector)
+    self.assertIn("sha256sum -c SHA256SUMS", collector)
+    self.assertIn("r1-meshdb-debian-corresponding-source.tar.gz", release)
+    self.assertGreaterEqual(release.count("source/runtime-package-sources.tsv"), 3)
+    self.assertIn("docker cp", release)
+    self.assertIn("--entrypoint /bin/bash r1-meshdb:ci", ci)
+    self.assertNotIn("--entrypoint /usr/bin/bash", ci)
+
   def test_root_license_is_apache_2(self):
     license_text = read("LICENSE")
     self.assertIn("Apache License", license_text)
@@ -257,7 +351,7 @@ func value() string {
     self.assertIn("mixed-license distribution", overview)
     self.assertIn("THIRD_PARTY_NOTICES.md", overview)
     self.assertIn("source/license-inventory.json", overview)
-    self.assertIn("companion SPDX SBOM", overview)
+    self.assertIn("SPDX and CycloneDX SBOMs", overview)
 
     readme = read("README.md")
     self.assertIn(
@@ -276,28 +370,106 @@ func value() string {
     self.assertIn("engine/c-deps/geos", notices)
     self.assertIn("95 notice files", notices)
     self.assertIn("one additional MIT license", notices)
+    self.assertIn("All 258 current vendored", notices)
+    self.assertIn("r1-meshdb-debian-corresponding-source.tar.gz", notices)
 
     release = read("RELEASE.md")
     self.assertIn("An untagged candidate digest is not a release", release)
     self.assertIn("verify-image.sh", release)
     workflow = read(".github/workflows/release.yml")
     self.assertGreaterEqual(workflow.count("LICENSE-OVERVIEW.md"), 3)
-    self.assertIn(
-      "LicenseRef-R1-Distributed-SQL-Third-Party",
-      read("scripts/verify-image.sh"),
-    )
+    self.assertNotIn("LicenseRef-R1-MeshDB-Third-Party", read("scripts/verify-image.sh"))
 
-  def test_oci_license_label_uses_specific_distribution_reference(self):
+  def test_oci_license_label_uses_standard_application_license(self):
     dockerfile = read("Dockerfile")
-    self.assertIn(
-      'org.opencontainers.image.licenses="Apache-2.0 AND '
-      'LicenseRef-R1-Distributed-SQL-Third-Party"',
-      dockerfile,
-    )
+    self.assertIn('org.opencontainers.image.licenses="Apache-2.0"', dockerfile)
+    self.assertNotIn("LicenseRef-R1-MeshDB-Third-Party", dockerfile)
     self.assertNotIn("LicenseRef-ThirdParty", dockerfile)
 
   def test_git_does_not_normalize_manifested_source_bytes(self):
     self.assertIn("* -text", read(".gitattributes"))
+
+  def test_meshdb_version_is_valid_single_source_and_build_input(self):
+    version = read("VERSION").strip()
+    self.assertRegex(version, r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
+    self.assertEqual(read("VERSION"), f"{version}\n")
+    build_script = read("scripts/build-engine.sh")
+    self.assertIn("R1_MESHDB_VERSION_FILE", build_script)
+    self.assertIn("R1_MESHDB_VERSION", build_script)
+    self.assertIn('ratio1_version="${ratio1_version:-v${meshdb_version}}"', build_script)
+    self.assertIn('"${ratio1_version}" != "v${meshdb_version}"', build_script)
+    self.assertIn(
+      "COPY --from=engine-builder /out/R1_MESHDB_VERSION "
+      "/usr/share/r1-meshdb/VERSION",
+      read("Dockerfile"),
+    )
+    workflows = read(".github/workflows/ci.yml") + read(".github/workflows/release.yml")
+    self.assertEqual(workflows.count("/usr/share/r1-meshdb/VERSION"), 2)
+    self.assertEqual(workflows.count("cmp VERSION"), 2)
+    ci = read(".github/workflows/ci.yml")
+    release = read(".github/workflows/release.yml")
+    self.assertIn("Resolve CI build version", ci)
+    self.assertIn("printf 'build_tag=v%s-ci.%s", ci)
+    self.assertIn("RATIO1_VERSION=${{ steps.version.outputs.build_tag }}", ci)
+    self.assertNotIn("RATIO1_VERSION=v1.0.0-ci.", ci)
+    self.assertIn("python3 scripts/resolve-release-version.py", release)
+    self.assertNotIn("v1\\.0\\.", read("scripts/inspect-ghcr-tag.sh"))
+    self.assertNotIn("v1\\.0\\.", read("scripts/inspect-github-release.sh"))
+    self.assertNotIn("v1\\.0\\.", read("scripts/verify-image.sh"))
+
+  def test_release_runs_automatically_only_for_main_version_changes(self):
+    release = read(".github/workflows/release.yml")
+    self.assertRegex(
+      release,
+      r"on:\n  push:\n    branches:\n      - main\n    paths:\n      - VERSION\n  workflow_dispatch:\s*\n",
+    )
+    self.assertNotIn("inputs:", release.partition("concurrency:")[0])
+    self.assertIn("github.event.before", release)
+    self.assertIn("steps.version.outputs.release_tag", release)
+    self.assertIn("queue: max", release)
+    self.assertNotIn("inputs.release_tag", release)
+    self.assertLess(
+      release.index("Resolve and validate release version"),
+      release.index("Build and publish the untagged release candidate"),
+    )
+
+  def test_queued_push_release_remains_valid_after_main_advances(self):
+    release = read(".github/workflows/release.yml")
+    self.assertIn('if [[ "$EVENT_NAME" == "push" ]]; then', release)
+    self.assertIn('git merge-base --is-ancestor "$GITHUB_SHA" origin/main', release)
+    self.assertIn('[[ "$(git rev-parse origin/main)" == "$GITHUB_SHA" ]]', release)
+    self.assertIn('[[ "$public_sha" == "$(git rev-parse origin/main)" ]]', release)
+    self.assertNotIn('[[ "$public_sha" == "$GITHUB_SHA" ]]', release)
+
+  def test_release_reruns_verify_source_tag_and_published_image_reference(self):
+    release = read(".github/workflows/release.yml")
+    self.assertIn("Verify the created source tag", release)
+    self.assertIn("Verify published release immutability", release)
+    published = release[release.index("Verify published release immutability"):]
+    self.assertIn("gh release download", published)
+    self.assertIn("--pattern image-reference.txt", published)
+    self.assertIn('cmp image-reference.txt "$downloaded/image-reference.txt"', published)
+
+  def test_engine_identity_support_and_telemetry_defaults_are_meshdb_owned(self):
+    self.assertIn('return fmt.Sprintf("R1 MeshDB %s %s', read("engine/pkg/build/info.go"))
+    self.assertIn('"Name":         "R1 MeshDB"', read("engine/pkg/sql/crdb_internal.go"))
+    self.assertIn('semconv.ServiceNameKey.String("R1 MeshDB")', read("engine/pkg/util/tracing/tracer.go"))
+    diagnostics = read("engine/pkg/server/diagnostics/diagnostics.go")
+    self.assertIn("const defaultUpdatesURL = ``", diagnostics)
+    self.assertIn("const defaultReportingURL = ``", diagnostics)
+    self.assertIn("func parseOptionalURL(value string) (*url.URL, error)", diagnostics)
+    self.assertNotIn("register.cockroachdb.com", diagnostics)
+    self.assertIn("serverCfg.StartDiagnosticsReporting = false", read("engine/pkg/cli/flags.go"))
+    self.assertIn(
+      'EnvOrDefaultBool("COCKROACH_SKIP_ENABLING_DIAGNOSTIC_REPORTING", true)',
+      read("engine/pkg/settings/cluster/cluster_settings.go"),
+    )
+    crash = read("engine/pkg/util/log/logcrash/crash_reporting.go")
+    self.assertIn('EnvOrDefaultString("COCKROACH_CRASH_REPORTS", "")', crash)
+    self.assertNotIn("errors.cockroachdb.com", crash)
+    support = read("engine/pkg/util/log/clog.go")
+    self.assertIn("Ratio1 maintainers", support)
+    self.assertNotIn("support@cockroachlabs.com", support)
 
   def test_source_provenance_pins_upstream_and_native_dependencies(self):
     provenance = json.loads(read("source/provenance.json"))
@@ -344,14 +516,10 @@ func value() string {
 
     overrides = json.loads(read("source/ratio1-engine-overrides.json"))
     self.assertEqual(overrides["upstreamCommit"], provenance["upstream"]["commit"])
+    verifier = load_script("scripts/verify-provenance.py")
     self.assertEqual(
       {record["path"] for record in overrides["modifiedUpstreamFiles"]},
-      {
-        "engine/pkg/cli/cli.go",
-        "engine/pkg/storage/pebble_iterator.go",
-        "engine/pkg/ui/ui.go",
-        "engine/pkg/util/ctxutil/context.go",
-      },
+      verifier.EXPECTED_MODIFIED_FILES,
     )
     self.assertEqual(
       {record["advisory"] for record in overrides["securityBackports"]},
@@ -412,7 +580,28 @@ func value() string {
     self.assertIn("cat-file", boundary_script)
     self.assertIn("is_engine_file", boundary_script)
     self.assertIn("Cockroach Community License", boundary_script)
+    self.assertIn("CockroachDB Community License", boundary_script)
+    self.assertIn("Cockroach Enterprise License", boundary_script)
+    self.assertIn("CockroachDB Enterprise License", boundary_script)
+    self.assertIn('b"pkg/ccl"', boundary_script)
     self.assertFalse((ROOT / "engine/.github").exists())
+
+  def test_source_boundary_rejects_ccl_license_and_namespace_markers(self):
+    verifier = load_script("scripts/verify-source-boundary.py")
+    markers = (
+      b"Cockroach Community License",
+      b"CockroachDB Community License",
+      b"Cockroach Enterprise License",
+      b"CockroachDB Enterprise License",
+      b"github.com/cockroachdb/cockroach/pkg/ccl/sqlproxyccl",
+      b"pkg/ccl/changefeedccl",
+    )
+    with tempfile.TemporaryDirectory() as directory:
+      fixture = Path(directory) / "source.go"
+      for marker in markers:
+        fixture.write_bytes(b"// " + marker + b"\n")
+        with self.assertRaises(SystemExit):
+          verifier.scan_source(fixture, "engine/pkg/fixture/source.go")
 
   def test_every_engine_file_has_an_affirmative_license_classification(self):
     inventory = json.loads(read("source/license-inventory.json"))
@@ -430,7 +619,59 @@ func value() string {
       self.assertRegex(entry["sha256"], r"^[0-9a-f]{64}$")
 
     by_path = {entry["path"]: entry["spdx"] for entry in entries}
+    self.assertEqual(by_path["engine/AUTHORS"], "Apache-2.0")
+    self.assertEqual(
+      hashlib.sha256((ROOT / "engine/AUTHORS").read_bytes()).hexdigest(),
+      "43f782e23df565c0f003c45dae70b25788c6fc0266a87f8624a157b499a8aac8",
+    )
     self.assertEqual(by_path["engine/c-deps/geos/COPYING"], "LGPL-2.1-only")
+    tut_root = "engine/c-deps/geos/tests/unit/tut"
+    tut_files = {
+      path.relative_to(ROOT).as_posix()
+      for path in (ROOT / tut_root).iterdir()
+      if path.is_file()
+    }
+    self.assertTrue(tut_files)
+    self.assertEqual({by_path[path] for path in tut_files}, {"BSD-2-Clause"})
+    self.assertEqual(
+      hashlib.sha256((ROOT / tut_root / "LICENSE").read_bytes()).hexdigest(),
+      "c208bc4abd59b0885130cd47eb9b400480a0aeeb5f0a937d35d84393258ea6c3",
+    )
+    astyle_root = "engine/c-deps/geos/tools/astyle"
+    astyle_mit_files = {
+      "ASBeautifier.cpp", "ASEnhancer.cpp", "ASFormatter.cpp",
+      "ASLocalizer.cpp", "ASLocalizer.h", "ASResource.cpp", "astyle.h",
+      "astyle_main.cpp", "astyle_main.h",
+    }
+    self.assertEqual(
+      {by_path[f"{astyle_root}/{filename}"] for filename in astyle_mit_files},
+      {"MIT"},
+    )
+    for filename in ("tinyxml2.cpp", "tinyxml2.h"):
+      self.assertEqual(
+        by_path[f"engine/c-deps/geos/tests/xmltester/tinyxml2/{filename}"],
+        "Zlib",
+      )
+    self.assertEqual(
+      by_path["engine/c-deps/geos/debian/copyright"],
+      "LGPL-2.0-or-later",
+    )
+    public_domain_paths = (
+      "engine/c-deps/jemalloc/msvc/test_threads/test_threads.cpp",
+      "engine/c-deps/proj/src/PJ_isea.c",
+    )
+    public_domain_refs = {by_path[path] for path in public_domain_paths}
+    self.assertEqual(len(public_domain_refs), 2)
+    for path in public_domain_paths:
+      license_ref = by_path[path]
+      self.assertRegex(
+        license_ref,
+        r"^LicenseRef-Public-Domain-Notice-[0-9a-f]{12}$",
+      )
+      self.assertEqual(
+        license_ref.rsplit("-", 1)[1],
+        hashlib.sha256((ROOT / path).read_bytes()).hexdigest()[:12],
+      )
     self.assertEqual(
       by_path["engine/c-deps/geos/include/geos/algorithm/ttmath/COPYRIGHT"],
       "BSD-3-Clause",
@@ -532,7 +773,7 @@ func value() string {
     self.assertRegex(dockerfile, r"FROM\s+[^\s]+@sha256:[0-9a-f]{64}")
     self.assertNotIn("perl -0pi", dockerfile)
     self.assertIn("GOPROXY=off", dockerfile)
-    self.assertIn("snapshot.debian.org/archive/debian/20260701T000000Z", dockerfile)
+    self.assertIn("snapshot.debian.org/archive/debian/20260812T000000Z", dockerfile)
     self.assertIn("autoconf=2.71-3", dockerfile)
     self.assertIn("bash=5.2.15-2+b13", dockerfile)
     self.assertIn("scripts/build-engine.sh", dockerfile)
@@ -600,7 +841,7 @@ func value() string {
     self.assertIn('[[ "$(git rev-parse origin/main)" == "$GITHUB_SHA" ]]', workflow_text)
     self.assertIn("platforms: linux/amd64", workflow_text)
     self.assertIn("image-reference.txt", read(".github/workflows/security.yml"))
-    self.assertNotIn("r1-distributed-sql:latest", read(".github/workflows/security.yml"))
+    self.assertNotIn("r1-meshdb:latest", read(".github/workflows/security.yml"))
     verifier = read("scripts/verify-image.sh")
     self.assertIn('DOCKER_CONFIG="${anonymous_config}" docker pull', verifier)
     self.assertNotIn("docker logout ghcr.io", verifier)
@@ -743,7 +984,7 @@ printf '%s' "${FAKE_REGISTRY_STATUS}"
       }
       command = [
         "bash", "scripts/inspect-ghcr-tag.sh",
-        "ghcr.io/ratio1/r1-distributed-sql:v23.1.28-r1.0.0",
+        "ghcr.io/ratio1/r1-meshdb:v1.0.0",
       ]
       for status, expected_code, expected_output in (
         ("200", 0, digest),
@@ -790,7 +1031,7 @@ else
 fi
 printf '%s' "${FAKE_GITHUB_STATUS}"
 '''
-    tag = "v23.1.28-r1.0.0"
+    tag = "v1.0.0"
     with tempfile.TemporaryDirectory() as directory:
       fake_bin = Path(directory)
       curl = fake_bin / "curl"
@@ -838,7 +1079,7 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
       )
       self.assertNotEqual(result.returncode, 0)
       for environment_override in (
-        {"FAKE_GITHUB_STATUS": "200", "FAKE_GITHUB_TAG": "v23.1.28-r1.9.9"},
+        {"FAKE_GITHUB_STATUS": "200", "FAKE_GITHUB_TAG": "v1.0.9"},
         {"FAKE_GITHUB_STATUS": "200", "FAKE_GITHUB_DRAFT": "null"},
       ):
         result = subprocess.run(
@@ -900,7 +1141,7 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
       supervision,
     )
     self.assertIn(
-      'assert_failed_cleanly "${resistant_timeout_case}" "initializing CockroachDB cluster if needed" 137 30',
+      'assert_failed_cleanly "${resistant_timeout_case}" "initializing R1 MeshDB cluster if needed" 137 30',
       supervision,
     )
     self.assertNotIn(

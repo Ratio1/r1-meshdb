@@ -1,4 +1,5 @@
 // Copyright 2015 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -805,7 +806,7 @@ func (t *Tracer) configure(ctx context.Context, sv *settings.Values, tracingDefa
 
 		opts := []otelsdk.TracerProviderOption{otelsdk.WithSampler(otelsdk.AlwaysSample())}
 		resource, err := resource.New(ctx,
-			resource.WithAttributes(semconv.ServiceNameKey.String("CockroachDB")),
+			resource.WithAttributes(semconv.ServiceNameKey.String("R1 MeshDB")),
 		)
 		if err == nil {
 			opts = append(opts, otelsdk.WithResource(resource))

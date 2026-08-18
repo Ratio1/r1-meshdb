@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0, included in the file
 // licenses/APL.txt.
 
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 package server
 
 import (
@@ -19,7 +21,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var errAPIInternalErrorString = "An internal server error has occurred. Please check your CockroachDB logs for more details."
+var errAPIInternalErrorString = "An internal server error has occurred. Please check your R1 MeshDB logs for more details."
 
 var errAPIInternalError = status.Errorf(
 	codes.Internal,

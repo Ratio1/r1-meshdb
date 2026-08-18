@@ -281,7 +281,7 @@ sentinel_hash="$(inspect_node1_store "sha256sum /store/forensic-sentinel | cut -
 inject_corruption_and_kill "${nodes[0]}"
 wait_for_exit "${nodes[0]}" 20
 if [[ "$(docker inspect -f '{{.State.ExitCode}}' "${nodes[0]}")" != "137" ]]; then
-  echo "recovery node did not preserve the killed CockroachDB status" >&2
+  echo "recovery node did not preserve the killed R1 MeshDB status" >&2
   exit 1
 fi
 if ! inspect_node1_store 'test -f /store/.deeploy-recovery-v1/state && test ! -L /store/.deeploy-recovery-v1/state' || \
@@ -301,7 +301,7 @@ docker start "${nodes[0]}" >/dev/null
 wait_for_sql 1 240
 new_node_id="$(root_sql_on_node1 --format=csv -e 'select crdb_internal.node_id();' | tail -n 1 | tr -d '\r')"
 if [[ -z "${new_node_id}" || "${new_node_id}" == "${old_node_id}" ]]; then
-  echo "recovered node did not join with a new CockroachDB node ID" >&2
+  echo "recovered node did not join with a new R1 MeshDB node ID" >&2
   exit 1
 fi
 wait_for_recovered_replication "${new_node_id}" "${old_node_id}"
@@ -328,7 +328,7 @@ fi
 docker start "${nodes[0]}" >/dev/null
 wait_for_exit "${nodes[0]}" 10
 if [[ "$(docker inspect -f '{{.State.ExitCode}}' "${nodes[0]}")" != "1" ]]; then
-  echo "exhausted recovery did not fail closed before starting CockroachDB" >&2
+  echo "exhausted recovery did not fail closed before starting R1 MeshDB" >&2
   exit 1
 fi
 retry_app_sql 2 -e "UPSERT INTO recovery_smoke VALUES (1002, 'survivors-after-exhaustion');" >/dev/null

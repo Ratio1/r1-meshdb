@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0, included in the file
 // licenses/APL.txt.
 
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 package cli
 
 import (
@@ -1243,8 +1245,8 @@ func extraServerFlagInit(cmd *cobra.Command) error {
 	}
 	serverCfg.LocalityAddresses = localityAdvertiseHosts
 
-	// Ensure that diagnostic reporting is enabled for server startup commands.
-	serverCfg.StartDiagnosticsReporting = true
+	// R1 MeshDB does not enable upstream diagnostics reporting by default.
+	serverCfg.StartDiagnosticsReporting = false
 
 	return nil
 }

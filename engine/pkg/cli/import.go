@@ -1,4 +1,5 @@
 // Copyright 2020 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -26,7 +27,7 @@ import (
 
 var importDumpFileCmd = &cobra.Command{
 	Use:   "db <format> <source>",
-	Short: "import a pgdump or mysqldump file into CockroachDB",
+	Short: "import a pgdump or mysqldump file into R1 MeshDB",
 	Long: `
 Uploads and imports a local dump file into the cockroach cluster via userfile storage.
 `,
@@ -36,7 +37,7 @@ Uploads and imports a local dump file into the cockroach cluster via userfile st
 
 var importDumpTableCmd = &cobra.Command{
 	Use:   "table <table> <format> <source>",
-	Short: "import a table from a pgdump or mysqldump file into CockroachDB",
+	Short: "import a table from a pgdump or mysqldump file into R1 MeshDB",
 	Long: `
 Uploads and imports a table from the local dump file into the cockroach cluster via userfile storage.
 `,

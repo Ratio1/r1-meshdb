@@ -287,7 +287,7 @@ create_case "${hostile_store_mode_case}" "${hostile_store_mode}" 3 2 -e TEST_CRD
 inspect_store "${hostile_store_mode}" "chmod 777 /store"
 run_case "${hostile_store_mode_case}"
 assert_exit "${hostile_store_mode_case}" 1
-assert_log "${hostile_store_mode_case}" "invalid CockroachDB store directory"
+assert_log "${hostile_store_mode_case}" "invalid R1 MeshDB store directory"
 
 hostile_store_owner="${tmp}/hostile-store-owner"
 hostile_store_owner_case="deeploy-crdb-recovery-hostile-store-owner-${run_id}"
@@ -295,7 +295,7 @@ create_case "${hostile_store_owner_case}" "${hostile_store_owner}" 3 2 -e TEST_C
 inspect_store "${hostile_store_owner}" "chown 1000:1000 /store && chmod 700 /store"
 run_case "${hostile_store_owner_case}"
 assert_exit "${hostile_store_owner_case}" 1
-assert_log "${hostile_store_owner_case}" "invalid CockroachDB store directory"
+assert_log "${hostile_store_owner_case}" "invalid R1 MeshDB store directory"
 
 legacy_store_root="${tmp}/legacy-store-root"
 legacy_store_root_case="deeploy-crdb-recovery-legacy-store-root-${run_id}"
@@ -304,7 +304,7 @@ inspect_store "${legacy_store_root}" "chmod 755 /store"
 run_case "${legacy_store_root_case}"
 assert_exit "${legacy_store_root_case}" 42
 if [[ "$(inspect_store "${legacy_store_root}" "stat -c '%a' /store")" != "700" ]]; then
-  echo "legacy CockroachDB store directory was not migrated to mode 700" >&2
+  echo "legacy R1 MeshDB store directory was not migrated to mode 700" >&2
   exit 1
 fi
 
@@ -617,7 +617,7 @@ fixture_check="$(docker run --rm -v "${real_fixture_volume}:/store:ro" \
   --entrypoint /cockroach/cockroach-real "${image}" \
   debug pebble sstable check "${fixture_sst}" 2>&1)"
 if ! grep -Fq 'checksum mismatch' <<< "${fixture_check}"; then
-  echo "CockroachDB checksum verification did not detect the injected SSTable corruption" >&2
+  echo "R1 MeshDB checksum verification did not detect the injected SSTable corruption" >&2
   exit 1
 fi
 
@@ -750,7 +750,7 @@ run_case "${missing_recovery_logs_case}"
 assert_exit "${missing_recovery_logs_case}" 1
 assert_log "${missing_recovery_logs_case}" "could not safely inspect the previous fresh-store run"
 if [[ -e "${capture_file}" ]]; then
-  echo "CockroachDB started after recovery logs disappeared" >&2
+  echo "R1 MeshDB started after recovery logs disappeared" >&2
   exit 1
 fi
 
@@ -771,7 +771,7 @@ run_case "${missing_recorded_run_case}"
 assert_exit "${missing_recorded_run_case}" 1
 assert_log "${missing_recorded_run_case}" "could not safely inspect the previous fresh-store run"
 if [[ -e "${capture_file}" ]]; then
-  echo "CockroachDB started after the exact recorded recovery run disappeared" >&2
+  echo "R1 MeshDB started after the exact recorded recovery run disappeared" >&2
   exit 1
 fi
 
@@ -916,7 +916,7 @@ run_case "${topology_case}"
 assert_exit "${topology_case}" 1
 assert_log "${topology_case}" "corrupt-store recovery state does not match this node topology"
 if [[ -e "${topology_capture}" ]]; then
-  echo "CockroachDB started after recovery topology changed" >&2
+  echo "R1 MeshDB started after recovery topology changed" >&2
   exit 1
 fi
 
@@ -931,7 +931,7 @@ run_case "${count_case}"
 assert_exit "${count_case}" 1
 assert_log "${count_case}" "corrupt-store recovery state does not match this node topology"
 if [[ -e "${count_capture}" ]]; then
-  echo "CockroachDB started after recovery node count changed" >&2
+  echo "R1 MeshDB started after recovery node count changed" >&2
   exit 1
 fi
 
@@ -946,7 +946,7 @@ run_case "${ca_case}"
 assert_exit "${ca_case}" 1
 assert_log "${ca_case}" "corrupt-store recovery state does not match this node topology"
 if [[ -e "${ca_capture}" ]]; then
-  echo "CockroachDB started after recovery CA changed" >&2
+  echo "R1 MeshDB started after recovery CA changed" >&2
   exit 1
 fi
 
@@ -1010,7 +1010,7 @@ run_case "${exhausted_case}"
 assert_exit "${exhausted_case}" 1
 assert_log "${exhausted_case}" "corrupt-store recovery is exhausted"
 if [[ -e "${capture_file}" ]]; then
-  echo "CockroachDB started after recovery was exhausted" >&2
+  echo "R1 MeshDB started after recovery was exhausted" >&2
   exit 1
 fi
 
@@ -1096,7 +1096,7 @@ run_case "${scan_tail_failure_case}"
 assert_exit "${scan_tail_failure_case}" 1
 assert_log "${scan_tail_failure_case}" "could not safely inspect the previous fresh-store run"
 if [[ -e "${capture_file}" ]]; then
-  echo "CockroachDB started after a recovery log read failure" >&2
+  echo "R1 MeshDB started after a recovery log read failure" >&2
   exit 1
 fi
 
@@ -1113,9 +1113,9 @@ create_case "${prune_find_failure_case}" "${prune_find_failure_store}" 3 2 \
 rm -f "${capture_file}"
 run_case "${prune_find_failure_case}"
 assert_exit "${prune_find_failure_case}" 1
-assert_log "${prune_find_failure_case}" "could not enumerate CockroachDB run-log entries"
+assert_log "${prune_find_failure_case}" "could not enumerate R1 MeshDB run-log entries"
 if [[ -e "${capture_file}" ]]; then
-  echo "CockroachDB started after run-log pruning enumeration failed" >&2
+  echo "R1 MeshDB started after run-log pruning enumeration failed" >&2
   exit 1
 fi
 
@@ -1163,7 +1163,7 @@ log_root_mode_case="deeploy-crdb-recovery-log-root-mode-${run_id}"
 create_case "${log_root_mode_case}" "${log_root_mode_store}" 3 2 -e TEST_CRDB_START_MODE=exit
 run_case "${log_root_mode_case}"
 assert_exit "${log_root_mode_case}" 1
-assert_log "${log_root_mode_case}" "invalid CockroachDB log directory"
+assert_log "${log_root_mode_case}" "invalid R1 MeshDB log directory"
 
 log_root_legacy_store="${tmp}/log-root-legacy-store"
 mkdir -p "${log_root_legacy_store}/logs"
@@ -1173,7 +1173,7 @@ create_case "${log_root_legacy_case}" "${log_root_legacy_store}" 3 2 -e TEST_CRD
 run_case "${log_root_legacy_case}"
 assert_exit "${log_root_legacy_case}" 42
 if [[ "$(inspect_store "${log_root_legacy_store}" "stat -c '%a' /store/logs")" != "700" ]]; then
-  echo "legacy CockroachDB log directory was not migrated to mode 700" >&2
+  echo "legacy R1 MeshDB log directory was not migrated to mode 700" >&2
   exit 1
 fi
 
@@ -1184,7 +1184,7 @@ log_root_owner_case="deeploy-crdb-recovery-log-root-owner-${run_id}"
 create_case "${log_root_owner_case}" "${log_root_owner_store}" 3 2 -e TEST_CRDB_START_MODE=exit
 run_case "${log_root_owner_case}"
 assert_exit "${log_root_owner_case}" 1
-assert_log "${log_root_owner_case}" "invalid CockroachDB log directory"
+assert_log "${log_root_owner_case}" "invalid R1 MeshDB log directory"
 
 run_mode_store="${tmp}/run-mode-store"
 mkdir -p "${run_mode_store}/logs/deeploy-run.badmode0"
@@ -1194,7 +1194,7 @@ run_mode_case="deeploy-crdb-recovery-run-mode-${run_id}"
 create_case "${run_mode_case}" "${run_mode_store}" 3 2 -e TEST_CRDB_START_MODE=exit
 run_case "${run_mode_case}"
 assert_exit "${run_mode_case}" 1
-assert_log "${run_mode_case}" "invalid CockroachDB run-log entry"
+assert_log "${run_mode_case}" "invalid R1 MeshDB run-log entry"
 
 run_owner_store="${tmp}/run-owner-store"
 mkdir -p "${run_owner_store}/logs/deeploy-run.badownr0"
@@ -1204,7 +1204,7 @@ run_owner_case="deeploy-crdb-recovery-run-owner-${run_id}"
 create_case "${run_owner_case}" "${run_owner_store}" 3 2 -e TEST_CRDB_START_MODE=exit
 run_case "${run_owner_case}"
 assert_exit "${run_owner_case}" 1
-assert_log "${run_owner_case}" "invalid CockroachDB run-log entry"
+assert_log "${run_owner_case}" "invalid R1 MeshDB run-log entry"
 
 mounted_run_store="${tmp}/mounted-run-store"
 mounted_run_external="${tmp}/mounted-run-external"
@@ -1218,7 +1218,7 @@ create_case "${mounted_run_case}" "${mounted_run_store}" 3 2 \
   -e TEST_CRDB_START_MODE=exit
 run_case "${mounted_run_case}"
 assert_exit "${mounted_run_case}" 1
-assert_log "${mounted_run_case}" "invalid CockroachDB run-log entry"
+assert_log "${mounted_run_case}" "invalid R1 MeshDB run-log entry"
 grep -Fxq 'must remain' "${mounted_run_external}/sentinel"
 
 rm_failure_store="${tmp}/rm-failure-store"
@@ -1240,7 +1240,7 @@ create_case "${rm_failure_case}" "${rm_failure_store}" 3 2 \
   -e TEST_CRDB_START_MODE=exit
 run_case "${rm_failure_case}"
 assert_exit "${rm_failure_case}" 1
-assert_log "${rm_failure_case}" "could not remove old CockroachDB run-log entry"
+assert_log "${rm_failure_case}" "could not remove old R1 MeshDB run-log entry"
 
 logs_symlink_store="${tmp}/logs-symlink-store"
 external_logs="${tmp}/capture/external-logs"
@@ -1250,9 +1250,9 @@ logs_symlink_case="deeploy-crdb-recovery-logs-symlink-${run_id}"
 create_case "${logs_symlink_case}" "${logs_symlink_store}" 3 2 -e TEST_CRDB_START_MODE=exit
 run_case "${logs_symlink_case}"
 assert_exit "${logs_symlink_case}" 1
-assert_log "${logs_symlink_case}" "invalid CockroachDB log directory"
+assert_log "${logs_symlink_case}" "invalid R1 MeshDB log directory"
 if find "${external_logs}" -mindepth 1 -print -quit | grep -q .; then
-  echo "symlinked log directory escaped the CockroachDB store" >&2
+  echo "symlinked log directory escaped the R1 MeshDB store" >&2
   exit 1
 fi
 

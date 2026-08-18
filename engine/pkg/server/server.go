@@ -1,4 +1,5 @@
 // Copyright 2014 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -1852,7 +1853,7 @@ func (s *Server) PreStart(ctx context.Context) error {
 			log.SafeManaged(s.cfg.SQLAddr), log.SafeManaged(s.cfg.SQLAdvertiseAddr))
 	}
 	log.Ops.Infof(ctx, "starting %s server at %s", log.SafeManaged(rpcConnType), log.SafeManaged(s.cfg.Addr))
-	log.Ops.Infof(ctx, "advertising CockroachDB node at %s", log.SafeManaged(s.cfg.AdvertiseAddr))
+	log.Ops.Infof(ctx, "advertising R1 MeshDB node at %s", log.SafeManaged(s.cfg.AdvertiseAddr))
 
 	log.Event(ctx, "accepting connections")
 

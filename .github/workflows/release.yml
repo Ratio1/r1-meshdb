@@ -1,15 +1,16 @@
 name: Release signed image
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - VERSION
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: Immutable release version (v23.1.28-r1.X.Y)
-        required: true
-        type: string
 
 concurrency:
-  group: r1-distributed-sql-release
+  group: r1-meshdb-release
+  queue: max
   cancel-in-progress: false
 
 permissions:
@@ -33,15 +34,49 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Validate release tag and source contracts
+      - name: Resolve and validate release version
+        id: version
         env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          BEFORE_SHA: ${{ github.event.before }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          args=(--allow-current-tag --github-output "$GITHUB_OUTPUT")
+          if [[ "$EVENT_NAME" == "push" && -n "$BEFORE_SHA" &&
+                ! "$BEFORE_SHA" =~ ^0+$ ]] &&
+              git show "$BEFORE_SHA:VERSION" > "$RUNNER_TEMP/previous-version" 2>/dev/null; then
+            args+=(--previous-version-file "$RUNNER_TEMP/previous-version")
+          fi
+          while IFS= read -r tag; do
+            args+=(--existing-tag "$tag")
+          done < <(git tag --list 'v*')
+          python3 scripts/resolve-release-version.py "${args[@]}"
+          release_tag="v$(<VERSION)"
+          if git show-ref --verify --quiet "refs/tags/$release_tag"; then
+            [[ "$(git rev-list -n 1 "$release_tag")" == "$GITHUB_SHA" ]] || {
+              echo "existing source tag does not identify this release commit" >&2
+              exit 1
+            }
+          fi
+
+      - name: Validate release source contracts
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         run: |
           set -euo pipefail
           [[ "$GITHUB_REF" == "refs/heads/main" ]]
-          [[ "$RELEASE_TAG" =~ ^v23\.1\.28-r1\.[0-9]+\.[0-9]+$ ]]
+          [[ "$RELEASE_TAG" == "v$(<VERSION)" ]]
           git fetch --no-tags origin main
-          [[ "$(git rev-parse origin/main)" == "$GITHUB_SHA" ]]
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+              echo "release push commit is no longer in main history" >&2
+              exit 1
+            }
+          else
+            [[ "$(git rev-parse origin/main)" == "$GITHUB_SHA" ]]
+          fi
           python3 scripts/verify-source-boundary.py
           python3 scripts/generate-license-inventory.py --check
           python3 scripts/verify-provenance.py
@@ -50,6 +85,39 @@ jobs:
           python3 scripts/generate-source-manifest.py --check
           python3 -m unittest tests.test_release_contract tests.test_sbom_contract
           bash -n entrypoint.sh scripts/*.sh testbed/*.sh
+
+      - name: Validate immutable source release identity
+        id: source-preflight
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          release_state="$(scripts/inspect-github-release.sh "$RELEASE_TAG")"
+          case "$release_state" in
+            missing|draft|published) ;;
+            *)
+              echo "invalid GitHub release state: $release_state" >&2
+              exit 1
+              ;;
+          esac
+          tag_exists=false
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            tag_exists=true
+            [[ "$(git rev-list -n 1 "$RELEASE_TAG")" == "$GITHUB_SHA" ]] || {
+              echo "existing source tag does not identify this release commit" >&2
+              exit 1
+            }
+          fi
+          if [[ "$release_state" == "missing" && "$tag_exists" == "true" ]]; then
+            echo "source tag exists without a resumable GitHub release: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          if [[ "$release_state" != "missing" && "$tag_exists" != "true" ]]; then
+            echo "GitHub release exists without its immutable source tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          printf 'release_state=%s\n' "$release_state" >> "$GITHUB_OUTPUT"
 
       - name: Prepare pristine source snapshot and evidence directory
         run: |
@@ -63,12 +131,12 @@ jobs:
           public_sha="$(GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0 \
             git -C "$RUNNER_TEMP" -c credential.helper= -c http.extraHeader= ls-remote \
             "$public_remote" refs/heads/main | awk '{print $1}')"
-          [[ "$public_sha" == "$GITHUB_SHA" ]] || {
-            echo 'The exact release source is not anonymously available from main.' >&2
+          [[ "$public_sha" == "$(git rev-parse origin/main)" ]] || {
+            echo 'The public and workflow main branches do not identify the same source.' >&2
             echo 'Make the staged source repository public before publishing any image digest.' >&2
             exit 1
           }
-          archive="$RUNNER_TEMP/r1-distributed-sql-${GITHUB_SHA}.tar.gz"
+          archive="$RUNNER_TEMP/r1-meshdb-${GITHUB_SHA}.tar.gz"
           extracted="$RUNNER_TEMP/public-source"
           curl --fail --location --silent --show-error \
             "https://github.com/Ratio1/r1-distributed-sql/archive/${GITHUB_SHA}.tar.gz" \
@@ -149,15 +217,15 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
         env:
           SOURCE_DATE_EPOCH: 1727820937
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         with:
           context: .
           platforms: linux/amd64
-          outputs: type=image,name=ghcr.io/ratio1/r1-distributed-sql,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=ghcr.io/ratio1/r1-meshdb,push-by-digest=true,name-canonical=true,push=true
           build-args: |
             BUILD_DATE=${{ steps.metadata.outputs.build_date }}
             RATIO1_REVISION=${{ github.sha }}
-            RATIO1_VERSION=${{ inputs.release_tag }}
+            RATIO1_VERSION=${{ steps.version.outputs.release_tag }}
             SOURCE_DATE_EPOCH=1727820937
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -171,14 +239,14 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$CANDIDATE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
-          image_ref="ghcr.io/ratio1/r1-distributed-sql@${CANDIDATE_DIGEST}"
+          image_ref="ghcr.io/ratio1/r1-meshdb@${CANDIDATE_DIGEST}"
           printf 'ref=%s\n' "$image_ref" >> "$GITHUB_OUTPUT"
           printf '%s\n' "$image_ref" > image-reference.txt
 
       - name: Prove candidate binary and compatibility paths
         env:
           IMAGE_REF: ${{ steps.image.outputs.ref }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         run: |
           set -euo pipefail
           docker pull "$IMAGE_REF"
@@ -186,6 +254,15 @@ jobs:
           trap 'docker rm "$container_id" >/dev/null 2>&1 || true' EXIT
           docker cp "$container_id:/cockroach/cockroach" ./cockroach
           docker cp "$container_id:/usr/local/bin/cloudflared" ./cloudflared
+          docker cp "$container_id:/usr/share/r1-meshdb/VERSION" "$RUNNER_TEMP/image-version.txt"
+          mkdir -p artifacts/debian-corresponding-source
+          docker cp "$container_id:/usr/share/src/r1-meshdb/debian/." \
+            artifacts/debian-corresponding-source/
+          (cd artifacts/debian-corresponding-source && sha256sum -c SHA256SUMS)
+          tar --sort=name --mtime='@1727820937' --owner=0 --group=0 --numeric-owner \
+            -czf artifacts/r1-meshdb-debian-corresponding-source.tar.gz \
+            -C artifacts debian-corresponding-source
+          cmp VERSION "$RUNNER_TEMP/image-version.txt"
           chmod 755 ./cockroach
           ./cockroach version | grep -F 'Distribution:     OSS'
           ./cockroach version | grep -F "Build Tag:        $RELEASE_TAG"
@@ -216,7 +293,7 @@ jobs:
       - name: Prove persisted rolling upgrade and rollback compatibility
         env:
           IMAGE_REF: ${{ steps.image.outputs.ref }}
-          R1_SQL_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/rolling-upgrade
+          R1_MESHDB_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/rolling-upgrade
         run: |
           timeout --signal=TERM --kill-after=120s 35m \
             testbed/run-rolling-upgrade.sh "$IMAGE_REF"
@@ -235,7 +312,7 @@ jobs:
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CF_BASE_DOMAIN: ${{ secrets.CF_BASE_DOMAIN }}
-          R1_SQL_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/real-cloudflare
+          R1_MESHDB_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/real-cloudflare
         run: |
           timeout --signal=TERM --kill-after=10m 30m \
             testbed/run-real-cloudflare-cluster.sh "$IMAGE_REF"
@@ -270,7 +347,7 @@ jobs:
           syft-version: v1.51.0
           upload-artifact: false
           upload-release-assets: false
-          output-file: artifacts/r1-distributed-sql-image.spdx.json
+          output-file: artifacts/r1-meshdb-image.spdx.json
 
       - name: Generate image CycloneDX SBOM
         uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
@@ -280,7 +357,7 @@ jobs:
           syft-version: v1.51.0
           upload-artifact: false
           upload-release-assets: false
-          output-file: artifacts/r1-distributed-sql-image.cdx.json
+          output-file: artifacts/r1-meshdb-image.cdx.json
 
       - name: Generate source SPDX SBOM
         uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
@@ -290,7 +367,7 @@ jobs:
           syft-version: v1.51.0
           upload-artifact: false
           upload-release-assets: false
-          output-file: artifacts/r1-distributed-sql-source.spdx.json
+          output-file: artifacts/r1-meshdb-source.spdx.json
 
       - name: Generate source CycloneDX SBOM
         uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
@@ -300,14 +377,14 @@ jobs:
           syft-version: v1.51.0
           upload-artifact: false
           upload-release-assets: false
-          output-file: artifacts/r1-distributed-sql-source.cdx.json
+          output-file: artifacts/r1-meshdb-source.cdx.json
 
       - name: Verify SBOM component coverage
         env:
           JSONSCHEMA_VERSION: 4.25.1
         run: |
           set -euo pipefail
-          for sbom in artifacts/r1-distributed-sql-*.json; do
+          for sbom in artifacts/r1-meshdb-*.json; do
             python3 scripts/augment-sbom.py "$sbom"
           done
           docker run --rm \
@@ -315,31 +392,31 @@ jobs:
             --volume "$PWD:/workspace:ro" \
             --workdir /workspace \
             python:3.13.7-slim@sha256:5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689 \
-            sh -ec 'python -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: -r source/sbom-validation-requirements.txt >/dev/null && python -c '\''import importlib.metadata, os; assert importlib.metadata.version("jsonschema") == os.environ["JSONSCHEMA_VERSION"]'\'' && python scripts/validate-sbom-schema.py artifacts/r1-distributed-sql-*.json'
+            sh -ec 'python -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: -r source/sbom-validation-requirements.txt >/dev/null && python -c '\''import importlib.metadata, os; assert importlib.metadata.version("jsonschema") == os.environ["JSONSCHEMA_VERSION"]'\'' && python scripts/validate-sbom-schema.py artifacts/r1-meshdb-*.json'
           python3 scripts/verify-sbom.py --require-runtime \
             --go-buildinfo artifacts/cockroach.buildinfo.txt \
             --go-buildinfo artifacts/cloudflared.buildinfo.txt \
-            artifacts/r1-distributed-sql-image.spdx.json
+            artifacts/r1-meshdb-image.spdx.json
           python3 scripts/verify-sbom.py --require-runtime \
             --go-buildinfo artifacts/cockroach.buildinfo.txt \
             --go-buildinfo artifacts/cloudflared.buildinfo.txt \
-            artifacts/r1-distributed-sql-image.cdx.json
-          python3 scripts/verify-sbom.py artifacts/r1-distributed-sql-source.spdx.json
-          python3 scripts/verify-sbom.py artifacts/r1-distributed-sql-source.cdx.json
+            artifacts/r1-meshdb-image.cdx.json
+          python3 scripts/verify-sbom.py artifacts/r1-meshdb-source.spdx.json
+          python3 scripts/verify-sbom.py artifacts/r1-meshdb-source.cdx.json
 
       - name: Attest build provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
-          subject-name: ghcr.io/ratio1/r1-distributed-sql
+          subject-name: ghcr.io/ratio1/r1-meshdb
           subject-digest: ${{ steps.candidate.outputs.digest }}
           push-to-registry: true
 
       - name: Attest image SPDX SBOM
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
-          subject-name: ghcr.io/ratio1/r1-distributed-sql
+          subject-name: ghcr.io/ratio1/r1-meshdb
           subject-digest: ${{ steps.candidate.outputs.digest }}
-          sbom-path: artifacts/r1-distributed-sql-image.spdx.json
+          sbom-path: artifacts/r1-meshdb-image.spdx.json
           push-to-registry: true
 
       - name: Install Cosign
@@ -356,7 +433,7 @@ jobs:
           cosign sign --yes "$IMAGE_REF"
           cosign attest --yes \
             --type spdxjson \
-            --predicate artifacts/r1-distributed-sql-image.spdx.json \
+            --predicate artifacts/r1-meshdb-image.spdx.json \
             "$IMAGE_REF"
           cosign attest --yes \
             --type openvex \
@@ -401,7 +478,7 @@ jobs:
           docker image rm --force "$IMAGE_REF" >/dev/null 2>&1 || true
           if ! DOCKER_CONFIG="$anonymous_config" docker pull "$IMAGE_REF"; then
             echo 'Anonymous pull failed. A package administrator must set the' >&2
-            echo 'r1-distributed-sql GHCR package visibility to Public, then rerun this workflow.' >&2
+            echo 'r1-meshdb GHCR package visibility to Public, then rerun this workflow.' >&2
             exit 1
           fi
 
@@ -409,10 +486,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: r1-distributed-sql-${{ inputs.release_tag }}-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          name: r1-meshdb-${{ steps.version.outputs.release_tag }}-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             artifacts/*.json
             artifacts/*.txt
+            artifacts/*.tar.gz
             artifacts/real-cloudflare/summary.txt
             artifacts/real-cloudflare/topology.json
             artifacts/real-cloudflare/node-*.log
@@ -430,6 +508,7 @@ jobs:
             source/manifest.sha256
             source/provenance.json
             source/runtime-packages.txt
+            source/runtime-package-sources.tsv
           if-no-files-found: warn
           retention-days: 90
 
@@ -437,7 +516,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: r1-distributed-sql-cloudflare-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
+          name: r1-meshdb-cloudflare-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/real-cloudflare/cloudflare-cleanup-state.json
           if-no-files-found: ignore
           retention-days: 7
@@ -447,7 +526,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IMAGE_REF: ${{ steps.image.outputs.ref }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
           GHCR_USERNAME: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -487,7 +566,7 @@ jobs:
           fi
           printf 'release_state=%s\n' "$release_state" >> "$GITHUB_OUTPUT"
 
-          tagged_ref="ghcr.io/ratio1/r1-distributed-sql:${RELEASE_TAG}"
+          tagged_ref="ghcr.io/ratio1/r1-meshdb:${RELEASE_TAG}"
           image_tag_exists=false
           tag_state="$(scripts/inspect-ghcr-tag.sh "$tagged_ref")"
           if [[ "$tag_state" != "absent" ]]; then
@@ -504,34 +583,59 @@ jobs:
             exit 1
           fi
 
+      - name: Verify published release immutability
+        if: steps.preflight.outputs.release_state == 'published'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          downloaded="$(mktemp -d)"
+          trap 'find "$downloaded" -mindepth 1 -depth -delete; rmdir "$downloaded"' EXIT
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern image-reference.txt \
+            --dir "$downloaded"
+          cmp image-reference.txt "$downloaded/image-reference.txt"
+
       - name: Prepare draft release and immutable source tag
         if: steps.preflight.outputs.release_state == 'missing'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         run: |
           gh release create "$RELEASE_TAG" \
-            artifacts/*.json artifacts/*.txt image-reference.txt LICENSE LICENSE-OVERVIEW.md \
+            artifacts/*.json artifacts/*.txt artifacts/*.tar.gz image-reference.txt LICENSE LICENSE-OVERVIEW.md \
             NOTICE RATIO1_PATCHES.md \
             THIRD_PARTY_NOTICES.md UPSTREAM.md source/license-inventory.json \
             source/manifest.sha256 source/provenance.json SECURITY.md \
-            source/runtime-packages.txt security/openvex.json \
+            source/runtime-packages.txt source/runtime-package-sources.tsv security/openvex.json \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --draft \
             --generate-notes \
-            --title "R1 Distributed SQL $RELEASE_TAG"
+            --title "R1 MeshDB $RELEASE_TAG"
+
+      - name: Verify the created source tag
+        if: steps.preflight.outputs.release_state == 'missing'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          git fetch --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+          [[ "$(git rev-list -n 1 "$RELEASE_TAG")" == "$GITHUB_SHA" ]]
 
       - name: Refresh and verify resumable draft release assets
         if: steps.preflight.outputs.release_state == 'draft'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         run: |
           set -euo pipefail
           release_assets=(
             artifacts/*.json
             artifacts/*.txt
+            artifacts/*.tar.gz
             image-reference.txt
             LICENSE
             LICENSE-OVERVIEW.md
@@ -544,6 +648,7 @@ jobs:
             source/provenance.json
             SECURITY.md
             source/runtime-packages.txt
+            source/runtime-package-sources.tsv
             security/openvex.json
           )
           gh release upload "$RELEASE_TAG" "${release_assets[@]}" \
@@ -577,13 +682,13 @@ jobs:
         if: steps.preflight.outputs.image_tag_exists != 'true'
         env:
           IMAGE_REF: ${{ steps.image.outputs.ref }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
           GHCR_USERNAME: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           digest="${IMAGE_REF##*@}"
-          tagged_ref="ghcr.io/ratio1/r1-distributed-sql:${RELEASE_TAG}"
+          tagged_ref="ghcr.io/ratio1/r1-meshdb:${RELEASE_TAG}"
           tag_state="$(scripts/inspect-ghcr-tag.sh "$tagged_ref")"
           if [[ "$tag_state" == "absent" ]]; then
             docker buildx imagetools create --prefer-index=false --tag "$tagged_ref" "$IMAGE_REF"
@@ -597,7 +702,7 @@ jobs:
         if: steps.preflight.outputs.release_state != 'published'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
 
       - name: Update latest only after release publication
@@ -606,7 +711,7 @@ jobs:
         run: |
           set -euo pipefail
           digest="${IMAGE_REF##*@}"
-          tagged_ref="ghcr.io/ratio1/r1-distributed-sql:latest"
+          tagged_ref="ghcr.io/ratio1/r1-meshdb:latest"
           docker buildx imagetools create --prefer-index=false --tag "$tagged_ref" "$IMAGE_REF"
           resolved="sha256:$(docker buildx imagetools inspect --raw "$tagged_ref" | sha256sum | awk '{print $1}')"
           [[ "$resolved" == "$digest" ]]

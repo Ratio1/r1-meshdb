@@ -119,7 +119,7 @@ class EphemeralTunnelTests(unittest.TestCase):
     suffixes = iter(("aaaa", "bbbb", "cccc"))
     with tempfile.TemporaryDirectory() as tmp:
       output = Path(tmp) / "allocation"
-      state = allocate(client(fake), output, 3, "r1-sql-ci", lambda: next(suffixes))
+      state = allocate(client(fake), output, 3, "r1-meshdb-ci", lambda: next(suffixes))
       self.assertEqual(len(state["tunnels"]), 3)
       persisted = load_state(output / "state.json")
       self.assertNotIn("secret-token", json.dumps(persisted))
@@ -135,7 +135,7 @@ class EphemeralTunnelTests(unittest.TestCase):
     fake = FakeCloudflare(fail_dns_at=2)
     with tempfile.TemporaryDirectory() as tmp:
       with self.assertRaises(CloudflareError):
-        allocate(client(fake), Path(tmp) / "allocation", 3, "r1-sql-ci", lambda: "fixed")
+        allocate(client(fake), Path(tmp) / "allocation", 3, "r1-meshdb-ci", lambda: "fixed")
     deletes = [(method, url) for method, url, _body, _timeout in fake.calls if method == "DELETE"]
     self.assertEqual(
       deletes,
@@ -169,7 +169,7 @@ class EphemeralTunnelTests(unittest.TestCase):
     with tempfile.TemporaryDirectory() as tmp:
       output = Path(tmp) / "allocation"
       with self.assertRaises(CloudflareError):
-        allocate(client(fake), output, 1, "r1-sql-ci", lambda: "lost")
+        allocate(client(fake), output, 1, "r1-meshdb-ci", lambda: "lost")
       self.assertFalse((output / "state.json").exists())
     delete_urls = [url for method, url, _body, _timeout in fake.calls if method == "DELETE"]
     self.assertEqual(
@@ -182,7 +182,7 @@ class EphemeralTunnelTests(unittest.TestCase):
     with tempfile.TemporaryDirectory() as tmp:
       output = Path(tmp) / "allocation"
       with self.assertRaises(CloudflareError):
-        allocate(client(fake), output, 1, "r1-sql-ci", lambda: "lost")
+        allocate(client(fake), output, 1, "r1-meshdb-ci", lambda: "lost")
       self.assertFalse((output / "state.json").exists())
     delete_urls = [url for method, url, _body, _timeout in fake.calls if method == "DELETE"]
     self.assertEqual(
@@ -198,7 +198,7 @@ class EphemeralTunnelTests(unittest.TestCase):
     with tempfile.TemporaryDirectory() as tmp:
       output = Path(tmp) / "allocation"
       with self.assertRaisesRegex(CloudflareError, "cleanup left 2"):
-        allocate(client(fake), output, 3, "r1-sql-ci", lambda: "fixed")
+        allocate(client(fake), output, 3, "r1-meshdb-ci", lambda: "fixed")
       state = load_state(output / "state.json")
       self.assertEqual([item["id"] for item in state["tunnels"]], ["tunnel-1", "tunnel-2"])
       self.assertFalse(list(output.glob("*.token")))
@@ -225,7 +225,7 @@ class EphemeralTunnelTests(unittest.TestCase):
   def test_load_state_binds_recovery_to_the_expected_run_prefix(self):
     with tempfile.TemporaryDirectory() as tmp:
       state_path = Path(tmp) / "state.json"
-      name = "r1-sql-ci-12345-2-1-deadbeef"
+      name = "r1-meshdb-ci-12345-2-1-deadbeef"
       state_path.write_text(json.dumps({
         "schemaVersion": 1,
         "accountId": "account",
@@ -240,26 +240,26 @@ class EphemeralTunnelTests(unittest.TestCase):
       }))
       state_path.chmod(0o600)
       self.assertEqual(
-        load_state(state_path, expected_run_prefix="r1-sql-ci-12345-2")["tunnels"][0]["id"],
+        load_state(state_path, expected_run_prefix="r1-meshdb-ci-12345-2")["tunnels"][0]["id"],
         "tunnel-1",
       )
       with self.assertRaisesRegex(CloudflareError, "requested run prefix"):
-        load_state(state_path, expected_run_prefix="r1-sql-ci-12345-3")
+        load_state(state_path, expected_run_prefix="r1-meshdb-ci-12345-3")
 
   def test_cleanup_run_prefix_deletes_only_the_exact_attempt_namespace(self):
     fake = FakeCloudflare()
-    exact_name = "r1-sql-ci-12345-2-1-deadbeef"
+    exact_name = "r1-meshdb-ci-12345-2-1-deadbeef"
     exact_id = "tunnel-exact"
     fake.tunnels = {
       exact_id: {"id": exact_id, "name": exact_name, "config_src": "local"},
       "tunnel-next-attempt": {
         "id": "tunnel-next-attempt",
-        "name": "r1-sql-ci-12345-20-1-feedface",
+        "name": "r1-meshdb-ci-12345-20-1-feedface",
         "config_src": "local",
       },
       "tunnel-other-run": {
         "id": "tunnel-other-run",
-        "name": "r1-sql-ci-123456-2-1-cafebabe",
+        "name": "r1-meshdb-ci-123456-2-1-cafebabe",
         "config_src": "local",
       },
     }
@@ -271,7 +271,7 @@ class EphemeralTunnelTests(unittest.TestCase):
       },
     }
 
-    self.assertEqual(cleanup_run_prefix(client(fake), "r1-sql-ci-12345-2", retries=1), 1)
+    self.assertEqual(cleanup_run_prefix(client(fake), "r1-meshdb-ci-12345-2", retries=1), 1)
     deletes = [url for method, url, _body, _timeout in fake.calls if method == "DELETE"]
     self.assertEqual(
       deletes,
@@ -283,29 +283,29 @@ class EphemeralTunnelTests(unittest.TestCase):
     self.assertIn("tunnel-next-attempt", fake.tunnels)
     self.assertIn("tunnel-other-run", fake.tunnels)
 
-    self.assertEqual(cleanup_run_prefix(client(fake), "r1-sql-ci-12345-2", retries=1), 0)
+    self.assertEqual(cleanup_run_prefix(client(fake), "r1-meshdb-ci-12345-2", retries=1), 0)
 
   def test_cleanup_run_prefix_rejects_ambiguous_or_oversized_matches(self):
     fake = FakeCloudflare()
     with self.assertRaisesRegex(CloudflareError, "run prefix"):
-      cleanup_run_prefix(client(fake), "r1-sql-ci-12345", retries=1)
+      cleanup_run_prefix(client(fake), "r1-meshdb-ci-12345", retries=1)
     self.assertFalse(fake.calls)
 
     fake.tunnels = {
       f"tunnel-{index}": {
         "id": f"tunnel-{index}",
-        "name": f"r1-sql-ci-12345-2-{index}-deadbeef",
+        "name": f"r1-meshdb-ci-12345-2-{index}-deadbeef",
         "config_src": "local",
       }
       for index in range(1, 5)
     }
     with self.assertRaisesRegex(CloudflareError, "more than three"):
-      cleanup_run_prefix(client(fake), "r1-sql-ci-12345-2", retries=1)
+      cleanup_run_prefix(client(fake), "r1-meshdb-ci-12345-2", retries=1)
     self.assertFalse([call for call in fake.calls if call[0] == "DELETE"])
 
   def test_cleanup_run_prefix_removes_dns_orphan_without_deleting_its_target(self):
     fake = FakeCloudflare()
-    name = "r1-sql-ci-12345-2-1-deadbeef"
+    name = "r1-meshdb-ci-12345-2-1-deadbeef"
     fake.tunnels = {
       "unrelated-tunnel": {
         "id": "unrelated-tunnel",
@@ -320,7 +320,7 @@ class EphemeralTunnelTests(unittest.TestCase):
         "content": "unrelated-tunnel.cfargotunnel.com",
       },
     }
-    self.assertEqual(cleanup_run_prefix(client(fake), "r1-sql-ci-12345-2", retries=1), 1)
+    self.assertEqual(cleanup_run_prefix(client(fake), "r1-meshdb-ci-12345-2", retries=1), 1)
     deletes = [url for method, url, _body, _timeout in fake.calls if method == "DELETE"]
     self.assertEqual(
       deletes,
@@ -330,7 +330,7 @@ class EphemeralTunnelTests(unittest.TestCase):
 
   def test_recovery_state_ids_never_drive_deletion(self):
     fake = FakeCloudflare()
-    name = "r1-sql-ci-12345-2-1-deadbeef"
+    name = "r1-meshdb-ci-12345-2-1-deadbeef"
     fake.tunnels = {
       "actual-tunnel": {
         "id": "actual-tunnel",
@@ -355,7 +355,7 @@ class EphemeralTunnelTests(unittest.TestCase):
       cleanup_state_allocations(
         client(fake),
         state,
-        expected_run_prefix="r1-sql-ci-12345-2",
+        expected_run_prefix="r1-meshdb-ci-12345-2",
         retries=1,
       ),
       1,

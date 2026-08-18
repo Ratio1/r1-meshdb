@@ -72,7 +72,7 @@ var HaveUI = false
 var indexHTML = []byte(`<!DOCTYPE html>
 <html>
 	<head>
-		<title>Cockroach Console</title>
+		<title>R1 MeshDB Console</title>
 		<meta charset="UTF-8">
 		<link href="favicon.ico" rel="shortcut icon">
 	</head>
@@ -124,7 +124,7 @@ type OIDCUI interface {
 // bareIndexHTML is used in place of indexHTMLTemplate when the binary is built
 // without the web UI.
 var bareIndexHTML = []byte(fmt.Sprintf(`<!DOCTYPE html>
-<title>CockroachDB</title>
+<title>R1 MeshDB</title>
 Binary built without web UI.
 <hr>
 <em>%s</em>`, build.GetInfo().Short()))

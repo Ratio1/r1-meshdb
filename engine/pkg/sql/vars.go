@@ -1,4 +1,5 @@
 // Copyright 2017 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -2924,7 +2925,7 @@ var varGen = map[string]sessionVar{
 // We want test coverage for this on and off so make it metamorphic.
 var copyFastPathDefault bool = util.ConstantWithMetamorphicTestBool("copy-fast-path-enabled-default", true)
 
-const compatErrMsg = "this parameter is currently recognized only for compatibility and has no effect in CockroachDB."
+const compatErrMsg = "this parameter is currently recognized only for compatibility and has no effect in R1 MeshDB."
 
 func init() {
 	// SetWithPlanner must be initialized in init() to avoid a circular

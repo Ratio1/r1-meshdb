@@ -39,7 +39,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 \
 
 FROM golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 AS engine-builder
 
-ARG RATIO1_VERSION=v23.1.28-r1.0.0
+ARG RATIO1_VERSION=v1.0.0
 ARG SOURCE_DATE_EPOCH=1727820937
 ARG BUILD_JOBS=4
 
@@ -48,8 +48,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     GOSUMDB=off
 
 RUN printf '%s\n' \
-      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260701T000000Z bookworm main' \
-      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260701T000000Z bookworm-security main' \
+      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260812T000000Z bookworm main' \
+      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260812T000000Z bookworm-security main' \
       > /etc/apt/sources.list \
   && rm -f /etc/apt/sources.list.d/debian.sources \
   && apt-get -o Acquire::Check-Valid-Until=false update \
@@ -73,6 +73,7 @@ COPY . .
 RUN python3 scripts/verify-source-boundary.py --worktree-only \
   && python3 scripts/verify-runtime-closure.py \
   && python3 scripts/generate-license-inventory.py --check \
+  && python3 scripts/generate-vendor-license-manifest.py --check \
   && python3 scripts/verify-provenance.py \
   && python3 scripts/verify-public-test-fixtures.py \
   && python3 scripts/verify-security-vex.py \
@@ -107,12 +108,16 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   && cp security/openvex.json /out/licenses/security/ \
   && cp source/provenance.json source/license-inventory.json \
        source/cloudflared-buildinfo.txt source/cloudflared-license-inventory.csv \
+       source/vendor-license-manifest.json \
        /out/licenses/source/ \
   && cp -a engine/licenses/. /out/licenses/engine/ \
+  && cp engine/AUTHORS /out/licenses/engine/AUTHORS \
   && cp engine/c-deps/geos/COPYING /out/licenses/engine/GEOS-COPYING \
   && cp engine/c-deps/jemalloc/COPYING /out/licenses/engine/JEMALLOC-COPYING \
   && cp engine/c-deps/libedit/COPYING /out/licenses/engine/LIBEDIT-COPYING \
   && cp engine/c-deps/proj/COPYING /out/licenses/engine/PROJ-COPYING \
+  && python3 scripts/generate-vendor-license-manifest.py --check \
+       --copy-to /out/licenses/engine/vendor \
   && cp -a licenses/cloudflared/. /out/licenses/cloudflared/
 
 FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241 AS runtime-rootfs-builder
@@ -120,56 +125,65 @@ FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN printf '%s\n' \
-      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260701T000000Z bookworm main' \
-      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260701T000000Z bookworm-security main' \
+      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260812T000000Z bookworm main' \
+      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260812T000000Z bookworm-security main' \
+      'deb-src [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260812T000000Z bookworm main' \
+      'deb-src [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260812T000000Z bookworm-security main' \
       > /etc/apt/sources.list \
   && rm -f /etc/apt/sources.list.d/debian.sources \
   && apt-get -o Acquire::Check-Valid-Until=false update \
   && apt-get install -y --no-install-recommends \
     bash=5.2.15-2+b13 \
     ca-certificates=20230311+deb12u1 \
-    libtinfo6=6.4-4 \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
+    libtinfo6=6.4-4
 
 COPY --chmod=755 scripts/assemble-runtime-rootfs.sh /usr/local/bin/assemble-runtime-rootfs
-COPY source/runtime-packages.txt /usr/share/r1-distributed-sql/runtime-packages.txt
+COPY --chmod=755 scripts/collect-debian-corresponding-source.sh /usr/local/bin/collect-debian-corresponding-source
+COPY source/runtime-packages.txt /usr/share/r1-meshdb/runtime-packages.txt
+COPY source/runtime-package-sources.tsv /usr/share/r1-meshdb/runtime-package-sources.tsv
 
 RUN --mount=from=engine-builder,source=/out/cockroach,target=/candidate-cockroach,ro \
   assemble-runtime-rootfs \
     /minimal-rootfs \
     /candidate-cockroach \
-    /usr/share/r1-distributed-sql/runtime-packages.txt
+    /usr/share/r1-meshdb/runtime-packages.txt \
+    /usr/share/r1-meshdb/runtime-package-sources.tsv \
+  && collect-debian-corresponding-source \
+    /minimal-rootfs/usr/share/doc/r1-meshdb/runtime-package-sources.tsv \
+    /minimal-rootfs/usr/share/src/r1-meshdb/debian \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
 
 FROM scratch
 
 ARG BUILD_DATE=""
 ARG RATIO1_REVISION="unknown"
-ARG RATIO1_VERSION="v23.1.28-r1.0.0"
+ARG RATIO1_VERSION="v1.0.0"
 
-LABEL org.opencontainers.image.title="R1 Distributed SQL" \
+LABEL org.opencontainers.image.title="R1 MeshDB" \
       org.opencontainers.image.description="Distributed SQL database runtime for Ratio1 edge nodes" \
       org.opencontainers.image.url="https://github.com/Ratio1/r1-distributed-sql" \
       org.opencontainers.image.source="https://github.com/Ratio1/r1-distributed-sql" \
       org.opencontainers.image.documentation="https://github.com/Ratio1/r1-distributed-sql/blob/main/README.md" \
-      org.opencontainers.image.licenses="Apache-2.0 AND LicenseRef-R1-Distributed-SQL-Third-Party" \
+      org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${RATIO1_REVISION}" \
       org.opencontainers.image.version="${RATIO1_VERSION}" \
       org.opencontainers.image.vendor="Ratio1" \
-      io.ratio1.r1-distributed-sql.upstream.version="v23.1.28" \
-      io.ratio1.r1-distributed-sql.upstream.revision="76e598c9b1c100fd9280b979140b5e377c330a20" \
-      io.ratio1.r1-distributed-sql.distribution="OSS"
+      io.ratio1.r1-meshdb.upstream.version="v23.1.28" \
+      io.ratio1.r1-meshdb.upstream.revision="76e598c9b1c100fd9280b979140b5e377c330a20" \
+      io.ratio1.r1-meshdb.distribution="OSS"
 
 COPY --from=runtime-rootfs-builder /minimal-rootfs/ /
 COPY --chmod=755 --from=cloudflared-builder /out/cloudflared /usr/local/bin/cloudflared
 COPY --chmod=755 --from=cloudflared-builder /out/r1-atomic-replace /usr/local/bin/r1-atomic-replace
 COPY --chmod=755 --from=engine-builder /out/cockroach /cockroach/cockroach
-COPY --from=engine-builder /out/lib/ /usr/local/lib/r1-distributed-sql/
-COPY --from=engine-builder /out/licenses/ /usr/share/doc/r1-distributed-sql/
+COPY --from=engine-builder /out/R1_MESHDB_VERSION /usr/share/r1-meshdb/VERSION
+COPY --from=engine-builder /out/lib/ /usr/local/lib/r1-meshdb/
+COPY --from=engine-builder /out/licenses/ /usr/share/doc/r1-meshdb/
 COPY --chmod=755 entrypoint.sh /usr/local/bin/deeploy-crdb-entrypoint
 
-ENV LD_LIBRARY_PATH=/usr/local/lib/r1-distributed-sql
+ENV LD_LIBRARY_PATH=/usr/local/lib/r1-meshdb
 
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["/usr/local/bin/deeploy-crdb-entrypoint"]

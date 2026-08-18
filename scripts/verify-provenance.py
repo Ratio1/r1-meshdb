@@ -17,10 +17,38 @@ ROOT = Path(__file__).resolve().parents[1]
 PROVENANCE = ROOT / "source" / "provenance.json"
 OVERRIDES = ROOT / "source" / "ratio1-engine-overrides.json"
 EXPECTED_MODIFIED_FILES = {
+  "engine/pkg/build/info.go",
   "engine/pkg/cli/cli.go",
+  "engine/pkg/cli/clierrorplus/decorate_error.go",
+  "engine/pkg/cli/cliflags/flags.go",
+  "engine/pkg/cli/clisqlcfg/context.go",
+  "engine/pkg/cli/clisqlclient/conn.go",
+  "engine/pkg/cli/clisqlshell/sql.go",
+  "engine/pkg/cli/demo.go",
+  "engine/pkg/cli/debug_recover_loss_of_quorum.go",
+  "engine/pkg/cli/examples.go",
+  "engine/pkg/cli/flags.go",
+  "engine/pkg/cli/gen.go",
+  "engine/pkg/cli/import.go",
+  "engine/pkg/cli/init.go",
+  "engine/pkg/cli/sql_shell_cmd.go",
+  "engine/pkg/cli/start.go",
+  "engine/pkg/docs/docs.go",
+  "engine/pkg/kv/kvserver/replica_consistency.go",
+  "engine/pkg/kv/kvserver/replica_corruption.go",
+  "engine/pkg/kv/kvclient/kvcoord/txn_coord_sender.go",
+  "engine/pkg/server/api_v2_error.go",
+  "engine/pkg/server/diagnostics/diagnostics.go",
+  "engine/pkg/server/server.go",
+  "engine/pkg/settings/cluster/cluster_settings.go",
+  "engine/pkg/sql/crdb_internal.go",
+  "engine/pkg/sql/vars.go",
   "engine/pkg/storage/pebble_iterator.go",
   "engine/pkg/ui/ui.go",
   "engine/pkg/util/ctxutil/context.go",
+  "engine/pkg/util/log/clog.go",
+  "engine/pkg/util/log/logcrash/crash_reporting.go",
+  "engine/pkg/util/tracing/tracer.go",
 }
 EXPECTED_REMOVED_FILES = {"engine/pkg/util/ctxutil/context_abi_pre1_20.go"}
 EXPECTED_ADDED_FILES = {
@@ -336,20 +364,48 @@ def check_native_upstreams(dependencies: list[dict], native_roots: dict[str, Pat
     ).stdout.strip()
     if revision != dependency.get("commit"):
       fail(f"native upstream revision differs for {name}: {revision}")
-    if tree_sha256(remote_root) != dependency.get("treeSha256"):
+    expected_upstream_tree = dependency.get("upstreamTreeSha256", dependency.get("treeSha256"))
+    if tree_sha256(remote_root) != expected_upstream_tree:
       fail(f"native upstream tree differs from the distributed tree: {name}")
+    additions = dependency.get("complianceAdditions", [])
+    if not isinstance(additions, list):
+      fail(f"native compliance additions have an invalid shape: {name}")
+    for addition in additions:
+      path = addition.get("path", "")
+      target = ROOT / "engine" / "c-deps" / name / path
+      if not target.is_file() or file_sha256(target) != addition.get("sha256"):
+        fail(f"native compliance addition differs: {name}/{path}")
+      if not addition.get("source"):
+        fail(f"native compliance addition has no source: {name}/{path}")
 
 
 def check_source_dependency_baseline(baseline: dict, upstream_root: Path | None) -> None:
+  baseline_repository = baseline.get("repository", "")
   baseline_commit = baseline.get("commit", "")
+  baseline_source_path = baseline.get("path", "")
+  baseline_artifact = baseline.get("artifact", "")
   baseline_sha256 = baseline.get("vendorModulesSha256", "")
+  if baseline_repository != "https://github.com/Ratio1/r1-distributed-sql.git":
+    fail("source dependency baseline repository is invalid")
   if not re.fullmatch(r"[0-9a-f]{40}", baseline_commit):
     fail("source dependency baseline commit is invalid")
+  if baseline_source_path != "engine/vendor/modules.txt":
+    fail("source dependency baseline path is invalid")
+  if baseline_artifact != "source/engine-v23.1.28-vendor-modules.baseline.txt":
+    fail("source dependency baseline artifact is invalid")
   if not re.fullmatch(r"[0-9a-f]{64}", baseline_sha256):
     fail("source baseline vendor module hash is invalid")
 
+  artifact_path = ROOT / baseline_artifact
+  try:
+    artifact_path.resolve(strict=True).relative_to(ROOT.resolve())
+  except (OSError, ValueError):
+    fail("source dependency baseline artifact is missing or outside the source tree")
+  if file_sha256(artifact_path) != baseline_sha256:
+    fail("source dependency baseline artifact differs")
+
   if upstream_root is not None:
-    baseline_path = upstream_root / "vendor" / "modules.txt"
+    baseline_path = upstream_root / Path(baseline_source_path).relative_to("engine")
     if not baseline_path.is_file() or file_sha256(baseline_path) != baseline_sha256:
       fail("source baseline vendor module snapshot differs")
     return
@@ -373,7 +429,7 @@ def check_source_dependency_baseline(baseline: dict, upstream_root: Path | None)
   if commit_probe.returncode != 0:
     return
   result = subprocess.run(
-    ["git", "show", f"{baseline_commit}:engine/vendor/modules.txt"],
+    ["git", "show", f"{baseline_commit}:{baseline_source_path}"],
     cwd=ROOT,
     check=False,
     stdout=subprocess.PIPE,
@@ -403,6 +459,7 @@ def check_engine_overrides(upstream_commit: str, patch_record: str, upstream_roo
     if change_class not in {
       "comments-only",
       "go-toolchain-compatibility",
+      "product-identity-and-privacy",
       "runtime-recovery-signal",
     }:
       fail(f"engine override has an invalid change class: {path}")

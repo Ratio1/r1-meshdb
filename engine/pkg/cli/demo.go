@@ -1,4 +1,5 @@
 // Copyright 2018 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -37,7 +38,7 @@ var demoCmd = &cobra.Command{
 	Use:   "demo",
 	Short: "open a demo sql shell",
 	Long: `
-Start an in-memory, standalone, single-node CockroachDB instance, and open an
+Start an in-memory, standalone, single-node R1 MeshDB instance, and open an
 interactive SQL prompt to it. Various datasets are available to be preloaded as
 subcommands: e.g. "cockroach demo startrek". See --help for a full list.
 
@@ -259,9 +260,9 @@ func runDemoInternal(
 
 	if cliCtx.IsInteractive {
 		cliCtx.PrintfUnlessEmbedded(`#
-# Welcome to the CockroachDB demo database!
+# Welcome to the R1 MeshDB demo database!
 #
-# You are connected to a temporary, in-memory CockroachDB cluster of %d node%s.
+# You are connected to a temporary, in-memory R1 MeshDB cluster of %d node%s.
 `, demoCtx.NumNodes, util.Pluralize(int64(demoCtx.NumNodes)))
 
 		if demoCtx.Multitenant {

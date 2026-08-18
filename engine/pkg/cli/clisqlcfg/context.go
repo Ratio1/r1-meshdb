@@ -1,4 +1,5 @@
 // Copyright 2021 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -216,7 +217,7 @@ func (c *Context) Run(ctx context.Context, conn clisqlclient.Conn) error {
 
 	if c.ConnCtx.DebugMode {
 		fmt.Fprintln(c.CmdOut,
-			"#\n# NOTE: if you intend to troubleshoot CockroachDB, you might want to set the current database\n"+
+			"#\n# NOTE: if you intend to troubleshoot R1 MeshDB, you might want to set the current database\n"+
 				"# to the empty string (SET database = \"\"), for otherwise simple queries against crdb_internal\n"+
 				"# and other vtables will attempt to take a database lease and incur write traffic.\n#")
 	}
