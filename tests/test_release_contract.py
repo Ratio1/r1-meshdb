@@ -1424,6 +1424,19 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
     self.assertNotIn("apt-get", local_transport)
     self.assertIn("r1-test-tcp-proxy", local_transport)
 
+  def test_process_environment_scans_tolerate_process_exit(self):
+    guarded_read = 'if ! values="$(tr "\\000" "\\n" 2>/dev/null < "$environment")"; then'
+    for path in (
+      "scripts/entrypoint-multinode-smoke.sh",
+      "testbed/run-rolling-upgrade.sh",
+      "testbed/run-real-cloudflare-cluster.sh",
+    ):
+      script = read(path)
+      self.assertIn(guarded_read, script, path)
+      self.assertIn('if [[ -e "$environment" ]]; then', script, path)
+      self.assertIn("process environment scan failed", script, path)
+      self.assertNotIn('[[ -r "$environment" ]] || continue', script, path)
+
   def test_generated_parser_outputs_are_declared(self):
     generated = set(read("source/generated-files.txt").splitlines())
     self.assertIn("pkg/sql/parser/sql.go", generated)

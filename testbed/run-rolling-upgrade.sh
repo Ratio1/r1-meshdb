@@ -284,9 +284,14 @@ for node in "${nodes[@]}"; do
     token="$(cat /runtime/cf-token)"
     scanner_pid="$$"
     for environment in /proc/[0-9]*/environ; do
-      [[ -r "$environment" ]] || continue
       [[ "$environment" != "/proc/${scanner_pid}/environ" ]] || continue
-      values="$(tr "\000" "\n" < "$environment")"
+      if ! values="$(tr "\000" "\n" 2>/dev/null < "$environment")"; then
+        if [[ -e "$environment" ]]; then
+          echo "process environment scan failed" >&2
+          exit 1
+        fi
+        continue
+      fi
       case "$values" in
         *r1_rolling_validation_password*|*"$token"*|*CRDB_NODE_KEY=*|*CRDB_CLIENT_ROOT_KEY=*)
           echo "secret remained in a candidate process environment" >&2

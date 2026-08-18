@@ -136,9 +136,15 @@ for name in "${node1}" "${node2}" "${node3}"; do
     set -euo pipefail
     scanner_pid="$$"
     for environment in /proc/[0-9]*/environ; do
-      [[ -r "$environment" ]] || continue
       [[ "$environment" != "/proc/${scanner_pid}/environ" ]] || continue
-      if tr "\000" "\n" < "$environment" | grep -Eq "entrypoint_multinode_secret|entrypoint-multinode-fake-token|^CRDB_(CA_CRT|NODE_CRT|NODE_KEY|CLIENT_ROOT_CRT|CLIENT_ROOT_KEY)="; then
+      if ! values="$(tr "\000" "\n" 2>/dev/null < "$environment")"; then
+        if [[ -e "$environment" ]]; then
+          echo "process environment scan failed" >&2
+          exit 1
+        fi
+        continue
+      fi
+      if grep -Eq "entrypoint_multinode_secret|entrypoint-multinode-fake-token|^CRDB_(CA_CRT|NODE_CRT|NODE_KEY|CLIENT_ROOT_CRT|CLIENT_ROOT_KEY)=" <<< "$values"; then
         echo "secret remained in a supervised process environment" >&2
         exit 1
       fi
