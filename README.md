@@ -64,6 +64,7 @@ python3 -m unittest tests.test_release_contract tests.test_sbom_contract
 python3 scripts/verify-source-boundary.py --worktree-only
 python3 scripts/generate-license-inventory.py --check
 python3 scripts/verify-provenance.py
+scripts/verify-upstream-provenance.sh  # authoritative; requires Docker and network access
 python3 scripts/verify-public-test-fixtures.py
 python3 scripts/verify-security-vex.py
 python3 scripts/generate-source-manifest.py --check

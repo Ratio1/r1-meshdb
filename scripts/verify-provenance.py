@@ -340,6 +340,51 @@ def check_native_upstreams(dependencies: list[dict], native_roots: dict[str, Pat
       fail(f"native upstream tree differs from the distributed tree: {name}")
 
 
+def check_source_dependency_baseline(baseline: dict, upstream_root: Path | None) -> None:
+  baseline_commit = baseline.get("commit", "")
+  baseline_sha256 = baseline.get("vendorModulesSha256", "")
+  if not re.fullmatch(r"[0-9a-f]{40}", baseline_commit):
+    fail("source dependency baseline commit is invalid")
+  if not re.fullmatch(r"[0-9a-f]{64}", baseline_sha256):
+    fail("source baseline vendor module hash is invalid")
+
+  if upstream_root is not None:
+    baseline_path = upstream_root / "vendor" / "modules.txt"
+    if not baseline_path.is_file() or file_sha256(baseline_path) != baseline_sha256:
+      fail("source baseline vendor module snapshot differs")
+    return
+
+  git_probe = subprocess.run(
+    ["git", "rev-parse", "--is-inside-work-tree"],
+    cwd=ROOT,
+    check=False,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.DEVNULL,
+  )
+  if git_probe.returncode != 0:
+    return
+  commit_probe = subprocess.run(
+    ["git", "cat-file", "-e", f"{baseline_commit}^{{commit}}"],
+    cwd=ROOT,
+    check=False,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+  )
+  if commit_probe.returncode != 0:
+    return
+  result = subprocess.run(
+    ["git", "show", f"{baseline_commit}:engine/vendor/modules.txt"],
+    cwd=ROOT,
+    check=False,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.DEVNULL,
+  )
+  if result.returncode != 0:
+    fail("source baseline commit has no vendor module snapshot")
+  if hashlib.sha256(result.stdout).hexdigest() != baseline_sha256:
+    fail("source baseline vendor module snapshot differs")
+
+
 def check_engine_overrides(upstream_commit: str, patch_record: str, upstream_root: Path | None) -> None:
   overrides = json.loads(OVERRIDES.read_text(encoding="utf-8"))
   if overrides.get("upstreamCommit") != upstream_commit:
@@ -427,26 +472,7 @@ def check_engine_overrides(upstream_commit: str, patch_record: str, upstream_roo
       upstream_path = upstream_root / path.relative_to(ROOT / "engine")
       if not upstream_path.is_file() or upstream.get(key) != file_sha256(upstream_path):
         fail(f"upstream dependency snapshot differs: {key}")
-  baseline = dependency.get("sourceBaseline", {})
-  baseline_commit = baseline.get("commit", "")
-  if not re.fullmatch(r"[0-9a-f]{40}", baseline_commit):
-    fail("source dependency baseline commit is invalid")
-  git_probe = subprocess.run(
-    ["git", "rev-parse", "--is-inside-work-tree"],
-    cwd=ROOT,
-    check=False,
-    stdout=subprocess.PIPE,
-    stderr=subprocess.DEVNULL,
-  )
-  if git_probe.returncode == 0:
-    result = subprocess.run(
-      ["git", "show", f"{baseline_commit}:engine/vendor/modules.txt"],
-      cwd=ROOT,
-      check=True,
-      stdout=subprocess.PIPE,
-    )
-    if baseline.get("vendorModulesSha256") != hashlib.sha256(result.stdout).hexdigest():
-      fail("source baseline vendor module snapshot differs")
+  check_source_dependency_baseline(dependency.get("sourceBaseline", {}), upstream_root)
 
   backports = overrides.get("securityBackports")
   advisories = {record.get("advisory") for record in backports if isinstance(record, dict)}

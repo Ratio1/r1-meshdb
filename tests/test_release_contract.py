@@ -57,6 +57,129 @@ func value() string {
       verifier.comments_only_projection(code_changed),
     )
 
+  def test_source_baseline_validation_survives_squash_history(self):
+    verifier = load_script("scripts/verify-provenance.py")
+    baseline = {
+      "commit": "a" * 40,
+      "vendorModulesSha256": "b" * 64,
+    }
+    with tempfile.TemporaryDirectory() as directory:
+      repository = Path(directory)
+      subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+      original_root = verifier.ROOT
+      verifier.ROOT = repository
+      try:
+        verifier.check_source_dependency_baseline(baseline, None)
+      finally:
+        verifier.ROOT = original_root
+
+  def test_source_baseline_validation_checks_available_history(self):
+    verifier = load_script("scripts/verify-provenance.py")
+    content = b"# baseline vendor modules\n"
+    with tempfile.TemporaryDirectory() as directory:
+      repository = Path(directory)
+      target = repository / "engine" / "vendor" / "modules.txt"
+      target.parent.mkdir(parents=True)
+      target.write_bytes(content)
+      subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+      subprocess.run(["git", "add", "."], cwd=repository, check=True)
+      subprocess.run(
+        [
+          "git", "-c", "user.name=CI", "-c", "user.email=ci@example.invalid",
+          "commit", "--quiet", "-m", "baseline",
+        ],
+        cwd=repository,
+        check=True,
+      )
+      commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repository,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+      ).stdout.strip()
+      baseline = {
+        "commit": commit,
+        "vendorModulesSha256": verifier.hashlib.sha256(content).hexdigest(),
+      }
+      original_root = verifier.ROOT
+      verifier.ROOT = repository
+      try:
+        verifier.check_source_dependency_baseline(baseline, None)
+        with self.assertRaises(SystemExit):
+          verifier.check_source_dependency_baseline(
+            {**baseline, "vendorModulesSha256": "0" * 64},
+            None,
+          )
+      finally:
+        verifier.ROOT = original_root
+
+  def test_source_baseline_validation_rejects_history_without_snapshot(self):
+    verifier = load_script("scripts/verify-provenance.py")
+    with tempfile.TemporaryDirectory() as directory:
+      repository = Path(directory)
+      (repository / "README.md").write_text("baseline\n", encoding="utf-8")
+      subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+      subprocess.run(["git", "add", "."], cwd=repository, check=True)
+      subprocess.run(
+        [
+          "git", "-c", "user.name=CI", "-c", "user.email=ci@example.invalid",
+          "commit", "--quiet", "-m", "baseline",
+        ],
+        cwd=repository,
+        check=True,
+      )
+      commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repository,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+      ).stdout.strip()
+      original_root = verifier.ROOT
+      verifier.ROOT = repository
+      try:
+        with self.assertRaises(SystemExit):
+          verifier.check_source_dependency_baseline(
+            {"commit": commit, "vendorModulesSha256": "0" * 64},
+            None,
+          )
+      finally:
+        verifier.ROOT = original_root
+
+  def test_source_baseline_validation_uses_exact_upstream_snapshot(self):
+    verifier = load_script("scripts/verify-provenance.py")
+    content = b"# exact upstream vendor modules\n"
+    with tempfile.TemporaryDirectory() as directory:
+      upstream_root = Path(directory)
+      target = upstream_root / "vendor" / "modules.txt"
+      target.parent.mkdir(parents=True)
+      target.write_bytes(content)
+      baseline = {
+        "commit": "a" * 40,
+        "vendorModulesSha256": verifier.hashlib.sha256(content).hexdigest(),
+      }
+      verifier.check_source_dependency_baseline(baseline, upstream_root)
+      with self.assertRaises(SystemExit):
+        verifier.check_source_dependency_baseline(
+          {**baseline, "vendorModulesSha256": "0" * 64},
+          upstream_root,
+        )
+
+  def test_hosted_provenance_paths_require_exact_upstream_verification(self):
+    for workflow_path in (
+      ".github/workflows/ci.yml",
+      ".github/workflows/release.yml",
+      ".github/workflows/security.yml",
+    ):
+      workflow = read(workflow_path)
+      self.assertIn("python3 scripts/verify-provenance.py", workflow)
+      self.assertIn("scripts/verify-upstream-provenance.sh", workflow)
+    self.assertIn(
+      'python3 "${root}/scripts/verify-provenance.py" "${args[@]}"',
+      read("scripts/verify-upstream-provenance.sh"),
+    )
+
   def test_required_compliance_and_provenance_files_exist(self):
     required = (
       "LICENSE",
