@@ -13,7 +13,7 @@ import unittest
 from scripts.cloudflare_cleanup_recovery import RecoveryError, resolve_cleanup_run
 
 
-REPOSITORY = "Ratio1/r1-distributed-sql"
+REPOSITORY = "Ratio1/r1-meshdb"
 RUN_ID = 12345
 ATTEMPT = 2
 STEP_NAME = "Run unchanged candidate through real ephemeral Cloudflare tunnels"

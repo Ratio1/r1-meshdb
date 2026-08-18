@@ -12,7 +12,7 @@
     {
       "path": "engine/pkg/build/info.go",
       "upstreamSha256": "e52e0ffcfa009e11bad10adc66c58d126f74d967df07980cb0c58b4529ca66ba",
-      "distributedSha256": "6c98962a25626e79933e23cacdd820545a5f7baba6a87d2d81cb8572eae23efd",
+      "distributedSha256": "24b986ff7493343f7e56c8ea19db00a40772a9a414dde62300159b232a8bc357",
       "changeClass": "product-identity-and-privacy",
       "reason": "Report the R1 MeshDB product identity and route actionable issue links to the Ratio1 repository while retaining the upstream commit metadata."
     },
@@ -159,7 +159,7 @@
     {
       "path": "engine/pkg/util/log/clog.go",
       "upstreamSha256": "69b023dc71054f33f77a6ff6c431851a6a21cbfac6e7118ffe03f3c14b41b75e",
-      "distributedSha256": "c1ab25b78e91cfdc294fa6ea253a6b2d8e5b4f3514f5c31338349e9597663f9b",
+      "distributedSha256": "a0bb9be9c2ef1c557d6e5755ca4b6ba9853169ea9ccfaf689410fd4fa3eaed1c",
       "changeClass": "product-identity-and-privacy",
       "reason": "Route fatal-error reports to Ratio1 without exposing users to an unaffiliated support address."
     },
@@ -194,7 +194,7 @@
     {
       "path": "engine/pkg/kv/kvclient/kvcoord/txn_coord_sender.go",
       "upstreamSha256": "3896c50d25d9c40e5550610338f1e2e02edf17d72431fc2e766502d3bd52e2ee",
-      "distributedSha256": "a8bedcf600b8b0dec58b8baefd8b0611d01995f8699e41d535915c6ec6a308bf",
+      "distributedSha256": "9981def051864f5cf577917ccd7719e5cfa5243b873e16fb638b1cd1f9cd77f3",
       "changeClass": "product-identity-and-privacy",
       "reason": "Route a known transaction assertion to Ratio1 support while retaining the upstream issue reference."
     },
@@ -262,7 +262,7 @@
       "goSumSha256": "5b49c9ca288606b8ec9ea5d244e26050312173d6d81940871c9429b622fcfcb4"
     },
     "sourceBaseline": {
-      "repository": "https://github.com/Ratio1/r1-distributed-sql.git",
+      "repository": "https://github.com/Ratio1/r1-meshdb.git",
       "commit": "610359213980391814f8ced2b5f57ba64e2f9e01",
       "path": "engine/vendor/modules.txt",
       "artifact": "source/engine-v23.1.28-vendor-modules.baseline.txt",

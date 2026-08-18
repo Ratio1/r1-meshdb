@@ -105,7 +105,7 @@ jobs:
             'cd /usr/share/src/r1-meshdb/debian && sha256sum -c SHA256SUMS'
           docker image inspect r1-meshdb:ci \
             --format '{{json .Config.Labels}}' \
-            | grep -F 'https://github.com/Ratio1/r1-distributed-sql'
+            | grep -F 'https://github.com/Ratio1/r1-meshdb'
 
       - name: Run the bounded local three-node testbed
         run: |

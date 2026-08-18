@@ -8,7 +8,7 @@ umask 077
 image_ref="${1:?usage: verify-image.sh <image@sha256:digest> <release-tag>}"
 release_tag="${2:?usage: verify-image.sh <image@sha256:digest> <release-tag>}"
 expected_issuer="https://token.actions.githubusercontent.com"
-expected_identity="https://github.com/Ratio1/r1-distributed-sql/.github/workflows/release.yml@refs/heads/main"
+expected_identity="https://github.com/Ratio1/r1-meshdb/.github/workflows/release.yml@refs/heads/main"
 
 [[ "${image_ref}" =~ ^ghcr\.io/ratio1/r1-meshdb@sha256:[0-9a-f]{64}$ ]] || {
   printf 'image must be an immutable ghcr.io/ratio1/r1-meshdb digest\n' >&2
@@ -43,16 +43,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-is_draft="$(gh release view "${release_tag}" --repo Ratio1/r1-distributed-sql \
+is_draft="$(gh release view "${release_tag}" --repo Ratio1/r1-meshdb \
   --json isDraft --jq .isDraft)"
 [[ "${is_draft}" == "false" ]] || {
   echo "release is missing or is still a draft: ${release_tag}" >&2
   exit 1
 }
 mkdir "${tmp_dir}/release"
-gh release download "${release_tag}" --repo Ratio1/r1-distributed-sql \
+gh release download "${release_tag}" --repo Ratio1/r1-meshdb \
   --pattern image-reference.txt --dir "${tmp_dir}/release"
-gh release download "${release_tag}" --repo Ratio1/r1-distributed-sql \
+gh release download "${release_tag}" --repo Ratio1/r1-meshdb \
   --pattern r1-meshdb-debian-corresponding-source.tar.gz --dir "${tmp_dir}/release"
 printf '%s\n' "${image_ref}" > "${tmp_dir}/expected-image-reference.txt"
 cmp "${tmp_dir}/expected-image-reference.txt" "${tmp_dir}/release/image-reference.txt"
@@ -62,7 +62,7 @@ cmp "${tmp_dir}/expected-image-reference.txt" "${tmp_dir}/release/image-referenc
 # tag's object is the release commit.
 tag_refs="$(GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0 \
   git -C "${tmp_dir}" -c credential.helper= -c http.extraHeader= ls-remote \
-  https://github.com/Ratio1/r1-distributed-sql.git \
+  https://github.com/Ratio1/r1-meshdb.git \
   "refs/tags/${release_tag}" "refs/tags/${release_tag}^{}")"
 tag_commit="$(awk '$2 ~ /\^\{\}$/ { print $1; found=1 } END { if (!found) exit 1 }' \
   <<< "${tag_refs}" 2>/dev/null || awk '$2 !~ /\^\{\}$/ { print $1; exit }' <<< "${tag_refs}")"
@@ -72,13 +72,13 @@ tag_commit="$(awk '$2 ~ /\^\{\}$/ { print $1; found=1 } END { if (!found) exit 1
 }
 
 gh attestation verify "oci://${image_ref}" \
-  --repo Ratio1/r1-distributed-sql \
+  --repo Ratio1/r1-meshdb \
   --cert-identity "${expected_identity}" \
   --source-ref "refs/heads/main" \
   --source-digest "${tag_commit}" \
   --predicate-type 'https://slsa.dev/provenance/v1'
 gh attestation verify "oci://${image_ref}" \
-  --repo Ratio1/r1-distributed-sql \
+  --repo Ratio1/r1-meshdb \
   --cert-identity "${expected_identity}" \
   --source-ref "refs/heads/main" \
   --source-digest "${tag_commit}" \
@@ -130,7 +130,7 @@ import sys
 labels = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 expected = {
   "org.opencontainers.image.licenses": "Apache-2.0",
-  "org.opencontainers.image.source": "https://github.com/Ratio1/r1-distributed-sql",
+  "org.opencontainers.image.source": "https://github.com/Ratio1/r1-meshdb",
   "org.opencontainers.image.version": sys.argv[2],
   "org.opencontainers.image.revision": sys.argv[3],
   "io.ratio1.r1-meshdb.distribution": "OSS",

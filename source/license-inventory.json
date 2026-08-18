@@ -13917,7 +13917,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/build/info.go",
-      "sha256": "6c98962a25626e79933e23cacdd820545a5f7baba6a87d2d81cb8572eae23efd",
+      "sha256": "24b986ff7493343f7e56c8ea19db00a40772a9a414dde62300159b232a8bc357",
       "spdx": "Apache-2.0"
     },
     {
@@ -16305,7 +16305,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/kv/kvclient/kvcoord/txn_coord_sender.go",
-      "sha256": "a8bedcf600b8b0dec58b8baefd8b0611d01995f8699e41d535915c6ec6a308bf",
+      "sha256": "9981def051864f5cf577917ccd7719e5cfa5243b873e16fb638b1cd1f9cd77f3",
       "spdx": "Apache-2.0"
     },
     {
@@ -33195,7 +33195,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/util/log/clog.go",
-      "sha256": "c1ab25b78e91cfdc294fa6ea253a6b2d8e5b4f3514f5c31338349e9597663f9b",
+      "sha256": "a0bb9be9c2ef1c557d6e5755ca4b6ba9853169ea9ccfaf689410fd4fa3eaed1c",
       "spdx": "Apache-2.0"
     },
     {

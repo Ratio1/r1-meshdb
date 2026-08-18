@@ -31,7 +31,7 @@ def source_baseline(repository: Path, commit: str, content: bytes) -> dict:
   artifact.parent.mkdir(parents=True, exist_ok=True)
   artifact.write_bytes(content)
   return {
-    "repository": "https://github.com/Ratio1/r1-distributed-sql.git",
+    "repository": "https://github.com/Ratio1/r1-meshdb.git",
     "commit": commit,
     "path": "engine/vendor/modules.txt",
     "artifact": "source/engine-v23.1.28-vendor-modules.baseline.txt",
@@ -432,6 +432,60 @@ func value() string {
       release.index("Resolve and validate release version"),
       release.index("Build and publish the untagged release candidate"),
     )
+
+  def test_repository_identity_is_r1_meshdb_everywhere(self):
+    repository = "Ratio1/r1-meshdb"
+    source_url = f"https://github.com/{repository}"
+    old_slug = "r1-" + "distributed-sql"
+    old_repository = f"Ratio1/{old_slug}"
+    tracked_hits = subprocess.run(
+      ["git", "grep", "-l", "-e", old_repository, "-e", old_slug],
+      cwd=ROOT,
+      check=False,
+      capture_output=True,
+      text=True,
+    ).stdout.splitlines()
+    self.assertEqual(tracked_hits, [], f"stale repository identity: {tracked_hits}")
+
+    release = read(".github/workflows/release.yml")
+    self.assertIn(f"public_remote='{source_url}.git'", release)
+    self.assertIn(f'"{source_url}/archive/${{GITHUB_SHA}}.tar.gz"', release)
+    self.assertIn(f"repos/{repository}/releases/tags/%s", read("scripts/inspect-github-release.sh"))
+
+    dockerfile = read("Dockerfile")
+    self.assertIn(f'org.opencontainers.image.url="{source_url}"', dockerfile)
+    self.assertIn(f'org.opencontainers.image.source="{source_url}"', dockerfile)
+    self.assertIn(
+      f'org.opencontainers.image.documentation="{source_url}/blob/main/README.md"',
+      dockerfile,
+    )
+
+    verifier = read("scripts/verify-image.sh")
+    self.assertIn(
+      f'expected_identity="{source_url}/.github/workflows/release.yml@refs/heads/main"',
+      verifier,
+    )
+    self.assertIn(f'--repo {repository}', verifier)
+    self.assertIn(f'"org.opencontainers.image.source": "{source_url}"', verifier)
+
+    self.assertIn(f'APPLICATION_SOURCE = "{source_url}"', read("scripts/augment-sbom.py"))
+    self.assertIn(f'APPLICATION_SOURCE = "{source_url}"', read("scripts/verify-sbom.py"))
+    self.assertIn(
+      f'baseline_repository != "{source_url}.git"',
+      read("scripts/verify-provenance.py"),
+    )
+    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/2")
+    self.assertEqual(
+      json.loads(read("source/ratio1-engine-overrides.json"))["dependencySnapshot"]
+      ["sourceBaseline"]["repository"],
+      f"{source_url}.git",
+    )
+    for path in (
+      "engine/pkg/build/info.go",
+      "engine/pkg/kv/kvclient/kvcoord/txn_coord_sender.go",
+      "engine/pkg/util/log/clog.go",
+    ):
+      self.assertIn(f"{source_url}/issues/new", read(path))
 
   def test_queued_push_release_remains_valid_after_main_advances(self):
     release = read(".github/workflows/release.yml")
