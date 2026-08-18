@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0, included in the file
 // licenses/APL.txt.
 
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 package kvserver
 
 import (
@@ -56,7 +58,7 @@ func (r *Replica) setCorruptRaftMuLocked(
 	preventStartupMsg := fmt.Sprintf(`ATTENTION:
 
 this node is terminating because replica %s detected an inconsistent state.
-Please contact the CockroachDB support team. It is not necessarily safe
+Please contact the R1 MeshDB maintainers. It is not necessarily safe
 to replace this node; cluster data may still be at risk of corruption.
 
 A file preventing this node from restarting was placed at:

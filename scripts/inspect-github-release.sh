@@ -8,7 +8,7 @@ umask 077
 release_tag="${1:?usage: inspect-github-release.sh <release-tag>}"
 : "${GH_TOKEN:?GH_TOKEN is required}"
 
-if [[ ! "${release_tag}" =~ ^v23\.1\.28-r1\.[0-9]+\.[0-9]+$ ]]; then
+if [[ ! "${release_tag}" =~ ^v1\.0\.[0-9]+$ ]]; then
   echo "invalid R1 MeshDB release tag: ${release_tag}" >&2
   exit 2
 fi

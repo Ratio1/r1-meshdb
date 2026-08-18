@@ -241,7 +241,7 @@ SQL
     fi
     if docker_cmd exec -e "SECRET_CANARY=${secret_canary}" "${name}" sh -c \
       'grep -R -Fq -- "$SECRET_CANARY" /cockroach/cockroach-data/logs 2>/dev/null'; then
-      echo "secret canary leaked into CockroachDB logs" >&2
+      echo "secret canary leaked into R1 MeshDB logs" >&2
       exit 1
     fi
     if docker_cmd exec -e "SECRET_CANARY=${secret_canary}" "${name}" sh -c \
@@ -380,7 +380,7 @@ for reserved_user in Root ADMIN node public; do
     exit 1
   fi
   if [[ "${reserved_status}" != "1" || \
-        "${reserved_output}" != *"CRDB_USER must not be a reserved CockroachDB identity"* ]]; then
+        "${reserved_output}" != *"CRDB_USER must not be a reserved R1 MeshDB identity"* ]]; then
     echo "CRDB_USER=${reserved_user} did not fail through reserved-identity validation" >&2
     exit 1
   fi

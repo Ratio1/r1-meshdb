@@ -16,7 +16,7 @@ on:
         type: string
 
 concurrency:
-  group: r1-sql-cloudflare-cleanup-${{ github.event.workflow_run.id || inputs.run_id }}
+  group: r1-meshdb-cloudflare-cleanup-${{ github.event.workflow_run.id || inputs.run_id }}
   cancel-in-progress: false
 
 permissions:

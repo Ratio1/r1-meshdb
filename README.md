@@ -21,7 +21,7 @@ SBOM application metadata.
 The release image is published as:
 
 ```text
-ghcr.io/ratio1/r1-distributed-sql
+ghcr.io/ratio1/r1-meshdb
 ```
 
 Production deployments must use an immutable digest. Release workflows publish
@@ -59,9 +59,9 @@ Cloudflare source commit whose archive checksum, source metadata, compiled
 package closure, binary hash, licenses, notices, and patent texts are enforced.
 
 ```bash
-docker build -t r1-distributed-sql:local .
+docker build -t r1-meshdb:local .
 docker run --rm --entrypoint /cockroach/cockroach \
-  r1-distributed-sql:local version
+  r1-meshdb:local version
 ```
 
 Run source and release-contract checks with:
@@ -82,7 +82,9 @@ The three-node runtime suite is documented in [testbed/README.md](testbed/README
 ## Supply Chain
 
 Releases include SPDX JSON and CycloneDX JSON SBOMs, GitHub build provenance,
-an OCI SBOM attestation, and a keyless Cosign signature recorded in Rekor.
+an OCI SBOM attestation, a keyless Cosign signature recorded in Rekor, exact
+vendored dependency notices, and a checksum-backed Debian corresponding-source
+bundle both inside the image and as a release asset.
 Verification is bound to the Ratio1 repository workflow identity; executable
 commands are in `scripts/verify-image.sh`.
 Repository and package promotion controls are documented in
@@ -90,8 +92,8 @@ Repository and package promotion controls are documented in
 
 ```bash
 scripts/verify-image.sh \
-  ghcr.io/ratio1/r1-distributed-sql@sha256:<digest> \
-  v23.1.28-r1.<major>.<patch>
+  ghcr.io/ratio1/r1-meshdb@sha256:<digest> \
+  v1.0.<patch>
 ```
 
 ## Support
@@ -113,7 +115,7 @@ and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 ## Citation
 
 The R1 MeshDB entry below is the recommended citation for the current source
-snapshot. Publish it with an immutable `v1.0` tag before treating it as a
+snapshot. Publish it with an immutable `v1.0.0` tag before treating it as a
 reproducible release citation.
 
 ```bibtex

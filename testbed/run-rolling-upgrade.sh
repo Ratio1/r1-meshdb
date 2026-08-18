@@ -8,24 +8,25 @@ umask 077
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 candidate_image="${1:?usage: testbed/run-rolling-upgrade.sh <candidate-image> [legacy-image]}"
 legacy_image="${2:-ghcr.io/ratio1/deeploy-cockroachdb-service@sha256:a2ca8a245d7c033a0469a65728351f293191e7ecbc3451083e51471a555fdd11}"
-if [[ "${R1_SQL_REQUIRE_DIGEST:-true}" == "true" && "${candidate_image}" != *@sha256:* ]]; then
+require_digest="${R1_MESHDB_REQUIRE_DIGEST:-${R1_SQL_REQUIRE_DIGEST:-true}}"
+if [[ "${require_digest}" == "true" && "${candidate_image}" != *@sha256:* ]]; then
   echo "rolling release validation requires an immutable candidate digest" >&2
   exit 1
 fi
 [[ "${legacy_image}" == *@sha256:* ]] || { echo "legacy rollback image must use an immutable digest" >&2; exit 1; }
 
-run_id="r1-sql-rolling-$$-${RANDOM}"
+run_id="r1-meshdb-rolling-$$-${RANDOM}"
 network="${run_id}"
-legacy_overlay="r1-distributed-sql-legacy-transport:${run_id}"
-candidate_overlay="r1-distributed-sql-candidate-transport:${run_id}"
+legacy_overlay="r1-meshdb-legacy-transport:${run_id}"
+candidate_overlay="r1-meshdb-candidate-transport:${run_id}"
 nodes=("${run_id}-1" "${run_id}-2" "${run_id}-3")
-tmp="$(mktemp -d /tmp/r1-sql-rolling.XXXXXXXX)"
+tmp="$(mktemp -d /tmp/r1-meshdb-rolling.XXXXXXXX)"
 certs_dir="${tmp}/certs"
 stores=("${run_id}-store-1" "${run_id}-store-2" "${run_id}-store-3")
 token_file="${tmp}/cf-token"
 db_password="r1_rolling_validation_password"
 child_password="r1_rolling_child_password"
-evidence_dir="${R1_SQL_EVIDENCE_DIR:-}"
+evidence_dir="${R1_MESHDB_EVIDENCE_DIR:-${R1_SQL_EVIDENCE_DIR:-}}"
 cleanup_started=false
 
 record_evidence() {

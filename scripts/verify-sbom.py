@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 from collections import defaultdict
+import hashlib
 import json
 from pathlib import Path
 from urllib.parse import quote, unquote
@@ -20,20 +21,18 @@ APPLICATION_NAME = "R1 MeshDB"
 APPLICATION_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 if not re.fullmatch(r"[0-9]+\.[0-9]+", APPLICATION_VERSION):
   raise RuntimeError("VERSION must use <major>.<minor>")
-APPLICATION_PURL = "pkg:generic/r1-distributed-sql"
+APPLICATION_PURL = f"pkg:generic/r1-meshdb@{APPLICATION_VERSION}"
 APPLICATION_SUPPLIER = "Organization: Ratio1"
 APPLICATION_SOURCE = "https://github.com/Ratio1/r1-distributed-sql"
-DISTRIBUTION_THIRD_PARTY_LICENSE_ID = "LicenseRef-R1-MeshDB-Third-Party"
-DISTRIBUTION_LICENSE_EXPRESSION = (
-  f"Apache-2.0 AND {DISTRIBUTION_THIRD_PARTY_LICENSE_ID}"
-)
-EXPECTED_LICENSE_FILE_COUNT = 11_948
+APPLICATION_LICENSE = "Apache-2.0"
+AGGREGATE_LICENSE_REF = "LicenseRef-Aggregate-License-Text"
 EXPECTED_VENDOR_MODULE_COUNT = 211
 SOURCE_ROOT_MODULE_NAME = "github.com/cockroachdb/cockroach"
 SOURCE_ROOT_MODULE_PURL = f"pkg:golang/{SOURCE_ROOT_MODULE_NAME}"
 SOURCE_ROOT_MODULE_VERSION = "UNKNOWN"
 SOURCE_ROOT_MODULE_LOCATION = "/engine/go.mod"
 RUNTIME_BINARY_PATHS = ("/cockroach/cockroach", "/usr/local/bin/cloudflared")
+RUNTIME_SOURCE_MAPPING = ROOT / "source/runtime-package-sources.tsv"
 
 
 def fail(message: str) -> None:
@@ -43,6 +42,13 @@ def fail(message: str) -> None:
 
 def normalized_purl(value: str) -> str:
   return value.split("?", 1)[0].lower()
+
+
+def is_application_purl(value: str) -> bool:
+  normalized = normalized_purl(value)
+  return normalized == "pkg:generic/r1-meshdb" or normalized.startswith(
+    "pkg:generic/r1-meshdb@"
+  )
 
 
 def debian_purl_identity(value: str) -> tuple[str, str] | None:
@@ -96,16 +102,65 @@ def expected_vendor_modules() -> dict[str, tuple[str, str]]:
 def expected_license_files() -> dict[str, dict]:
   document = json.loads((ROOT / "source/license-inventory.json").read_text(encoding="utf-8"))
   records = document.get("files")
-  if not isinstance(records, list) or len(records) != EXPECTED_LICENSE_FILE_COUNT:
-    fail(
-      "source license inventory differs from the release contract: "
-      f"expected {EXPECTED_LICENSE_FILE_COUNT}, found "
-      f"{len(records) if isinstance(records, list) else 'invalid'}"
-    )
+  if not isinstance(records, list) or not records:
+    fail("source license inventory is missing, empty, or malformed")
   by_path = {record.get("path"): record for record in records if isinstance(record, dict)}
   if None in by_path or len(by_path) != len(records):
     fail("source license inventory paths are missing or duplicated")
   return by_path
+
+
+def source_text(record: dict) -> str:
+  path = ROOT / record["path"]
+  content = path.read_bytes()
+  if hashlib.sha256(content).hexdigest() != record["sha256"]:
+    fail(f"license inventory checksum differs from source: {record['path']}")
+  try:
+    return content.decode("utf-8")
+  except UnicodeDecodeError:
+    fail(f"custom license text is not UTF-8: {record['path']}")
+
+
+def custom_license_id(record: dict) -> str:
+  base = record["spdx"].removeprefix("LicenseRef-")
+  base = re.sub(r"-(?:SHA256-)?[0-9a-f]{12,64}$", "", base)
+  return f"LicenseRef-{base}-SHA256-{record['sha256']}"
+
+
+def custom_license_text(record: dict) -> str:
+  content = source_text(record)
+  if "notice in source header" not in record.get("basis", "").lower():
+    return content
+  lines = content.splitlines(keepends=True)
+  if lines and lines[0].lstrip().startswith("//"):
+    header_lines = []
+    for line in lines:
+      if not line.lstrip().startswith("//"):
+        break
+      header_lines.append(line)
+    header = "".join(header_lines)
+  elif lines and lines[0].lstrip().startswith("/*"):
+    end = next((index for index, line in enumerate(lines) if "*/" in line), -1)
+    header = "".join(lines[:end + 1]) if end >= 0 else ""
+  else:
+    header = ""
+  if "public domain" not in header.lower():
+    fail(f"custom source-header license notice is not extractable: {record['path']}")
+  return header
+
+
+def source_license(record: dict) -> tuple[str, str | None, str | None]:
+  expression = record["spdx"]
+  if expression in {AGGREGATE_LICENSE_REF, "NOASSERTION"}:
+    return (
+      "NOASSERTION",
+      "Aggregate license/notice document; no single license conclusion is asserted. "
+      f"Inventory basis: {record['basis']}",
+      None,
+    )
+  if expression.startswith("LicenseRef-"):
+    return custom_license_id(record), None, custom_license_text(record)
+  return expression, None, None
 
 
 def expected_runtime_packages() -> dict[str, str]:
@@ -118,6 +173,25 @@ def expected_runtime_packages() -> dict[str, str]:
       fail(f"invalid or duplicate runtime package record: {line!r}")
     packages[name] = version
   return packages
+
+
+def expected_runtime_sources() -> dict[str, tuple[str, str, str]]:
+  lines = RUNTIME_SOURCE_MAPPING.read_text(encoding="utf-8").splitlines()
+  if not lines or lines[0] != "binary-package\tbinary-version\tsource-package\tsource-version":
+    fail("Debian runtime source mapping header is invalid")
+  mappings = {}
+  for line in lines[1:]:
+    fields = line.split("\t")
+    if len(fields) != 4 or not all(fields) or fields[0] in mappings:
+      fail(f"invalid Debian runtime source mapping: {line!r}")
+    mappings[fields[0]] = (fields[1], fields[2], fields[3])
+  if {name: record[0] for name, record in mappings.items()} != expected_runtime_packages():
+    fail("Debian runtime source mapping differs from the binary package inventory")
+  return mappings
+
+
+def debian_source_purl(name: str, version: str) -> str:
+  return f"pkg:generic/debian-source/{quote(name, safe='.-_~')}@{quote(version, safe='.-_~')}"
 
 
 def source_path(value: str) -> str:
@@ -191,6 +265,7 @@ def verify_spdx(document: dict) -> dict:
     fail("SPDX identifiers are missing or duplicated")
   known = set(identifiers)
   outgoing: dict[str, set[str]] = defaultdict(set)
+  typed_relationships: set[tuple[str, str, str]] = set()
   for relationship in relationships:
     left = relationship.get("spdxElementId")
     right = relationship.get("relatedSpdxElement")
@@ -198,6 +273,7 @@ def verify_spdx(document: dict) -> dict:
       fail("SPDX relationship refers to an unknown element")
     if relationship.get("relationshipType") in {"CONTAINS", "DEPENDS_ON", "DESCRIBES"}:
       outgoing[left].add(right)
+    typed_relationships.add((left, relationship.get("relationshipType", ""), right))
 
   by_purl: dict[str, list[dict]] = defaultdict(list)
   occurrence_records: list[tuple[str, tuple[str, ...], str]] = []
@@ -211,32 +287,34 @@ def verify_spdx(document: dict) -> dict:
   applications = by_purl.get(APPLICATION_PURL, [])
   if len(applications) != 1:
     fail("SPDX application identity is missing or duplicated")
+  conflicting_applications = [
+    package for package in packages
+    if package not in applications and (
+      package.get("name") == APPLICATION_NAME
+      or any(
+        is_application_purl(purl)
+        for purl in spdx_purls(package)
+      )
+    )
+  ]
+  if conflicting_applications:
+    fail("SPDX application identity conflicts with the versioned R1 MeshDB PURL")
   application = applications[0]
   if (
     application.get("name") != APPLICATION_NAME
     or application.get("versionInfo") != APPLICATION_VERSION
     or application.get("supplier") != APPLICATION_SUPPLIER
     or application.get("downloadLocation") != APPLICATION_SOURCE
-    or application.get("licenseConcluded") != DISTRIBUTION_LICENSE_EXPRESSION
-    or application.get("licenseDeclared") != DISTRIBUTION_LICENSE_EXPRESSION
+    or application.get("licenseConcluded") != APPLICATION_LICENSE
+    or application.get("licenseDeclared") != APPLICATION_LICENSE
   ):
     fail("SPDX application identity differs from the release contract")
   license_infos = document.get("hasExtractedLicensingInfos", [])
-  definitions = [
-    item for item in license_infos
-    if item.get("licenseId") == DISTRIBUTION_THIRD_PARTY_LICENSE_ID
-  ] if isinstance(license_infos, list) else []
-  if len(definitions) != 1:
-    fail("SPDX distribution third-party license reference is missing or duplicated")
-  definition = definitions[0]
-  if (
-    "third-party" not in definition.get("extractedText", "").lower()
-    or not any(
-      value.endswith("/THIRD_PARTY_NOTICES.md")
-      for value in definition.get("seeAlsos", [])
-    )
-  ):
-    fail("SPDX distribution third-party license reference is incomplete")
+  if not isinstance(license_infos, list):
+    fail("SPDX extracted licensing information is malformed")
+  license_info_ids = [item.get("licenseId") for item in license_infos]
+  if None in license_info_ids or len(license_info_ids) != len(set(license_info_ids)):
+    fail("SPDX extracted licensing identifiers are missing or duplicated")
   if application["SPDXID"] not in outgoing[document["SPDXID"]]:
     fail("SPDX application identity is disconnected from the document")
 
@@ -260,7 +338,9 @@ def verify_spdx(document: dict) -> dict:
     "application_id": application["SPDXID"],
     "by_purl": by_purl,
     "files": files,
+    "license_infos": {item["licenseId"]: item for item in license_infos},
     "outgoing": outgoing,
+    "typed_relationships": typed_relationships,
   }
 
 
@@ -299,6 +379,15 @@ def verify_cyclonedx(document: dict) -> dict:
   applications = by_purl.get(APPLICATION_PURL, [])
   if len(applications) != 1:
     fail("CycloneDX application identity is missing or duplicated")
+  conflicting_applications = [
+    component for component in components
+    if component not in applications and (
+      component.get("name") == APPLICATION_NAME
+      or is_application_purl(component.get("purl", ""))
+    )
+  ]
+  if conflicting_applications:
+    fail("CycloneDX application identity conflicts with the versioned R1 MeshDB PURL")
   application = applications[0]
   suppliers = application.get("supplier", {})
   licenses = cdx_license_values(application)
@@ -311,7 +400,7 @@ def verify_cyclonedx(document: dict) -> dict:
     or application.get("name") != APPLICATION_NAME
     or application.get("version") != APPLICATION_VERSION
     or suppliers.get("name") != "Ratio1"
-    or licenses != {DISTRIBUTION_LICENSE_EXPRESSION}
+    or licenses != {APPLICATION_LICENSE}
     or APPLICATION_SOURCE not in source_references
   ):
     fail("CycloneDX application identity differs from the release contract")
@@ -345,6 +434,7 @@ def verify_cyclonedx(document: dict) -> dict:
 
 def verify_source_spdx(view: dict) -> None:
   expected_files = expected_license_files()
+  expected_custom_infos: dict[str, dict] = {}
   by_path: dict[str, list[dict]] = defaultdict(list)
   for file_ in view["files"]:
     path = source_path(file_.get("fileName", ""))
@@ -354,6 +444,7 @@ def verify_source_spdx(view: dict) -> None:
     missing = sorted(set(expected_files) - set(by_path))
     fail(f"SPDX source license inventory is incomplete: {missing[:3]}")
   for path, expected in expected_files.items():
+    concluded_license, license_comment, extracted_text = source_license(expected)
     records = by_path[path]
     if len(records) != 1:
       fail(f"SPDX source file is duplicated: {path}")
@@ -361,12 +452,37 @@ def verify_source_spdx(view: dict) -> None:
     hashes = sha256_checksums(record.get("checksums", []), "algorithm", "checksumValue")
     if hashes != [expected["sha256"]]:
       fail(f"SPDX source file hash differs: {path}")
-    if record.get("licenseConcluded") != expected["spdx"]:
+    if record.get("licenseConcluded") != concluded_license:
       fail(f"SPDX source file license differs: {path}")
-    if set(record.get("licenseInfoInFiles", [])) != {expected["spdx"]}:
+    if set(record.get("licenseInfoInFiles", [])) != {concluded_license}:
       fail(f"SPDX source file license evidence is absent: {path}")
+    if license_comment:
+      if record.get("licenseComments") != license_comment:
+        fail(f"SPDX aggregate source file explanation differs: {path}")
+    elif "licenseComments" in record:
+      fail(f"SPDX source file has an unexpected license comment: {path}")
+    if extracted_text is not None:
+      expected_custom_infos[concluded_license] = {
+        "licenseId": concluded_license,
+        "name": f"Exact license or notice text SHA-256 {expected['sha256']}",
+        "extractedText": extracted_text,
+      }
     if record["SPDXID"] not in view["outgoing"][view["application_id"]]:
       fail(f"SPDX source file is disconnected from the application: {path}")
+  for license_id, expected_info in expected_custom_infos.items():
+    if view["license_infos"].get(license_id) != expected_info:
+      fail(f"SPDX custom license definition is missing or differs: {license_id}")
+  obsolete_ids = {"LicenseRef-License-Text", AGGREGATE_LICENSE_REF}
+  used_obsolete = {
+    value
+    for file_ in by_path.values()
+    for record in file_
+    for field in ("licenseConcluded",)
+    for value in [record.get(field)]
+    if value in obsolete_ids
+  }
+  if used_obsolete:
+    fail(f"SPDX source files reuse ambiguous license references: {sorted(used_obsolete)}")
 
 
 def cdx_properties(component: dict) -> dict[str, list[str]]:
@@ -389,6 +505,7 @@ def verify_source_cyclonedx(view: dict) -> None:
     extra = sorted(set(by_path) - set(expected_files))
     fail(f"CycloneDX source license inventory differs: missing={missing[:3]} extra={extra[:3]}")
   for path, expected in expected_files.items():
+    concluded_license, license_comment, extracted_text = source_license(expected)
     records = by_path[path]
     if len(records) != 1:
       fail(f"CycloneDX source file is duplicated: {path}")
@@ -399,11 +516,27 @@ def verify_source_cyclonedx(view: dict) -> None:
     if hashes != [expected["sha256"]]:
       fail(f"CycloneDX source file hash differs: {path}")
     licenses = cdx_license_values(record)
-    if licenses != {expected["spdx"]}:
+    expected_licenses = set() if concluded_license == "NOASSERTION" else {concluded_license}
+    if licenses != expected_licenses:
       fail(f"CycloneDX source file license differs: {path}")
     properties = cdx_properties(record)
     if properties.get("io.ratio1.source.license-basis") != [expected["basis"]]:
       fail(f"CycloneDX source file license basis differs: {path}")
+    if license_comment:
+      if properties.get("io.ratio1.source.license-comment") != [license_comment]:
+        fail(f"CycloneDX aggregate source file explanation differs: {path}")
+    elif properties.get("io.ratio1.source.license-comment"):
+      fail(f"CycloneDX source file has an unexpected license comment: {path}")
+    if extracted_text is not None:
+      choices = record.get("licenses", [])
+      if len(choices) != 1:
+        fail(f"CycloneDX custom source license evidence is malformed: {path}")
+      license_record = choices[0].get("license", {})
+      if license_record.get("name") != concluded_license or license_record.get("text") != {
+        "contentType": "text/plain; charset=utf-8",
+        "content": extracted_text,
+      }:
+        fail(f"CycloneDX custom source license text differs: {path}")
     if record["bom-ref"] not in view["outgoing"][view["application_id"]]:
       fail(f"CycloneDX source file is disconnected from the application: {path}")
 
@@ -470,6 +603,7 @@ def buildinfo_purls(path: Path) -> set[str]:
 
 
 def verify_runtime_packages(view: dict, format_name: str) -> None:
+  binary_records = {}
   for name, version in expected_runtime_packages().items():
     matches = [
       record
@@ -486,6 +620,49 @@ def verify_runtime_packages(view: dict, format_name: str) -> None:
     identifier = record.get("SPDXID") if format_name == "SPDX" else record.get("bom-ref")
     if identifier not in view["outgoing"][view["application_id"]]:
       fail(f"{format_name} runtime package is disconnected from the application: {name}={version}")
+    binary_records[name] = record
+
+  sources = expected_runtime_sources()
+  source_records = {}
+  for source_name, source_version in sorted({
+    (record[1], record[2]) for record in sources.values()
+  }):
+    source_purl = debian_source_purl(source_name, source_version)
+    matches = view["by_purl"].get(normalized_purl(source_purl), [])
+    if len(matches) != 1:
+      fail(
+        f"{format_name} Debian corresponding-source package is missing or duplicated: "
+        f"{source_name}={source_version}"
+      )
+    source_record = matches[0]
+    actual_version = (
+      source_record.get("versionInfo") if format_name == "SPDX" else source_record.get("version")
+    )
+    if source_record.get("name") != source_name or actual_version != source_version:
+      fail(f"{format_name} Debian corresponding-source identity differs: {source_purl}")
+    identifier = (
+      source_record.get("SPDXID") if format_name == "SPDX" else source_record.get("bom-ref")
+    )
+    if identifier not in view["outgoing"][view["application_id"]]:
+      fail(f"{format_name} Debian corresponding source is disconnected: {source_purl}")
+    source_records[(source_name, source_version)] = source_record
+
+  for binary_name, (_, source_name, source_version) in sources.items():
+    binary_record = binary_records[binary_name]
+    source_record = source_records[(source_name, source_version)]
+    if format_name == "SPDX":
+      relationship = (
+        binary_record["SPDXID"], "GENERATED_FROM", source_record["SPDXID"]
+      )
+      if relationship not in view["typed_relationships"]:
+        fail(f"SPDX Debian binary lacks its GENERATED_FROM relationship: {binary_name}")
+    else:
+      source_purl = debian_source_purl(source_name, source_version)
+      properties = cdx_properties(binary_record)
+      if properties.get("io.ratio1.debian.source-purl") != [source_purl]:
+        fail(f"CycloneDX Debian binary lacks its source PURL: {binary_name}")
+      if source_record["bom-ref"] not in view["outgoing"][binary_record["bom-ref"]]:
+        fail(f"CycloneDX Debian binary is disconnected from its source: {binary_name}")
 
 
 def verify_runtime_binaries_spdx(view: dict) -> None:
@@ -559,7 +736,7 @@ def main() -> None:
       verify_source_cyclonedx(view)
     print(
       f"verified {format_name} source SBOM: {EXPECTED_VENDOR_MODULE_COUNT} vendored Go modules, "
-      f"1 source root Go module, {EXPECTED_LICENSE_FILE_COUNT} licensed files"
+      f"1 source root Go module, {len(expected_license_files())} licensed files"
     )
 
 

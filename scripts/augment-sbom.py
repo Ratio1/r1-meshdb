@@ -12,6 +12,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+from urllib.parse import quote, unquote
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,27 +22,12 @@ APPLICATION_NAME = "R1 MeshDB"
 APPLICATION_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 if not re.fullmatch(r"[0-9]+\.[0-9]+", APPLICATION_VERSION):
   raise RuntimeError("VERSION must use <major>.<minor>")
-APPLICATION_PURL = "pkg:generic/r1-distributed-sql"
+APPLICATION_PURL = f"pkg:generic/r1-meshdb@{APPLICATION_VERSION}"
 APPLICATION_SOURCE = "https://github.com/Ratio1/r1-distributed-sql"
-DISTRIBUTION_THIRD_PARTY_LICENSE_ID = "LicenseRef-R1-MeshDB-Third-Party"
-DISTRIBUTION_LICENSE_EXPRESSION = (
-  f"Apache-2.0 AND {DISTRIBUTION_THIRD_PARTY_LICENSE_ID}"
-)
-DISTRIBUTION_THIRD_PARTY_LICENSE_INFO = {
-  "licenseId": DISTRIBUTION_THIRD_PARTY_LICENSE_ID,
-  "name": "R1 MeshDB third-party license set",
-  "extractedText": (
-    "This reference identifies the third-party licenses that apply to software "
-    "included in the R1 MeshDB source and image. It does not replace "
-    "or modify those licenses. Exact component-level SPDX conclusions and full "
-    "license texts are recorded in this SBOM, THIRD_PARTY_NOTICES.md, the source "
-    "license inventory, and the license files shipped with the distribution."
-  ),
-  "seeAlsos": [
-    "https://github.com/Ratio1/r1-distributed-sql/blob/main/THIRD_PARTY_NOTICES.md",
-  ],
-}
+APPLICATION_LICENSE = "Apache-2.0"
+AGGREGATE_LICENSE_REF = "LicenseRef-Aggregate-License-Text"
 RUNTIME_BINARY_PATHS = ("/cockroach/cockroach", "/usr/local/bin/cloudflared")
+RUNTIME_SOURCE_MAPPING = ROOT / "source/runtime-package-sources.tsv"
 
 
 def native_components() -> list[dict]:
@@ -54,12 +40,103 @@ def license_inventory() -> list[dict]:
   return document["files"]
 
 
+def runtime_source_mappings() -> dict[str, tuple[str, str, str]]:
+  lines = RUNTIME_SOURCE_MAPPING.read_text(encoding="utf-8").splitlines()
+  if not lines or lines[0] != "binary-package\tbinary-version\tsource-package\tsource-version":
+    raise SystemExit("Debian runtime source mapping header is invalid")
+  mappings = {}
+  for line in lines[1:]:
+    fields = line.split("\t")
+    if len(fields) != 4 or not all(fields) or fields[0] in mappings:
+      raise SystemExit(f"Debian runtime source mapping is invalid: {line!r}")
+    mappings[fields[0]] = (fields[1], fields[2], fields[3])
+  return mappings
+
+
+def debian_purl_identity(value: str) -> tuple[str, str] | None:
+  prefix = "pkg:deb/debian/"
+  base = value.split("?", 1)[0]
+  if not base.lower().startswith(prefix) or "@" not in base:
+    return None
+  name, version = base[len(prefix):].rsplit("@", 1)
+  return unquote(name).lower(), unquote(version)
+
+
+def debian_source_purl(name: str, version: str) -> str:
+  return f"pkg:generic/debian-source/{quote(name, safe='.-_~')}@{quote(version, safe='.-_~')}"
+
+
+def debian_source_url(name: str, version: str) -> str:
+  return f"https://snapshot.debian.org/package/{quote(name, safe='')}/{quote(version, safe='')}/"
+
+
+def source_text(record: dict) -> str:
+  path = ROOT / record["path"]
+  content = path.read_bytes()
+  if hashlib.sha256(content).hexdigest() != record["sha256"]:
+    raise SystemExit(f"license inventory checksum differs from source: {record['path']}")
+  try:
+    return content.decode("utf-8")
+  except UnicodeDecodeError as error:
+    raise SystemExit(f"custom license text is not UTF-8: {record['path']}") from error
+
+
+def custom_license_id(record: dict) -> str:
+  base = record["spdx"].removeprefix("LicenseRef-")
+  base = re.sub(r"-(?:SHA256-)?[0-9a-f]{12,64}$", "", base)
+  return f"LicenseRef-{base}-SHA256-{record['sha256']}"
+
+
+def custom_license_text(record: dict) -> str:
+  content = source_text(record)
+  if "notice in source header" not in record.get("basis", "").lower():
+    return content
+  lines = content.splitlines(keepends=True)
+  if lines and lines[0].lstrip().startswith("//"):
+    header_lines = []
+    for line in lines:
+      if not line.lstrip().startswith("//"):
+        break
+      header_lines.append(line)
+    header = "".join(header_lines)
+  elif lines and lines[0].lstrip().startswith("/*"):
+    end = next((index for index, line in enumerate(lines) if "*/" in line), -1)
+    header = "".join(lines[:end + 1]) if end >= 0 else ""
+  else:
+    header = ""
+  if "public domain" not in header.lower():
+    raise SystemExit(f"custom source-header license notice is not extractable: {record['path']}")
+  return header
+
+
+def source_license(record: dict) -> tuple[str, str | None, str | None]:
+  """Return the SBOM conclusion, comment, and exact custom text for a file."""
+  expression = record["spdx"]
+  if expression in {AGGREGATE_LICENSE_REF, "NOASSERTION"}:
+    return (
+      "NOASSERTION",
+      "Aggregate license/notice document; no single license conclusion is asserted. "
+      f"Inventory basis: {record['basis']}",
+      None,
+    )
+  if expression.startswith("LicenseRef-"):
+    return custom_license_id(record), None, custom_license_text(record)
+  return expression, None, None
+
+
 def purl(component: dict) -> str:
   return f"pkg:generic/{component['name']}@{component['commit']}"
 
 
 def normalized_purl(value: str) -> str:
   return value.split("?", 1)[0].lower()
+
+
+def is_application_purl(value: str) -> bool:
+  normalized = normalized_purl(value)
+  return normalized == "pkg:generic/r1-meshdb" or normalized.startswith(
+    "pkg:generic/r1-meshdb@"
+  )
 
 
 def source_path(value: str) -> str:
@@ -96,15 +173,11 @@ def augment_spdx(document: dict, components: list[dict]) -> None:
   relationships = document.setdefault("relationships", [])
   document_id = document.get("SPDXID", "SPDXRef-DOCUMENT")
   license_infos = document.setdefault("hasExtractedLicensingInfos", [])
-  matches = [
-    item for item in license_infos
-    if item.get("licenseId") == DISTRIBUTION_THIRD_PARTY_LICENSE_ID
-  ]
-  if len(matches) > 1 or (matches and matches[0] != DISTRIBUTION_THIRD_PARTY_LICENSE_INFO):
-    raise SystemExit("SPDX distribution third-party license reference conflicts")
-  if not matches:
-    license_infos.append(dict(DISTRIBUTION_THIRD_PARTY_LICENSE_INFO))
-  license_infos.sort(key=lambda item: item.get("licenseId", ""))
+  if not isinstance(license_infos, list):
+    raise SystemExit("SPDX extracted licensing information is malformed")
+  license_infos_by_id: dict[str, list[dict]] = defaultdict(list)
+  for info in license_infos:
+    license_infos_by_id[info.get("licenseId", "")].append(info)
 
   by_purl: dict[str, list[dict]] = defaultdict(list)
   for package in packages:
@@ -113,36 +186,102 @@ def augment_spdx(document: dict, components: list[dict]) -> None:
         by_purl[normalized_purl(reference["referenceLocator"])].append(package)
 
   applications = by_purl.get(APPLICATION_PURL, [])
+  conflicting_applications = [
+    package for package in packages
+    if package not in applications and (
+      package.get("name") == APPLICATION_NAME
+      or any(
+        is_application_purl(reference.get("referenceLocator", ""))
+        for reference in package.get("externalRefs", [])
+        if reference.get("referenceType") == "purl"
+      )
+    )
+  ]
+  if conflicting_applications:
+    raise SystemExit("SPDX application identity conflicts with the versioned R1 MeshDB PURL")
   if len(applications) > 1:
     raise SystemExit("SPDX application identity is duplicated")
   if applications:
     application = applications[0]
   else:
     application = {
-      "SPDXID": "SPDXRef-Package-r1-distributed-sql",
+      "SPDXID": "SPDXRef-Package-r1-meshdb",
       "name": APPLICATION_NAME,
       "versionInfo": APPLICATION_VERSION,
       "supplier": "Organization: Ratio1",
       "downloadLocation": APPLICATION_SOURCE,
       "filesAnalyzed": False,
-      "licenseConcluded": DISTRIBUTION_LICENSE_EXPRESSION,
-      "licenseDeclared": DISTRIBUTION_LICENSE_EXPRESSION,
+      "licenseConcluded": APPLICATION_LICENSE,
+      "licenseDeclared": APPLICATION_LICENSE,
       "copyrightText": "Copyright 2026 Ratio1",
       "externalRefs": [{
         "referenceCategory": "PACKAGE-MANAGER",
         "referenceType": "purl",
         "referenceLocator": APPLICATION_PURL,
       }],
-      "summary": "Ratio1 OSS distributed SQL application",
+      "summary": "R1 MeshDB decentralized distributed database application",
     }
     packages.append(application)
     by_purl[APPLICATION_PURL].append(application)
-  application["licenseConcluded"] = DISTRIBUTION_LICENSE_EXPRESSION
-  application["licenseDeclared"] = DISTRIBUTION_LICENSE_EXPRESSION
+  application["licenseConcluded"] = APPLICATION_LICENSE
+  application["licenseDeclared"] = APPLICATION_LICENSE
   application["name"] = APPLICATION_NAME
   application["versionInfo"] = APPLICATION_VERSION
   application_id = application["SPDXID"]
   add_spdx_relationship(relationships, document_id, "DESCRIBES", application_id)
+
+  mappings = runtime_source_mappings()
+  binary_packages: dict[str, dict] = {}
+  for package in packages:
+    for reference in package.get("externalRefs", []):
+      if reference.get("referenceType") != "purl":
+        continue
+      identity = debian_purl_identity(reference.get("referenceLocator", ""))
+      if identity and identity[0] in mappings and identity[1] == mappings[identity[0]][0]:
+        if identity[0] in binary_packages:
+          raise SystemExit(f"SPDX Debian runtime package is duplicated: {identity[0]}")
+        binary_packages[identity[0]] = package
+  if binary_packages:
+    if set(binary_packages) != set(mappings):
+      raise SystemExit("SPDX Debian runtime package set is incomplete")
+    source_packages: dict[tuple[str, str], dict] = {}
+    for binary_name, (_, source_name, source_version) in mappings.items():
+      source_key = (source_name, source_version)
+      source_purl = debian_source_purl(*source_key)
+      if source_key not in source_packages:
+        matches = by_purl.get(normalized_purl(source_purl), [])
+        if len(matches) > 1:
+          raise SystemExit(f"SPDX Debian source package is duplicated: {source_name}")
+        if matches:
+          source_package = matches[0]
+        else:
+          source_package = {
+            "SPDXID": f"SPDXRef-Package-debian-source-{source_file_id(source_purl)}",
+            "name": source_name,
+            "versionInfo": source_version,
+            "supplier": "Organization: Debian",
+            "downloadLocation": debian_source_url(source_name, source_version),
+            "filesAnalyzed": False,
+            "licenseConcluded": "NOASSERTION",
+            "licenseDeclared": "NOASSERTION",
+            "copyrightText": "NOASSERTION",
+            "externalRefs": [{
+              "referenceCategory": "PACKAGE-MANAGER",
+              "referenceType": "purl",
+              "referenceLocator": source_purl,
+            }],
+            "summary": "Exact Debian corresponding-source package accompanying the R1 MeshDB runtime image",
+          }
+          packages.append(source_package)
+          by_purl[normalized_purl(source_purl)].append(source_package)
+        source_packages[source_key] = source_package
+        add_spdx_relationship(relationships, application_id, "DEPENDS_ON", source_package["SPDXID"])
+      add_spdx_relationship(
+        relationships,
+        binary_packages[binary_name]["SPDXID"],
+        "GENERATED_FROM",
+        source_packages[source_key]["SPDXID"],
+      )
 
   for component in components:
     component_purl = purl(component)
@@ -186,6 +325,7 @@ def augment_spdx(document: dict, components: list[dict]) -> None:
       if path in expected:
         by_path[path].append(file_)
     for path, record in expected.items():
+      concluded_license, license_comment, extracted_text = source_license(record)
       matches = by_path.get(path, [])
       if len(matches) > 1:
         raise SystemExit(f"SPDX source file is duplicated: {path}")
@@ -199,7 +339,9 @@ def augment_spdx(document: dict, components: list[dict]) -> None:
         if existing_hashes and existing_hashes != {record["sha256"]}:
           raise SystemExit(f"SPDX source file checksum conflicts with inventory: {path}")
         existing_license = file_.get("licenseConcluded")
-        if existing_license not in {None, "NOASSERTION", record["spdx"]}:
+        if existing_license not in {
+          None, "NOASSERTION", record["spdx"], concluded_license,
+        }:
           raise SystemExit(f"SPDX source file license conflicts with inventory: {path}")
       else:
         file_ = {
@@ -211,8 +353,27 @@ def augment_spdx(document: dict, components: list[dict]) -> None:
       file_["checksums"] = [
         item for item in file_.get("checksums", []) if item.get("algorithm") != "SHA256"
       ] + [{"algorithm": "SHA256", "checksumValue": record["sha256"]}]
-      file_["licenseConcluded"] = record["spdx"]
-      file_["licenseInfoInFiles"] = [record["spdx"]]
+      file_["licenseConcluded"] = concluded_license
+      file_["licenseInfoInFiles"] = [concluded_license]
+      if license_comment:
+        file_["licenseComments"] = license_comment
+      else:
+        file_.pop("licenseComments", None)
+      if extracted_text is not None:
+        license_id = concluded_license
+        expected_info = {
+          "licenseId": license_id,
+          "name": f"Exact license or notice text SHA-256 {record['sha256']}",
+          "extractedText": extracted_text,
+        }
+        existing_infos = license_infos_by_id.get(license_id, [])
+        if len(existing_infos) > 1 or (
+          existing_infos and existing_infos[0] != expected_info
+        ):
+          raise SystemExit(f"SPDX custom license definition conflicts: {license_id}")
+        if not existing_infos:
+          license_infos.append(expected_info)
+          license_infos_by_id[license_id].append(expected_info)
       add_spdx_relationship(relationships, application_id, "CONTAINS", file_["SPDXID"])
 
   runtime_files = {
@@ -244,6 +405,7 @@ def augment_spdx(document: dict, components: list[dict]) -> None:
     item.get("spdxElementId", ""), item.get("relationshipType", ""),
     item.get("relatedSpdxElement", ""),
   ))
+  license_infos.sort(key=lambda item: item.get("licenseId", ""))
 
 
 def add_cdx_property(component: dict, name: str, value: str) -> None:
@@ -256,11 +418,17 @@ def add_cdx_property(component: dict, name: str, value: str) -> None:
   properties.sort(key=lambda item: (item.get("name", ""), item.get("value", "")))
 
 
-def cdx_license_choice(spdx: str) -> dict:
+def cdx_license_choice(spdx: str, extracted_text: str | None = None) -> dict:
   if re.search(r"\s(?:AND|OR|WITH)\s", spdx):
     return {"expression": spdx}
   if spdx.startswith("LicenseRef-"):
-    return {"license": {"name": spdx}}
+    license_record = {"name": spdx}
+    if extracted_text is not None:
+      license_record["text"] = {
+        "contentType": "text/plain; charset=utf-8",
+        "content": extracted_text,
+      }
+    return {"license": license_record}
   return {"license": {"id": spdx}}
 
 
@@ -302,6 +470,15 @@ def augment_cyclonedx(document: dict, components: list[dict]) -> None:
     if component.get("purl"):
       by_purl[normalized_purl(component["purl"])].append(component)
   applications = by_purl.get(APPLICATION_PURL, [])
+  conflicting_applications = [
+    component for component in output_components
+    if component not in applications and (
+      component.get("name") == APPLICATION_NAME
+      or is_application_purl(component.get("purl", ""))
+    )
+  ]
+  if conflicting_applications:
+    raise SystemExit("CycloneDX application identity conflicts with the versioned R1 MeshDB PURL")
   if len(applications) > 1:
     raise SystemExit("CycloneDX application identity is duplicated")
   if applications:
@@ -315,12 +492,12 @@ def augment_cyclonedx(document: dict, components: list[dict]) -> None:
       "version": APPLICATION_VERSION,
       "purl": APPLICATION_PURL,
       "supplier": {"name": "Ratio1"},
-      "licenses": [{"expression": DISTRIBUTION_LICENSE_EXPRESSION}],
+      "licenses": [{"license": {"id": APPLICATION_LICENSE}}],
       "externalReferences": [{"type": "vcs", "url": APPLICATION_SOURCE}],
     }
     output_components.append(application)
     by_purl[APPLICATION_PURL].append(application)
-  application["licenses"] = [{"expression": DISTRIBUTION_LICENSE_EXPRESSION}]
+  application["licenses"] = [{"license": {"id": APPLICATION_LICENSE}}]
   application["name"] = APPLICATION_NAME
   application["version"] = APPLICATION_VERSION
   application_ref = application["bom-ref"]
@@ -329,6 +506,60 @@ def augment_cyclonedx(document: dict, components: list[dict]) -> None:
   )
   if application_ref not in root_dependency["dependsOn"]:
     root_dependency["dependsOn"].append(application_ref)
+
+  mappings = runtime_source_mappings()
+  binary_components: dict[str, dict] = {}
+  for component in output_components:
+    identity = debian_purl_identity(component.get("purl", ""))
+    if identity and identity[0] in mappings and identity[1] == mappings[identity[0]][0]:
+      if identity[0] in binary_components:
+        raise SystemExit(f"CycloneDX Debian runtime package is duplicated: {identity[0]}")
+      binary_components[identity[0]] = component
+  if binary_components:
+    if set(binary_components) != set(mappings):
+      raise SystemExit("CycloneDX Debian runtime package set is incomplete")
+    source_components: dict[tuple[str, str], dict] = {}
+    for binary_name, (_, source_name, source_version) in mappings.items():
+      source_key = (source_name, source_version)
+      source_purl = debian_source_purl(*source_key)
+      if source_key not in source_components:
+        matches = by_purl.get(normalized_purl(source_purl), [])
+        if len(matches) > 1:
+          raise SystemExit(f"CycloneDX Debian source package is duplicated: {source_name}")
+        if matches:
+          source_component = matches[0]
+        else:
+          source_component = {
+            "type": "library",
+            "bom-ref": source_purl,
+            "group": "Debian Source",
+            "name": source_name,
+            "version": source_version,
+            "purl": source_purl,
+            "externalReferences": [{
+              "type": "distribution",
+              "url": debian_source_url(source_name, source_version),
+            }],
+            "properties": [{
+              "name": "io.ratio1.debian.corresponding-source",
+              "value": "included at /usr/share/src/r1-meshdb/debian",
+            }],
+          }
+          output_components.append(source_component)
+          by_purl[normalized_purl(source_purl)].append(source_component)
+        source_components[source_key] = source_component
+        dependencies_by_ref.setdefault(
+          source_component["bom-ref"], {"ref": source_component["bom-ref"], "dependsOn": []}
+        )
+        if source_component["bom-ref"] not in application_dependency["dependsOn"]:
+          application_dependency["dependsOn"].append(source_component["bom-ref"])
+      binary_component = binary_components[binary_name]
+      add_cdx_property(binary_component, "io.ratio1.debian.source-purl", source_purl)
+      binary_dependency = dependencies_by_ref.setdefault(
+        binary_component["bom-ref"], {"ref": binary_component["bom-ref"], "dependsOn": []}
+      )
+      if source_components[source_key]["bom-ref"] not in binary_dependency["dependsOn"]:
+        binary_dependency["dependsOn"].append(source_components[source_key]["bom-ref"])
 
   for component in components:
     component_purl = purl(component)
@@ -377,6 +608,7 @@ def augment_cyclonedx(document: dict, components: list[dict]) -> None:
         if component.get("type") == "file" and path in expected:
           by_path[path].append(component)
     for path, inventory_record in expected.items():
+      concluded_license, license_comment, extracted_text = source_license(inventory_record)
       matches = by_path.get(path, [])
       if len(matches) > 1:
         raise SystemExit(f"CycloneDX source file is duplicated: {path}")
@@ -389,7 +621,10 @@ def augment_cyclonedx(document: dict, components: list[dict]) -> None:
         if existing_hashes and existing_hashes != {inventory_record["sha256"]}:
           raise SystemExit(f"CycloneDX source file checksum conflicts with inventory: {path}")
         existing_licenses = cdx_license_values(record)
-        if existing_licenses and inventory_record["spdx"] not in existing_licenses:
+        allowed_existing_licenses = {
+          inventory_record["spdx"], concluded_license,
+        }
+        if existing_licenses and not existing_licenses <= allowed_existing_licenses:
           raise SystemExit(f"CycloneDX source file license conflicts with inventory: {path}")
       else:
         record = {
@@ -401,9 +636,14 @@ def augment_cyclonedx(document: dict, components: list[dict]) -> None:
       record["hashes"] = [
         item for item in record.get("hashes", []) if item.get("alg") != "SHA-256"
       ] + [{"alg": "SHA-256", "content": inventory_record["sha256"]}]
-      record["licenses"] = [cdx_license_choice(inventory_record["spdx"])]
+      if concluded_license == "NOASSERTION":
+        record.pop("licenses", None)
+      else:
+        record["licenses"] = [cdx_license_choice(concluded_license, extracted_text)]
       add_cdx_property(record, "io.ratio1.source.path", path)
       add_cdx_property(record, "io.ratio1.source.license-basis", inventory_record["basis"])
+      if license_comment:
+        add_cdx_property(record, "io.ratio1.source.license-comment", license_comment)
       dependencies_by_ref.setdefault(record["bom-ref"], {"ref": record["bom-ref"], "dependsOn": []})
       if record["bom-ref"] not in application_dependency["dependsOn"]:
         application_dependency["dependsOn"].append(record["bom-ref"])

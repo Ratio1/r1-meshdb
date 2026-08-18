@@ -40,7 +40,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
-          [[ "$tag" =~ ^v23\.1\.28-r1\.[0-9]+\.[0-9]+$ ]]
+          [[ "$tag" =~ ^v1\.0\.[0-9]+$ ]]
           git fetch --force origin "refs/tags/${tag}:refs/tags/${tag}"
           tag_commit="$(git rev-list -n 1 "$tag")"
           [[ "$tag_commit" =~ ^[0-9a-f]{40}$ ]]
@@ -50,7 +50,7 @@ jobs:
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
             --pattern image-reference.txt --dir artifacts
           image_ref="$(cat artifacts/image-reference.txt)"
-          [[ "$image_ref" =~ ^ghcr\.io/ratio1/r1-distributed-sql@sha256:[0-9a-f]{64}$ ]]
+          [[ "$image_ref" =~ ^ghcr\.io/ratio1/r1-meshdb@sha256:[0-9a-f]{64}$ ]]
           {
             printf 'tag=%s\n' "$tag"
             printf 'tag_commit=%s\n' "$tag_commit"
@@ -117,7 +117,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: r1-distributed-sql-security-${{ github.run_id }}
+          name: r1-meshdb-security-${{ github.run_id }}
           path: |
             artifacts/trivy-raw.json
             artifacts/trivy-vex.json

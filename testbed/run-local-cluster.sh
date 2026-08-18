@@ -6,8 +6,8 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 image="${1:?usage: testbed/run-local-cluster.sh <image-ref>}"
-run_id="r1-distributed-sql-local-$$-${RANDOM}"
-transport_image="r1-distributed-sql-local-transport:${run_id}"
+run_id="r1-meshdb-local-$$-${RANDOM}"
+transport_image="r1-meshdb-local-transport:${run_id}"
 
 cleanup() {
   local status=$?
@@ -21,7 +21,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if [[ "${R1_SQL_REQUIRE_DIGEST:-true}" == "true" && "${image}" != *@sha256:* ]]; then
+require_digest="${R1_MESHDB_REQUIRE_DIGEST:-${R1_SQL_REQUIRE_DIGEST:-true}}"
+if [[ "${require_digest}" == "true" && "${image}" != *@sha256:* ]]; then
   echo "local release-candidate validation requires an immutable image digest" >&2
   exit 1
 fi

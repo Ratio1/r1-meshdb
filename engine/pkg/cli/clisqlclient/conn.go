@@ -1,4 +1,5 @@
 // Copyright 2015 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -356,7 +357,7 @@ func (c *sqlConn) GetServerMetadata(
 		// The "Version" field was not present, this indicates a v1.0
 		// CockroachDB. Use that below.
 		version = "v1.0-" + v10fields[1]
-		c.serverBuild = fmt.Sprintf("CockroachDB %s %s (%s, built %s, %s)",
+		c.serverBuild = fmt.Sprintf("R1 MeshDB %s %s (%s, built %s, %s)",
 			v10fields[0], version, v10fields[2], v10fields[3], v10fields[4])
 	}
 

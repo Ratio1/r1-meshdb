@@ -19,7 +19,11 @@ FORBIDDEN_PREFIXES = (
 )
 FORBIDDEN_SOURCE_MARKERS = (
   b"Cockroach Community License",
+  b"CockroachDB Community License",
+  b"Cockroach Enterprise License",
+  b"CockroachDB Enterprise License",
   b"github.com/cockroachdb/cockroach/pkg/ccl",
+  b"pkg/ccl",
   b"pkg/ui/distccl",
 )
 def fail(message: str) -> None:

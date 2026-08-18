@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0, included in the file
 // licenses/APL.txt.
 
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 package cli
 
 import (
@@ -45,7 +47,7 @@ func runTerm(cmd *cobra.Command, args []string) (resErr error) {
 		// Refer to README.md to understand the general design guidelines for
 		// help texts.
 		const welcomeMessage = `#
-# Welcome to the CockroachDB SQL shell.
+# Welcome to the R1 MeshDB SQL shell.
 # All statements must be terminated by a semicolon.
 # To exit, type: \q.
 #

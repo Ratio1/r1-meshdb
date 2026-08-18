@@ -7,7 +7,7 @@ output_root="${OUTPUT_ROOT:-/out}"
 repository_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 meshdb_version_file="${R1_MESHDB_VERSION_FILE:-${repository_root}/VERSION}"
 source_date_epoch="${SOURCE_DATE_EPOCH:-1727820937}"
-ratio1_version="${RATIO1_VERSION:-v23.1.28-r1.0.0}"
+ratio1_version="${RATIO1_VERSION:-}"
 upstream_revision="76e598c9b1c100fd9280b979140b5e377c330a20"
 native_root="${build_root}/native"
 source_root="${build_root}/native-source"
@@ -26,14 +26,14 @@ if [[ ! "${meshdb_version}" =~ ^[0-9]+\.[0-9]+$ ]]; then
   printf 'R1 MeshDB VERSION must use <major>.<minor>: %s\n' "${meshdb_version}" >&2
   exit 1
 fi
+ratio1_version="${ratio1_version:-v${meshdb_version}.0}"
 
-case "${ratio1_version}" in
-  v23.1.28-r1.*.*) ;;
-  *)
-    printf 'RATIO1_VERSION must use v23.1.28-r1.<major>.<patch>: %s\n' "${ratio1_version}" >&2
-    exit 1
-    ;;
-esac
+if [[ ! "${ratio1_version}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ||
+      "${ratio1_version}" != "v${meshdb_version}."* ]]; then
+  printf 'RATIO1_VERSION must match VERSION as v%s.<patch> with an optional prerelease: %s\n' \
+    "${meshdb_version}" "${ratio1_version}" >&2
+  exit 1
+fi
 
 case "${parallelism}" in
   ''|*[!0-9]*|0)

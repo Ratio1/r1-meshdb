@@ -10,18 +10,214 @@
       "reason": "Preserve Pebble's typed corruption marker while adding the established local-corruption panic signal at the shared iterator-close boundary, allowing the bounded Ratio1 store-recovery supervisor to classify verified checksum corruption without matching untrusted error text."
     },
     {
+      "path": "engine/pkg/build/info.go",
+      "upstreamSha256": "e52e0ffcfa009e11bad10adc66c58d126f74d967df07980cb0c58b4529ca66ba",
+      "distributedSha256": "6c98962a25626e79933e23cacdd820545a5f7baba6a87d2d81cb8572eae23efd",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Report the R1 MeshDB product identity and route actionable issue links to the Ratio1 repository while retaining the upstream commit metadata."
+    },
+    {
+      "path": "engine/pkg/cli/clierrorplus/decorate_error.go",
+      "upstreamSha256": "7023fbe2a06c33e32ac942e82c037eef995e080b4de0006c90bf7730d4b15431",
+      "distributedSha256": "d013bdfbbffe950e6b877a38255d8ef39e53d296c18a545a2d097df13852cb8e",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Identify node and CLI errors as R1 MeshDB errors rather than presenting the fork as the upstream product."
+    },
+    {
+      "path": "engine/pkg/cli/cliflags/flags.go",
+      "upstreamSha256": "0f2a40127874b595887d354cef14c07aa2d52bc1e3c53015f6c8a48af887480f",
+      "distributedSha256": "b50ce53f23a601cc304e88d856643bf07d9f3399cb6e7d6c83b8496f7f9934f1",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Use R1 MeshDB in operator-facing command flag documentation."
+    },
+    {
+      "path": "engine/pkg/cli/clisqlclient/conn.go",
+      "upstreamSha256": "427f784c89f39189becf0e8b3c4c2eb9fcbbfdb3da0cdd8fcf9dfa3758f3a4f0",
+      "distributedSha256": "6dc40da9971843e4b3b86e7fd74154f2f4f3b981e9a9ab596581eb79b86c048c",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Use R1 MeshDB for the legacy-compatible server build display."
+    },
+    {
+      "path": "engine/pkg/cli/clisqlshell/sql.go",
+      "upstreamSha256": "95a07b82c9eeee3315f34954e565982080f7665384ed29f3eb182adbf4b12b0b",
+      "distributedSha256": "bf49b650c26d2895b0c8e1682565f526eb655711fe27e8ac5c5bd45ca34d3e75",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Identify the interactive client as the R1 MeshDB compatible SQL client."
+    },
+    {
+      "path": "engine/pkg/cli/demo.go",
+      "upstreamSha256": "0a225dcbd36d46032532dcc5fcde3ae762d55344085f45424457296bc2367d83",
+      "distributedSha256": "d0f84833b344446a29c7b63122b55bd3f0e33f82e9aed42ddce9fa7c8b2a574e",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Use the R1 MeshDB identity in the demo command and welcome text."
+    },
+    {
+      "path": "engine/pkg/cli/examples.go",
+      "upstreamSha256": "402b5feb227969eec378d8de8df86eba5a0812a9a12be49785d267edd11c9a69",
+      "distributedSha256": "7adc580de7af11d501b053685179113f41764ebf28efa2242ce2d278f8b85837",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Use the R1 MeshDB identity in example-generator help."
+    },
+    {
+      "path": "engine/pkg/cli/flags.go",
+      "upstreamSha256": "34fa3a4be8440d6f945ecb5c760b8e2b9ce29998bfa3afa4cc39ac21f866b023",
+      "distributedSha256": "d968164a311c4107bac419fe288b17fa57f1e30d7aa16834caf5d97ee2f9c549",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Disable diagnostics reporting in the default server configuration."
+    },
+    {
+      "path": "engine/pkg/cli/gen.go",
+      "upstreamSha256": "c79614fb4cc934b670806749aad6f5d1eabcdaa43dafe8e4956957300bb5d362",
+      "distributedSha256": "3fc425f062896d4b649c27faf2e326efd8e1c72fe62d6bc77050a0ed6d92b7da",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Generate R1 MeshDB-branded man pages and shell completion help."
+    },
+    {
+      "path": "engine/pkg/cli/import.go",
+      "upstreamSha256": "a582ff8f0ae8b90bc1603ccfe1ee1327fdd1f04951526ad1b68a110ba602d5e9",
+      "distributedSha256": "ee5690dfc7b501615e96537e0f451b5e1267b5812c16d6c02c9995188c1d8c50",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Use the R1 MeshDB identity in import command help."
+    },
+    {
+      "path": "engine/pkg/cli/init.go",
+      "upstreamSha256": "9fe5f43ad780e758f17276e4e3b53f8fcd39afb409e2e94b4875ba9c1d250a8b",
+      "distributedSha256": "cacbb313b4b41c642a5be2cf0002dd86c756774c252043b57210db831e496484",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Use the R1 MeshDB identity in cluster initialization help."
+    },
+    {
+      "path": "engine/pkg/cli/sql_shell_cmd.go",
+      "upstreamSha256": "afc35b237412eea2e4c7bdea6b14e69d42a6a4120b87213fbf95f5a5f9b19da1",
+      "distributedSha256": "53b0ddc8423794663cdba61cc590444e2a9a22a2e4257b2c649bb429983871a1",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Identify the interactive shell as the R1 MeshDB SQL shell."
+    },
+    {
+      "path": "engine/pkg/cli/start.go",
+      "upstreamSha256": "e738c6de15d7824a4e3d8788fd349629ea9cceb54d08fe2cc72550d1a86a8af0",
+      "distributedSha256": "e5ba022b8f47ae2e7356460bab056a8f29cb01640e4a6aacf7798d30adb2852b",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Use the R1 MeshDB identity in node startup help, status, and deprecation output."
+    },
+    {
+      "path": "engine/pkg/docs/docs.go",
+      "upstreamSha256": "1df863c9bfc4a8042132a4576c39216f2fd618d9a707c2f332737dc58d85e5fb",
+      "distributedSha256": "576dcd10ddd8e0a4c53893ac019f3f9b331ddf45a149e8d37b627999cfa8ab44",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Pin compatibility documentation to upstream v23.1 instead of deriving an invalid upstream documentation path from the R1 MeshDB product version."
+    },
+    {
+      "path": "engine/pkg/kv/kvserver/replica_consistency.go",
+      "upstreamSha256": "567bf32adf45c6be0f707048126041009426b6263e49d1638e37e1e73b85244c",
+      "distributedSha256": "c8041605c94cad485ed779d37a8686e4b8faab0213b5df3c7a673f00d823b6f1",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Route consistency-check escalation to the R1 MeshDB maintainers."
+    },
+    {
+      "path": "engine/pkg/kv/kvserver/replica_corruption.go",
+      "upstreamSha256": "b3895aaf7050add050cff13c6733c9d65d504f359d44b953c1fc406da2cc6308",
+      "distributedSha256": "34fdfbc4a3c4cb71c0227f2aa57bacd7d095f9b9cc6acd794046275f2ba8ab81",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Route corruption escalation to the R1 MeshDB maintainers."
+    },
+    {
+      "path": "engine/pkg/server/api_v2_error.go",
+      "upstreamSha256": "2c64ffca31ff1ac1ea40003a171ccd3de8b2ee570e5ad74902c37648584c732d",
+      "distributedSha256": "557b048fdc22162e52870f9f1726645079f6b1295601291ecaa7cfdcd3e515cc",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Identify runtime diagnostic logs as R1 MeshDB logs."
+    },
+    {
+      "path": "engine/pkg/server/diagnostics/diagnostics.go",
+      "upstreamSha256": "1b6f40daca97fa4f0e47b89339f898f34ec7d1056df975ea9beebde889b5e250",
+      "distributedSha256": "00d9ed829a4793cb2395b46553befa29531c297077e885bc2a88fc1cd87428e1",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Remove default update-check and diagnostics-report endpoints so the fork does not contact Cockroach Labs."
+    },
+    {
+      "path": "engine/pkg/server/server.go",
+      "upstreamSha256": "bef696112e1be1676ab5343748b4e16e36e7ac27004ecf2f6c8635c245864020",
+      "distributedSha256": "233e7abb8f9cb2d754f14cc2d357b598fe83ac9529ddaaa56513bedd026ae5d0",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Use the R1 MeshDB identity in node advertising logs."
+    },
+    {
+      "path": "engine/pkg/settings/cluster/cluster_settings.go",
+      "upstreamSha256": "6d73fb3b69ec149e62d5dae4eaefc44a5f38f3c8413180914e495007ffc2102c",
+      "distributedSha256": "adadf163fb81f24b502265fb392442664a373a6447d819b01da793e4e7fd45cb",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Default telemetry opt-out to true for the independent R1 MeshDB distribution."
+    },
+    {
+      "path": "engine/pkg/sql/crdb_internal.go",
+      "upstreamSha256": "47a0d97ef3b7e570521c064345dbcce75f948324b680698d5ea782a845610ef5",
+      "distributedSha256": "5ce67bff0547f511299e09173611197d0c680f697d45d11fa9c43561f2c64871",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Report R1 MeshDB as the product name in internal build metadata and catalog descriptions."
+    },
+    {
+      "path": "engine/pkg/util/log/clog.go",
+      "upstreamSha256": "69b023dc71054f33f77a6ff6c431851a6a21cbfac6e7118ffe03f3c14b41b75e",
+      "distributedSha256": "c1ab25b78e91cfdc294fa6ea253a6b2d8e5b4f3514f5c31338349e9597663f9b",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Route fatal-error reports to Ratio1 without exposing users to an unaffiliated support address."
+    },
+    {
+      "path": "engine/pkg/util/log/logcrash/crash_reporting.go",
+      "upstreamSha256": "aaa5b74c0fbfbfea2d404ca543d31673e24824e455361408ef0556decb467a1e",
+      "distributedSha256": "2273df27055c74e2c191cce56a4aa04eb5e097dc7a0f91669c3e95267748a741",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Disable the default Cockroach Labs crash-report endpoint while retaining an explicit operator override."
+    },
+    {
+      "path": "engine/pkg/util/tracing/tracer.go",
+      "upstreamSha256": "54fedf541417c4d6eedd4002069ce0fb8ca51e82cce040e42757e9f7ef58a0f2",
+      "distributedSha256": "a9536fba93fd23f37a6f003723399857529d53b79bbf34a649b04f030f8e5cad",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Use R1 MeshDB as the OpenTelemetry service name."
+    },
+    {
+      "path": "engine/pkg/cli/clisqlcfg/context.go",
+      "upstreamSha256": "256d44cfc7e2654adeb81cd457123d1f025d2d04476947829f1422a7a0828902",
+      "distributedSha256": "342212e7960abe9f2f80fd5a4b338cb1174e55395ecfa3953cbf8dad83a63721",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Use R1 MeshDB in the interactive troubleshooting note."
+    },
+    {
+      "path": "engine/pkg/cli/debug_recover_loss_of_quorum.go",
+      "upstreamSha256": "9371ccaa542940691b3fd2444ce4f37f096b19e6237ed562fac9a94496095594",
+      "distributedSha256": "e0654af2f86810e52078b6a91aff91a32c2aaa353ce58527f95724ca8d301dfd",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Use R1 MeshDB in loss-of-quorum recovery safety instructions."
+    },
+    {
+      "path": "engine/pkg/kv/kvclient/kvcoord/txn_coord_sender.go",
+      "upstreamSha256": "3896c50d25d9c40e5550610338f1e2e02edf17d72431fc2e766502d3bd52e2ee",
+      "distributedSha256": "a8bedcf600b8b0dec58b8baefd8b0611d01995f8699e41d535915c6ec6a308bf",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Route a known transaction assertion to Ratio1 support while retaining the upstream issue reference."
+    },
+    {
+      "path": "engine/pkg/sql/vars.go",
+      "upstreamSha256": "77bee329e28594883bb500e14d9cb5bf8a46904d13d6632badc12ec7acc644c8",
+      "distributedSha256": "af95f13a604172835849319f44b11e5aa07998122e4d3ddd9f1a95a7b392bab3",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Use R1 MeshDB in the user-visible compatibility parameter error."
+    },
+    {
       "path": "engine/pkg/cli/cli.go",
       "upstreamSha256": "65be03268d8674f85da607167638fe608b7a9f79d95bfd7cc18e9ae3eb4e2ebe",
-      "distributedSha256": "5fbdc5fcbc813fccd7c54bcb74f4f31fc815e9b673e9417dd88ece9572af3c14",
-      "changeClass": "comments-only",
-      "reason": "Remove a comment reference to an excluded enterprise-only source path."
+      "distributedSha256": "2f9070f35feecc91b6ee816a0238aa5b929f3fbe035a10f7fd844224027a730a",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Use R1 MeshDB for the root CLI identity while retaining neutral wording for excluded upstream assets."
     },
     {
       "path": "engine/pkg/ui/ui.go",
       "upstreamSha256": "a69f40de750b5757ebbd7d73056c4d64cfa797f13fe1dc5a110c2c0d7ebedb06",
-      "distributedSha256": "f1c779909382e3988361639a91ac9626424dcd54b9bba97f8c83d1d1b50dcbb1",
-      "changeClass": "comments-only",
-      "reason": "Remove a comment reference to excluded console asset paths."
+      "distributedSha256": "97a0d3e4aeb2c7f9141582a4e830240c23be3fd836f1d9c98d4a6bed25f2c751",
+      "changeClass": "product-identity-and-privacy",
+      "reason": "Use R1 MeshDB for console page titles while retaining neutral wording for excluded upstream console assets."
     },
     {
       "path": "engine/pkg/util/ctxutil/context.go",
@@ -66,7 +262,10 @@
       "goSumSha256": "5b49c9ca288606b8ec9ea5d244e26050312173d6d81940871c9429b622fcfcb4"
     },
     "sourceBaseline": {
+      "repository": "https://github.com/Ratio1/r1-distributed-sql.git",
       "commit": "610359213980391814f8ced2b5f57ba64e2f9e01",
+      "path": "engine/vendor/modules.txt",
+      "artifact": "source/engine-v23.1.28-vendor-modules.baseline.txt",
       "vendorModulesSha256": "ba79d5d4e92b21bfe85aa1aa23615088800fd06dca09e0ddcd1ba782b4990c12"
     },
     "distributed": {

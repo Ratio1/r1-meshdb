@@ -9,7 +9,7 @@ tagged_ref="${1:?usage: inspect-ghcr-tag.sh <ghcr-version-tag>}"
 : "${GHCR_USERNAME:?GHCR_USERNAME is required}"
 : "${GHCR_TOKEN:?GHCR_TOKEN is required}"
 
-if [[ ! "${tagged_ref}" =~ ^ghcr\.io/ratio1/r1-distributed-sql:(v23\.1\.28-r1\.[0-9]+\.[0-9]+)$ ]]; then
+if [[ ! "${tagged_ref}" =~ ^ghcr\.io/ratio1/r1-meshdb:(v1\.0\.[0-9]+)$ ]]; then
   echo "invalid R1 MeshDB GHCR version tag: ${tagged_ref}" >&2
   exit 2
 fi
@@ -34,7 +34,7 @@ trap cleanup EXIT
 
 basic_auth="$(printf '%s' "${GHCR_USERNAME}:${GHCR_TOKEN}" | base64 | tr -d '\n')"
 token_response="$({
-  printf 'url = "https://ghcr.io/token?service=ghcr.io&scope=repository%%3Aratio1%%2Fr1-distributed-sql%%3Apull"\n'
+  printf 'url = "https://ghcr.io/token?service=ghcr.io&scope=repository%%3Aratio1%%2Fr1-meshdb%%3Apull"\n'
   printf 'header = "Authorization: Basic %s"\n' "${basic_auth}"
   printf 'silent\nshow-error\nfail\n'
 } | curl --config -)"
@@ -54,7 +54,7 @@ unset token_response
 
 headers="${tmp}/headers"
 status="$({
-  printf 'url = "https://ghcr.io/v2/ratio1/r1-distributed-sql/manifests/%s"\n' "${tag}"
+  printf 'url = "https://ghcr.io/v2/ratio1/r1-meshdb/manifests/%s"\n' "${tag}"
   printf 'head\n'
   printf 'header = "Authorization: Bearer %s"\n' "${registry_token}"
   printf 'header = "Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"\n'

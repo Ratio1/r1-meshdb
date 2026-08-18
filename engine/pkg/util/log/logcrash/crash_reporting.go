@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0, included in the file
 // licenses/APL.txt.
 
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 package logcrash
 
 import (
@@ -40,9 +42,8 @@ var (
 	// DiagnosticsReportingEnabled wraps "diagnostics.reporting.enabled".
 	//
 	// "diagnostics.reporting.enabled" enables reporting of metrics related to a
-	// node's storage (number, size and health of ranges) back to CockroachDB.
-	// Collecting this data from production clusters helps us understand and improve
-	// how our storage systems behave in real-world use cases.
+	// node's storage (number, size and health of ranges) to an explicitly
+	// configured diagnostics endpoint.
 	//
 	// Note: while the setting itself is actually defined with a default value of
 	// `false`, it is usually automatically set to `true` when a cluster is created
@@ -54,7 +55,7 @@ var (
 	DiagnosticsReportingEnabled = settings.RegisterBoolSetting(
 		settings.TenantWritable,
 		"diagnostics.reporting.enabled",
-		"enable reporting diagnostic metrics to cockroach labs",
+		"enable reporting diagnostic metrics to a configured endpoint",
 		false,
 	).WithPublic()
 
@@ -81,7 +82,7 @@ var (
 	// ReportSensitiveDetails enables reporting of unanonymized data.
 	//
 	// This should not be used by anyone unwilling to share the whole cluster
-	// data with Cockroach Labs and various cloud services.
+	// data with the operator-configured reporting service.
 	ReportSensitiveDetails = envutil.EnvOrDefaultBool("COCKROACH_REPORT_SENSITIVE_DETAILS", false)
 
 	// globalSettings stores a global reference to a *setting.Values container;
@@ -205,27 +206,13 @@ func PanicAsError(depth int, r interface{}) error {
 
 // Crash reporting URL.
 //
-// This uses a Sentry proxy run by Cockroach Labs. The proxy
-// abstracts the actual Sentry submission project ID and
-// submission key.
-//
-// Non-release builds wishing to use Sentry reports
-// are invited to use the following URL instead:
-//
-//	https://ignored@errors.cockroachdb.com/api/sentrydev/v2/1111
-//
-// This can be set via e.g. the env var COCKROACH_CRASH_REPORTS.
-// Note that the special number "1111" is important as it
-// needs to be matched exactly by the CRL proxy.
+// R1 MeshDB has no default crash-reporting endpoint. Operators can set a
+// Sentry-compatible endpoint explicitly with COCKROACH_CRASH_REPORTS.
 //
 // TODO(knz): We could envision auto-selecting this alternate URL
 // when detecting a non-release build.
 var crashReportURL = func() string {
-	var defaultURL string
-	if build.SeemsOfficial() {
-		defaultURL = "https://ignored@errors.cockroachdb.com/api/sentry/v2/1111"
-	}
-	return envutil.EnvOrDefaultString("COCKROACH_CRASH_REPORTS", defaultURL)
+	return envutil.EnvOrDefaultString("COCKROACH_CRASH_REPORTS", "")
 }()
 
 // crashReportingActive is set to true if raven has been initialized.

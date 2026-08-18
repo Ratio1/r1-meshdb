@@ -1,6 +1,12 @@
 {
   "files": [
     {
+      "basis": "authorship metadata retained byte-for-byte from CockroachDB v23.1.28",
+      "path": "engine/AUTHORS",
+      "sha256": "43f782e23df565c0f003c45dae70b25788c6fc0266a87f8624a157b499a8aac8",
+      "spdx": "Apache-2.0"
+    },
+    {
       "basis": "engine/c-deps/geos/COPYING",
       "path": "engine/c-deps/geos/.astylerc",
       "sha256": "4878f51f258335f9b8e05fbe13f1e493ecc44c1529349138c1f35827ef68d244",
@@ -349,10 +355,10 @@
       "spdx": "LGPL-2.1-only"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/debian/copyright (embedded license grant)",
       "path": "engine/c-deps/geos/debian/copyright",
       "sha256": "bb7362232ebec77baf8f579f7dfa4d58d0d67ba4014ca79ebc495a4eb558d85d",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "LGPL-2.0-or-later"
     },
     {
       "basis": "engine/c-deps/geos/COPYING",
@@ -6595,100 +6601,106 @@
       "spdx": "LGPL-2.1-only"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
+      "path": "engine/c-deps/geos/tests/unit/tut/LICENSE",
+      "sha256": "c208bc4abd59b0885130cd47eb9b400480a0aeeb5f0a937d35d84393258ea6c3",
+      "spdx": "BSD-2-Clause"
+    },
+    {
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/README",
       "sha256": "9c75889b693f314effff23565b9b7afc045b5d1890984c2f6201faa27fc45e86",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut.hpp",
       "sha256": "15296a2a7cd70c99902472d9e433be57d3f753697a1e0b2f5bd251495913de01",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut_assert.hpp",
       "sha256": "9617a4b51208d311a8f6a8de78a9c5e7b657afc30fac295ad38672f1017236ba",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut_config.hpp",
       "sha256": "105686ceff0e170ca350e4787770cf088193e64f71448e12189dd2aed1f3a9f2",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut_console_reporter.hpp",
       "sha256": "89b61c8d9417b1bd50d9b96e6079ea821ceddf2170da4064bbccad13d9e000b9",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut_cppunit_reporter.hpp",
       "sha256": "1a522f5d5822b519685bda6fd44e3c33199e4fe863475f5505b75e96b0ddc7a4",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut_exception.hpp",
       "sha256": "0f2e2af58bbe053c9bb3794fb69682808bf28e394a7385cfaf26a0cb891986ea",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut_fpt.hpp",
       "sha256": "e2021ebaa1a2adc62aa771200de50cda645b41bfee6867e2a4b935e8a6b79416",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut_macros.hpp",
       "sha256": "9c8cf99603e371ff955fb197ec4c5338075c9e226b23c58a31838b23f44199f7",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut_main.hpp",
       "sha256": "52c75426195f847667e1193f63aa58aad49dca47979dc4adcf2130b329756be3",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut_posix.hpp",
       "sha256": "28018162691b83a04f5b4cf3d60b73c3b9e86e0048e036042530f4acc47eb6fb",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut_reporter.hpp",
       "sha256": "58b9a1ad3fac0a9895c29282a5f82a722b2c1b8148ad49266c0b89edf1d221ef",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut_restartable.hpp",
       "sha256": "a9df276a64c68d297dd6877cc130957445676ff33252597370a861c3d7ae6c29",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut_result.hpp",
       "sha256": "a5dce4e2b7d1f0e869560a07633d2684d0c732944a7e24c40626756cb09ecf5a",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut_runner.hpp",
       "sha256": "02e3d210168ac3a36c8635e54ac2ae693cec681df36f4b1468360cd20336ef89",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/unit/tut/LICENSE",
       "path": "engine/c-deps/geos/tests/unit/tut/tut_xml_reporter.hpp",
       "sha256": "0421b42c1724f9545256b1f6565d2919d77ecc9c637e430cb9ab0678b7d17cc3",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "BSD-2-Clause"
     },
     {
       "basis": "engine/c-deps/geos/COPYING",
@@ -7477,16 +7489,16 @@
       "spdx": "LGPL-2.1-only"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/xmltester/tinyxml2/tinyxml2.cpp (embedded Zlib license grant)",
       "path": "engine/c-deps/geos/tests/xmltester/tinyxml2/tinyxml2.cpp",
       "sha256": "bb94acf7f1c23b3521577ff32daeb19834b98f72151bc6f5ea82e08639ce7ec4",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "Zlib"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tests/xmltester/tinyxml2/tinyxml2.h (embedded Zlib license grant)",
       "path": "engine/c-deps/geos/tests/xmltester/tinyxml2/tinyxml2.h",
       "sha256": "3a9b7fb39615647dcae5804126042dc670e9d332bc2426044c6e521cff62eb94",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "Zlib"
     },
     {
       "basis": "engine/c-deps/geos/COPYING",
@@ -7507,40 +7519,40 @@
       "spdx": "LGPL-2.1-only"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tools/astyle/LICENSE.md",
       "path": "engine/c-deps/geos/tools/astyle/ASBeautifier.cpp",
       "sha256": "e9a8001644074fa0d13feee191ab89527fb99cd57fb88b6be1ca9f15ee43697f",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "MIT"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tools/astyle/LICENSE.md",
       "path": "engine/c-deps/geos/tools/astyle/ASEnhancer.cpp",
       "sha256": "e311ea6f2714fa1e90ccc7f63abd0f580087f90bebde0dbe95ec6fda1ae2cad8",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "MIT"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tools/astyle/LICENSE.md",
       "path": "engine/c-deps/geos/tools/astyle/ASFormatter.cpp",
       "sha256": "2e800890d5c9d3d9ca4bdabda3c8c8ddef6b57646473930fe023c475472c5e56",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "MIT"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tools/astyle/LICENSE.md",
       "path": "engine/c-deps/geos/tools/astyle/ASLocalizer.cpp",
       "sha256": "6b6e63bc52a0378f689a2c2821265f712d4f7cec18901849b23d15c86fb51067",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "MIT"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tools/astyle/LICENSE.md",
       "path": "engine/c-deps/geos/tools/astyle/ASLocalizer.h",
       "sha256": "b35c1a309a0cd54f71a5cc192082d2f2bf9821f99dce45042f69d4c3a1a9efb9",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "MIT"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tools/astyle/LICENSE.md",
       "path": "engine/c-deps/geos/tools/astyle/ASResource.cpp",
       "sha256": "ec5cbbf42b85a36b1589c69838ea2590dad0a7bbfad716e883f5b92b133e920d",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "MIT"
     },
     {
       "basis": "engine/c-deps/geos/COPYING",
@@ -7561,22 +7573,22 @@
       "spdx": "LGPL-2.1-only"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tools/astyle/LICENSE.md",
       "path": "engine/c-deps/geos/tools/astyle/astyle.h",
       "sha256": "c50a5f5d16737c6021ee3acede7a431ce21c72ea1cceee09653d196ec8de196b",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "MIT"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tools/astyle/LICENSE.md",
       "path": "engine/c-deps/geos/tools/astyle/astyle_main.cpp",
       "sha256": "5121468462b36cbd41ce17e568f789a00ef2faca04ddc442b7adac4de8223a64",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "MIT"
     },
     {
-      "basis": "engine/c-deps/geos/COPYING",
+      "basis": "engine/c-deps/geos/tools/astyle/LICENSE.md",
       "path": "engine/c-deps/geos/tools/astyle/astyle_main.h",
       "sha256": "c8d9a828ce81f271b4df335cdf0459b0ba6e7bc474aa2448fcc2c1b7c4522ac9",
-      "spdx": "LGPL-2.1-only"
+      "spdx": "MIT"
     },
     {
       "basis": "engine/c-deps/geos/COPYING",
@@ -8707,10 +8719,10 @@
       "spdx": "BSD-2-Clause"
     },
     {
-      "basis": "engine/c-deps/jemalloc/COPYING",
+      "basis": "engine/c-deps/jemalloc/msvc/test_threads/test_threads.cpp (explicit public-domain notice in source header)",
       "path": "engine/c-deps/jemalloc/msvc/test_threads/test_threads.cpp",
       "sha256": "32cb44dfdc9bf8758a11f4c52e9f421e82ed5094956af399983b61a9c1bf5790",
-      "spdx": "BSD-2-Clause"
+      "spdx": "LicenseRef-Public-Domain-Notice-32cb44dfdc9b"
     },
     {
       "basis": "engine/c-deps/jemalloc/COPYING",
@@ -12061,10 +12073,10 @@
       "spdx": "MIT"
     },
     {
-      "basis": "engine/c-deps/proj/COPYING",
+      "basis": "engine/c-deps/proj/src/PJ_isea.c (explicit public-domain notice in source header)",
       "path": "engine/c-deps/proj/src/PJ_isea.c",
       "sha256": "44d7e74b25ce723d78c8de136b2e00494367ad59f4aeb5c3199f4469dd99fede",
-      "spdx": "MIT"
+      "spdx": "LicenseRef-Public-Domain-Notice-44d7e74b25ce"
     },
     {
       "basis": "engine/c-deps/proj/src/PJ_krovak.c (embedded license grant)",
@@ -13905,7 +13917,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/build/info.go",
-      "sha256": "e52e0ffcfa009e11bad10adc66c58d126f74d967df07980cb0c58b4529ca66ba",
+      "sha256": "6c98962a25626e79933e23cacdd820545a5f7baba6a87d2d81cb8572eae23efd",
       "spdx": "Apache-2.0"
     },
     {
@@ -13941,7 +13953,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/cli.go",
-      "sha256": "5fbdc5fcbc813fccd7c54bcb74f4f31fc815e9b673e9417dd88ece9572af3c14",
+      "sha256": "2f9070f35feecc91b6ee816a0238aa5b929f3fbe035a10f7fd844224027a730a",
       "spdx": "Apache-2.0"
     },
     {
@@ -14025,7 +14037,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/clierrorplus/decorate_error.go",
-      "sha256": "7023fbe2a06c33e32ac942e82c037eef995e080b4de0006c90bf7730d4b15431",
+      "sha256": "d013bdfbbffe950e6b877a38255d8ef39e53d296c18a545a2d097df13852cb8e",
       "spdx": "Apache-2.0"
     },
     {
@@ -14061,7 +14073,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/cliflags/flags.go",
-      "sha256": "0f2a40127874b595887d354cef14c07aa2d52bc1e3c53015f6c8a48af887480f",
+      "sha256": "b50ce53f23a601cc304e88d856643bf07d9f3399cb6e7d6c83b8496f7f9934f1",
       "spdx": "Apache-2.0"
     },
     {
@@ -14073,7 +14085,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/clisqlcfg/context.go",
-      "sha256": "256d44cfc7e2654adeb81cd457123d1f025d2d04476947829f1422a7a0828902",
+      "sha256": "342212e7960abe9f2f80fd5a4b338cb1174e55395ecfa3953cbf8dad83a63721",
       "spdx": "Apache-2.0"
     },
     {
@@ -14097,7 +14109,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/clisqlclient/conn.go",
-      "sha256": "427f784c89f39189becf0e8b3c4c2eb9fcbbfdb3da0cdd8fcf9dfa3758f3a4f0",
+      "sha256": "6dc40da9971843e4b3b86e7fd74154f2f4f3b981e9a9ab596581eb79b86c048c",
       "spdx": "Apache-2.0"
     },
     {
@@ -14283,7 +14295,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/clisqlshell/sql.go",
-      "sha256": "95a07b82c9eeee3315f34954e565982080f7665384ed29f3eb182adbf4b12b0b",
+      "sha256": "bf49b650c26d2895b0c8e1682565f526eb655711fe27e8ac5c5bd45ca34d3e75",
       "spdx": "Apache-2.0"
     },
     {
@@ -14361,7 +14373,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/debug_recover_loss_of_quorum.go",
-      "sha256": "9371ccaa542940691b3fd2444ce4f37f096b19e6237ed562fac9a94496095594",
+      "sha256": "e0654af2f86810e52078b6a91aff91a32c2aaa353ce58527f95724ca8d301dfd",
       "spdx": "Apache-2.0"
     },
     {
@@ -14403,7 +14415,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/demo.go",
-      "sha256": "0a225dcbd36d46032532dcc5fcde3ae762d55344085f45424457296bc2367d83",
+      "sha256": "d0f84833b344446a29c7b63122b55bd3f0e33f82e9aed42ddce9fa7c8b2a574e",
       "spdx": "Apache-2.0"
     },
     {
@@ -14475,7 +14487,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/examples.go",
-      "sha256": "402b5feb227969eec378d8de8df86eba5a0812a9a12be49785d267edd11c9a69",
+      "sha256": "7adc580de7af11d501b053685179113f41764ebf28efa2242ce2d278f8b85837",
       "spdx": "Apache-2.0"
     },
     {
@@ -14499,7 +14511,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/flags.go",
-      "sha256": "34fa3a4be8440d6f945ecb5c760b8e2b9ce29998bfa3afa4cc39ac21f866b023",
+      "sha256": "d968164a311c4107bac419fe288b17fa57f1e30d7aa16834caf5d97ee2f9c549",
       "spdx": "Apache-2.0"
     },
     {
@@ -14511,7 +14523,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/gen.go",
-      "sha256": "c79614fb4cc934b670806749aad6f5d1eabcdaa43dafe8e4956957300bb5d362",
+      "sha256": "3fc425f062896d4b649c27faf2e326efd8e1c72fe62d6bc77050a0ed6d92b7da",
       "spdx": "Apache-2.0"
     },
     {
@@ -14523,13 +14535,13 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/import.go",
-      "sha256": "a582ff8f0ae8b90bc1603ccfe1ee1327fdd1f04951526ad1b68a110ba602d5e9",
+      "sha256": "ee5690dfc7b501615e96537e0f451b5e1267b5812c16d6c02c9995188c1d8c50",
       "spdx": "Apache-2.0"
     },
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/init.go",
-      "sha256": "9fe5f43ad780e758f17276e4e3b53f8fcd39afb409e2e94b4875ba9c1d250a8b",
+      "sha256": "cacbb313b4b41c642a5be2cf0002dd86c756774c252043b57210db831e496484",
       "spdx": "Apache-2.0"
     },
     {
@@ -14601,7 +14613,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/sql_shell_cmd.go",
-      "sha256": "afc35b237412eea2e4c7bdea6b14e69d42a6a4120b87213fbf95f5a5f9b19da1",
+      "sha256": "53b0ddc8423794663cdba61cc590444e2a9a22a2e4257b2c649bb429983871a1",
       "spdx": "Apache-2.0"
     },
     {
@@ -14613,7 +14625,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/start.go",
-      "sha256": "e738c6de15d7824a4e3d8788fd349629ea9cceb54d08fe2cc72550d1a86a8af0",
+      "sha256": "e5ba022b8f47ae2e7356460bab056a8f29cb01640e4a6aacf7798d30adb2852b",
       "spdx": "Apache-2.0"
     },
     {
@@ -15213,7 +15225,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/docs/docs.go",
-      "sha256": "1df863c9bfc4a8042132a4576c39216f2fd618d9a707c2f332737dc58d85e5fb",
+      "sha256": "576dcd10ddd8e0a4c53893ac019f3f9b331ddf45a149e8d37b627999cfa8ab44",
       "spdx": "Apache-2.0"
     },
     {
@@ -16293,7 +16305,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/kv/kvclient/kvcoord/txn_coord_sender.go",
-      "sha256": "3896c50d25d9c40e5550610338f1e2e02edf17d72431fc2e766502d3bd52e2ee",
+      "sha256": "a8bedcf600b8b0dec58b8baefd8b0611d01995f8699e41d535915c6ec6a308bf",
       "spdx": "Apache-2.0"
     },
     {
@@ -17937,13 +17949,13 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/kv/kvserver/replica_consistency.go",
-      "sha256": "567bf32adf45c6be0f707048126041009426b6263e49d1638e37e1e73b85244c",
+      "sha256": "c8041605c94cad485ed779d37a8686e4b8faab0213b5df3c7a673f00d823b6f1",
       "spdx": "Apache-2.0"
     },
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/kv/kvserver/replica_corruption.go",
-      "sha256": "b3895aaf7050add050cff13c6733c9d65d504f359d44b953c1fc406da2cc6308",
+      "sha256": "34fdfbc4a3c4cb71c0227f2aa57bacd7d095f9b9cc6acd794046275f2ba8ab81",
       "spdx": "Apache-2.0"
     },
     {
@@ -19461,7 +19473,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/server/api_v2_error.go",
-      "sha256": "2c64ffca31ff1ac1ea40003a171ccd3de8b2ee570e5ad74902c37648584c732d",
+      "sha256": "557b048fdc22162e52870f9f1726645079f6b1295601291ecaa7cfdcd3e515cc",
       "spdx": "Apache-2.0"
     },
     {
@@ -19671,7 +19683,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/server/diagnostics/diagnostics.go",
-      "sha256": "1b6f40daca97fa4f0e47b89339f898f34ec7d1056df975ea9beebde889b5e250",
+      "sha256": "00d9ed829a4793cb2395b46553befa29531c297077e885bc2a88fc1cd87428e1",
       "spdx": "Apache-2.0"
     },
     {
@@ -19947,7 +19959,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/server/server.go",
-      "sha256": "bef696112e1be1676ab5343748b4e16e36e7ac27004ecf2f6c8635c245864020",
+      "sha256": "233e7abb8f9cb2d754f14cc2d357b598fe83ac9529ddaaa56513bedd026ae5d0",
       "spdx": "Apache-2.0"
     },
     {
@@ -20355,7 +20367,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/settings/cluster/cluster_settings.go",
-      "sha256": "6d73fb3b69ec149e62d5dae4eaefc44a5f38f3c8413180914e495007ffc2102c",
+      "sha256": "adadf163fb81f24b502265fb392442664a373a6447d819b01da793e4e7fd45cb",
       "spdx": "Apache-2.0"
     },
     {
@@ -23463,7 +23475,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/sql/crdb_internal.go",
-      "sha256": "47a0d97ef3b7e570521c064345dbcce75f948324b680698d5ea782a845610ef5",
+      "sha256": "5ce67bff0547f511299e09173611197d0c680f697d45d11fa9c43561f2c64871",
       "spdx": "Apache-2.0"
     },
     {
@@ -31329,7 +31341,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/sql/vars.go",
-      "sha256": "77bee329e28594883bb500e14d9cb5bf8a46904d13d6632badc12ec7acc644c8",
+      "sha256": "af95f13a604172835849319f44b11e5aa07998122e4d3ddd9f1a95a7b392bab3",
       "spdx": "Apache-2.0"
     },
     {
@@ -32055,7 +32067,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/ui/ui.go",
-      "sha256": "f1c779909382e3988361639a91ac9626424dcd54b9bba97f8c83d1d1b50dcbb1",
+      "sha256": "97a0d3e4aeb2c7f9141582a4e830240c23be3fd836f1d9c98d4a6bed25f2c751",
       "spdx": "Apache-2.0"
     },
     {
@@ -33183,7 +33195,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/util/log/clog.go",
-      "sha256": "69b023dc71054f33f77a6ff6c431851a6a21cbfac6e7118ffe03f3c14b41b75e",
+      "sha256": "c1ab25b78e91cfdc294fa6ea253a6b2d8e5b4f3514f5c31338349e9597663f9b",
       "spdx": "Apache-2.0"
     },
     {
@@ -33483,7 +33495,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/util/log/logcrash/crash_reporting.go",
-      "sha256": "aaa5b74c0fbfbfea2d404ca543d31673e24824e455361408ef0556decb467a1e",
+      "sha256": "2273df27055c74e2c191cce56a4aa04eb5e097dc7a0f91669c3e95267748a741",
       "spdx": "Apache-2.0"
     },
     {
@@ -34347,7 +34359,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/util/tracing/tracer.go",
-      "sha256": "54fedf541417c4d6eedd4002069ce0fb8ca51e82cce040e42757e9f7ef58a0f2",
+      "sha256": "a9536fba93fd23f37a6f003723399857529d53b79bbf34a649b04f030f8e5cad",
       "spdx": "Apache-2.0"
     },
     {

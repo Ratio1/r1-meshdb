@@ -4,9 +4,10 @@
 
 set -euo pipefail
 
-rootfs="${1:?usage: assemble-runtime-rootfs.sh <rootfs> <engine-binary> <expected-packages>}"
-engine_binary="${2:?usage: assemble-runtime-rootfs.sh <rootfs> <engine-binary> <expected-packages>}"
-expected_packages="${3:?usage: assemble-runtime-rootfs.sh <rootfs> <engine-binary> <expected-packages>}"
+rootfs="${1:?usage: assemble-runtime-rootfs.sh <rootfs> <engine-binary> <expected-packages> <expected-sources>}"
+engine_binary="${2:?usage: assemble-runtime-rootfs.sh <rootfs> <engine-binary> <expected-packages> <expected-sources>}"
+expected_packages="${3:?usage: assemble-runtime-rootfs.sh <rootfs> <engine-binary> <expected-packages> <expected-sources>}"
+expected_sources="${4:?usage: assemble-runtime-rootfs.sh <rootfs> <engine-binary> <expected-packages> <expected-sources>}"
 package_list="$(mktemp)"
 
 cleanup() {
@@ -130,25 +131,48 @@ mkdir -p \
   "${rootfs}/cockroach/certs" \
   "${rootfs}/tmp" \
   "${rootfs}/usr/local/bin" \
-  "${rootfs}/usr/share/doc/r1-distributed-sql" \
+  "${rootfs}/usr/share/doc/r1-meshdb" \
   "${rootfs}/var/lib/dpkg"
 chmod 1777 "${rootfs}/tmp"
 ln -s bash "${rootfs}/bin/sh"
-ln -s deeploy-crdb-entrypoint "${rootfs}/usr/local/bin/r1-distributed-sql-entrypoint"
+ln -s deeploy-crdb-entrypoint "${rootfs}/usr/local/bin/r1-meshdb-entrypoint"
 
 sort -u "${package_list}" | while IFS= read -r package; do
   dpkg-query -W -f='${Package}=${Version}\n' "${package}"
-done | sort -u > "${rootfs}/usr/share/doc/r1-distributed-sql/runtime-packages.txt"
+done | sort -u > "${rootfs}/usr/share/doc/r1-meshdb/runtime-packages.txt"
 
 if ! diff -u "${expected_packages}" \
-    "${rootfs}/usr/share/doc/r1-distributed-sql/runtime-packages.txt"; then
+    "${rootfs}/usr/share/doc/r1-meshdb/runtime-packages.txt"; then
   echo "minimal runtime package inventory changed" >&2
   exit 1
 fi
 
+printf 'binary-package\tbinary-version\tsource-package\tsource-version\n' \
+  > "${rootfs}/usr/share/doc/r1-meshdb/runtime-package-sources.tsv"
 cut -d= -f1 "${expected_packages}" | while IFS= read -r package; do
-  dpkg-query -W -f='Package: ${Package}\nStatus: install ok installed\nArchitecture: ${Architecture}\nVersion: ${Version}\nDescription: retained files for the R1 MeshDB minimal runtime\n\n' \
+  record="$(dpkg-query -W -f='${Package}\t${Version}\t${source:Package}\t${source:Version}' "${package}")"
+  IFS=$'\t' read -r binary_package binary_version source_package source_version <<< "${record}"
+  source_package="${source_package:-${binary_package}}"
+  source_version="${source_version:-${binary_version}}"
+  printf '%s\t%s\t%s\t%s\n' \
+    "${binary_package}" "${binary_version}" "${source_package}" "${source_version}"
+done | LC_ALL=C sort -u >> "${rootfs}/usr/share/doc/r1-meshdb/runtime-package-sources.tsv"
+
+if ! diff -u "${expected_sources}" \
+    "${rootfs}/usr/share/doc/r1-meshdb/runtime-package-sources.tsv"; then
+  echo "minimal runtime source-package inventory changed" >&2
+  exit 1
+fi
+
+cut -d= -f1 "${expected_packages}" | while IFS= read -r package; do
+  record="$(dpkg-query -W -f='${source:Package}\t${source:Version}' "${package}")"
+  IFS=$'\t' read -r source_package source_version <<< "${record}"
+  source_package="${source_package:-${package}}"
+  source_version="${source_version:-$(dpkg-query -W -f='${Version}' "${package}")}"
+  dpkg-query -W -f='Package: ${Package}\nStatus: install ok installed\nArchitecture: ${Architecture}\nVersion: ${Version}\n' \
     "${package}"
+  printf 'Source: %s (%s)\nDescription: retained files for the R1 MeshDB minimal runtime\n\n' \
+    "${source_package}" "${source_version}"
   copyright="/usr/share/doc/${package}/copyright"
   [[ ! -e "${copyright}" && ! -L "${copyright}" ]] || copy_path "${copyright}"
 done > "${rootfs}/var/lib/dpkg/status"

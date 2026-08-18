@@ -16,15 +16,17 @@ exercises the image defaults.
 ```bash
 python3 -m unittest tests.test_release_contract
 testbed/run-local-cluster.sh \
-  ghcr.io/ratio1/r1-distributed-sql@sha256:<verified-digest>
+  ghcr.io/ratio1/r1-meshdb@sha256:<verified-digest>
 ```
 
-For a pre-publication local image only, set `R1_SQL_REQUIRE_DIGEST=false`.
+For a pre-publication local image only, set
+`R1_MESHDB_REQUIRE_DIGEST=false`. The legacy `R1_SQL_REQUIRE_DIGEST` spelling
+remains an input alias for existing automation.
 Such a run is build feedback and does not satisfy the signed-artifact gate.
 The local transport overlay also does not prove Cloudflare behavior. The
 unmodified signed digest with real tunnels is required in the hybrid testbed.
 Database stores use disposable Docker-managed volumes. This avoids host
-bind-mount `fsync` behavior becoming a false CockroachDB disk-stall failure and
+bind-mount `fsync` behavior becoming a false R1 MeshDB disk-stall failure and
 more closely matches the dedicated Linux filesystems used by edge-node fixed
 volumes; every harness asserts that its named volumes are deleted on exit.
 
@@ -48,7 +50,7 @@ non-secret resource identifiers are retained as
 `Recover ephemeral Cloudflare resources` workflow runs automatically after an
 unsuccessful release attempt. It validates the exact repository, workflow,
 branch, run ID, and attempt before using that state, then verifies the
-deterministic `r1-sql-ci-<run-id>-<attempt>` namespace through the Cloudflare
+deterministic `r1-meshdb-ci-<run-id>-<attempt>` namespace through the Cloudflare
 API. If the artifact is unavailable after runner loss, the same exact-prefix
 lookup removes matching DNS records and tunnels without touching adjacent run
 or attempt namespaces.

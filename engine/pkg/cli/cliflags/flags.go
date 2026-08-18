@@ -1,4 +1,5 @@
 // Copyright 2015 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -242,7 +243,7 @@ can also be specified (e.g. .25).`,
 		Name:   "host",
 		EnvVar: "COCKROACH_HOST",
 		Description: `
-CockroachDB node to connect to.
+R1 MeshDB node to connect to.
 This can be specified either as an address/hostname, or
 together with a port number as in -s myhost:26257.
 If the port number is left unspecified, it defaults to 26257.
@@ -331,7 +332,7 @@ Reveal the SQL statements sent implicitly by the command-line utility.`,
 	CliDebugMode = FlagInfo{
 		Name: "debug-sql-cli",
 		Description: `
-Simplify the SQL CLI to ease troubleshooting of CockroachDB
+Simplify the SQL CLI to ease troubleshooting of R1 MeshDB
 issues. This echoes sent SQL, removes the database name and txn status
 from the prompt, and forces behavior to become independent on current
 transaction state. Equivalent to --echo-sql, \unset check_syntax and
@@ -516,7 +517,7 @@ feature.
 	AdvertiseAddr = FlagInfo{
 		Name: "advertise-addr",
 		Description: `
-The address/hostname and port to advertise to other CockroachDB nodes
+The address/hostname and port to advertise to other R1 MeshDB nodes
 for intra-cluster communication. It must resolve and be routable from
 other nodes in the cluster.
 <PRE>
@@ -666,7 +667,7 @@ apply. This flag is experimental.
 	LocalityAdvertiseAddr = FlagInfo{
 		Name: "locality-advertise-addr",
 		Description: `
-List of ports to advertise to other CockroachDB nodes for intra-cluster
+List of ports to advertise to other R1 MeshDB nodes for intra-cluster
 communication for some locality. This should be specified as a comma
 separated list of locality@address. Addresses can also include ports.
 For example:
@@ -689,14 +690,14 @@ For example:
 	ListeningURLFile = FlagInfo{
 		Name: "listening-url-file",
 		Description: `
-After the CockroachDB node has started up successfully, it will
+After the R1 MeshDB node has started up successfully, it will
 write its connection URL to the specified file.`,
 	}
 
 	PIDFile = FlagInfo{
 		Name: "pid-file",
 		Description: `
-After the CockroachDB node has started up successfully, it will
+After the R1 MeshDB node has started up successfully, it will
 write its process ID to the specified file.`,
 	}
 
@@ -1640,7 +1641,7 @@ Setting this flag will be interpreted in the same way as setting the
 		Description: `
 Redact anything that may contain confidential data or PII from retrieved
 debug data. An exception is made for range key data, as this data is
-necessary to support CockroachDB.
+necessary to support R1 MeshDB.
 `,
 	}
 

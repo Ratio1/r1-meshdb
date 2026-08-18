@@ -10,17 +10,17 @@ release_tag="${2:?usage: verify-image.sh <image@sha256:digest> <release-tag>}"
 expected_issuer="https://token.actions.githubusercontent.com"
 expected_identity="https://github.com/Ratio1/r1-distributed-sql/.github/workflows/release.yml@refs/heads/main"
 
-[[ "${image_ref}" =~ ^ghcr\.io/ratio1/r1-distributed-sql@sha256:[0-9a-f]{64}$ ]] || {
-  printf 'image must be an immutable ghcr.io/ratio1/r1-distributed-sql digest\n' >&2
+[[ "${image_ref}" =~ ^ghcr\.io/ratio1/r1-meshdb@sha256:[0-9a-f]{64}$ ]] || {
+  printf 'image must be an immutable ghcr.io/ratio1/r1-meshdb digest\n' >&2
   exit 1
 }
 
-if [[ ! "${release_tag}" =~ ^v23\.1\.28-r1\.[0-9]+\.[0-9]+$ ]]; then
+if [[ ! "${release_tag}" =~ ^v1\.0\.[0-9]+$ ]]; then
   printf 'invalid R1 MeshDB release tag: %s\n' "${release_tag}" >&2
   exit 1
 fi
 
-for command in cmp docker cosign gh git python3; do
+for command in cmp diff docker cosign gh git python3 sha256sum tar; do
   command -v "${command}" >/dev/null 2>&1 || {
     printf 'required command not found: %s\n' "${command}" >&2
     exit 1
@@ -52,6 +52,8 @@ is_draft="$(gh release view "${release_tag}" --repo Ratio1/r1-distributed-sql \
 mkdir "${tmp_dir}/release"
 gh release download "${release_tag}" --repo Ratio1/r1-distributed-sql \
   --pattern image-reference.txt --dir "${tmp_dir}/release"
+gh release download "${release_tag}" --repo Ratio1/r1-distributed-sql \
+  --pattern r1-meshdb-debian-corresponding-source.tar.gz --dir "${tmp_dir}/release"
 printf '%s\n' "${image_ref}" > "${tmp_dir}/expected-image-reference.txt"
 cmp "${tmp_dir}/expected-image-reference.txt" "${tmp_dir}/release/image-reference.txt"
 
@@ -88,6 +90,12 @@ gh attestation verify "oci://${image_ref}" \
 DOCKER_CONFIG="${anonymous_config}" docker pull "${image_ref}"
 container_id="$(docker create "${image_ref}")"
 docker cp "${container_id}:/cockroach/cockroach" "${tmp_dir}/cockroach"
+mkdir "${tmp_dir}/image-debian" "${tmp_dir}/release-debian"
+docker cp "${container_id}:/usr/share/src/r1-meshdb/debian/." "${tmp_dir}/image-debian/"
+(cd "${tmp_dir}/image-debian" && sha256sum -c SHA256SUMS)
+tar -xzf "${tmp_dir}/release/r1-meshdb-debian-corresponding-source.tar.gz" \
+  --strip-components=1 -C "${tmp_dir}/release-debian"
+diff -qr "${tmp_dir}/image-debian" "${tmp_dir}/release-debian"
 chmod 755 "${tmp_dir}/cockroach"
 (
   cd "${tmp_dir}"
@@ -121,13 +129,11 @@ import sys
 
 labels = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 expected = {
-  "org.opencontainers.image.licenses": (
-    "Apache-2.0 AND LicenseRef-R1-MeshDB-Third-Party"
-  ),
+  "org.opencontainers.image.licenses": "Apache-2.0",
   "org.opencontainers.image.source": "https://github.com/Ratio1/r1-distributed-sql",
   "org.opencontainers.image.version": sys.argv[2],
   "org.opencontainers.image.revision": sys.argv[3],
-  "io.ratio1.r1-distributed-sql.distribution": "OSS",
+  "io.ratio1.r1-meshdb.distribution": "OSS",
 }
 for key, value in expected.items():
   if labels.get(key) != value:

@@ -1,4 +1,5 @@
 // Copyright 2021 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -279,7 +280,7 @@ using the --host flag. This designated node will handle collection of data from
 all surviving nodes.
 
 In the second case data is read directly from local stores on each node.
-CockroachDB must not be running on any node. The location of each store must be
+R1 MeshDB must not be running on any node. The location of each store must be
 provided using the --store flag. The command must be executed for all surviving
 stores.
 

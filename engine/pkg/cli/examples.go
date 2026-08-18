@@ -1,4 +1,5 @@
 // Copyright 2016 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -24,8 +25,8 @@ import (
 
 var genExamplesCmd = &cobra.Command{
 	Use:   "example-data",
-	Short: "generate example SQL code suitable for use with CockroachDB",
-	Long: `This command generates example SQL code that shows various CockroachDB features and
+	Short: "generate example SQL code suitable for use with R1 MeshDB",
+	Long: `This command generates example SQL code that shows various R1 MeshDB features and
 is suitable to populate an example database for demonstration and education purposes.
 `,
 }

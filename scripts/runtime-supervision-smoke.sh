@@ -259,7 +259,7 @@ assert_failed_cleanly() {
   local timeout_seconds="${4:-5}"
   if ! wait_for_exit "${name}" "${timeout_seconds}"; then
     docker logs "${name}" >&2 2>/dev/null || true
-    echo "${name} remained running after CockroachDB exited" >&2
+    echo "${name} remained running after R1 MeshDB exited" >&2
     return 1
   fi
 
@@ -293,7 +293,7 @@ assert_baseline_false_running() {
     return 1
   fi
   if container_has_command "${name}" "/cockroach/cockroach-real start "; then
-    echo "baseline CockroachDB server did not exit" >&2
+    echo "baseline R1 MeshDB server did not exit" >&2
     return 1
   fi
   if ! container_has_command "${name}" "/cockroach/cockroach init "; then
@@ -327,12 +327,12 @@ if [[ "${expectation}" == "broken" ]]; then
   assert_baseline_false_running "${init_case}"
   exit 0
 fi
-assert_failed_cleanly "${init_case}" "CockroachDB exited during cluster initialization" 137
+assert_failed_cleanly "${init_case}" "R1 MeshDB exited during cluster initialization" 137
 assert_no_bootstrap_temp "${init_case}"
 
 pre_listener_case="deeploy-crdb-supervision-listener-${run_id}"
 start_case "${pre_listener_case}" -e TEST_CRDB_START_MODE=exit -e TEST_CRDB_START_EXIT_CODE=42
-assert_failed_cleanly "${pre_listener_case}" "CockroachDB exited during SQL listener readiness" 42
+assert_failed_cleanly "${pre_listener_case}" "R1 MeshDB exited during SQL listener readiness" 42
 
 timeout_upper_bound_case="deeploy-crdb-supervision-timeout-upper-bound-${run_id}"
 start_case "${timeout_upper_bound_case}" -e CRDB_BOOTSTRAP_TIMEOUT_SECONDS=3601
@@ -342,7 +342,7 @@ assert_failed_cleanly "${timeout_upper_bound_case}" \
 sql_listener_timeout_case="deeploy-crdb-supervision-listener-timeout-${run_id}"
 start_case "${sql_listener_timeout_case}" -e TEST_CRDB_START_MODE=block_no_listener
 assert_failed_cleanly "${sql_listener_timeout_case}" \
-  "CockroachDB SQL listener did not open on 127.0.0.1:26257 within 3 seconds" 1 8
+  "R1 MeshDB SQL listener did not open on 127.0.0.1:26257 within 3 seconds" 1 8
 
 default_timeout_case="deeploy-crdb-supervision-default-timeout-${run_id}"
 start_case "${default_timeout_case}" \
@@ -368,7 +368,7 @@ start_case "${sql_case}" \
   -e TEST_CRDB_SQL_MODE=block
 wait_for_command "${sql_case}" "/cockroach/cockroach sql "
 kill_real_server "${sql_case}"
-assert_failed_cleanly "${sql_case}" "CockroachDB exited during SQL bootstrap readiness" 137
+assert_failed_cleanly "${sql_case}" "R1 MeshDB exited during SQL bootstrap readiness" 137
 assert_no_bootstrap_temp "${sql_case}"
 
 bootstrap_case="deeploy-crdb-supervision-bootstrap-${run_id}"
@@ -379,7 +379,7 @@ start_case "${bootstrap_case}" \
 wait_for_file "${bootstrap_case}" /tmp/runtime-supervision-readiness-complete
 wait_for_command "${bootstrap_case}" "/cockroach/cockroach sql "
 kill_real_server "${bootstrap_case}"
-assert_failed_cleanly "${bootstrap_case}" "CockroachDB exited during SQL bootstrap" 137
+assert_failed_cleanly "${bootstrap_case}" "R1 MeshDB exited during SQL bootstrap" 137
 assert_no_bootstrap_temp "${bootstrap_case}"
 
 cleanup_rm_case="deeploy-crdb-supervision-cleanup-rm-${run_id}"
@@ -396,7 +396,7 @@ assert_no_bootstrap_temp "${cleanup_rm_case}"
 
 simultaneous_case="deeploy-crdb-supervision-simultaneous-${run_id}"
 start_case "${simultaneous_case}" -e TEST_CRDB_INIT_MODE=success -e TEST_CRDB_SQL_MODE=fail_then_kill_server
-assert_failed_cleanly "${simultaneous_case}" "CockroachDB exited during" 137
+assert_failed_cleanly "${simultaneous_case}" "R1 MeshDB exited during" 137
 assert_no_bootstrap_temp "${simultaneous_case}"
 
 timeout_case="deeploy-crdb-supervision-timeout-${run_id}"
@@ -428,7 +428,7 @@ assert_no_bootstrap_temp "${ddl_failure_case}"
 resistant_timeout_case="deeploy-crdb-supervision-resistant-timeout-${run_id}"
 start_case "${resistant_timeout_case}" -e TEST_CRDB_INIT_MODE=ignore_term
 wait_for_command "${resistant_timeout_case}" "/cockroach/cockroach init "
-assert_failed_cleanly "${resistant_timeout_case}" "initializing CockroachDB cluster if needed" 137 30
+assert_failed_cleanly "${resistant_timeout_case}" "initializing R1 MeshDB cluster if needed" 137 30
 assert_no_bootstrap_temp "${resistant_timeout_case}"
 
 compound_case="deeploy-crdb-supervision-compound-${run_id}"
@@ -439,7 +439,7 @@ start_case "${compound_case}" \
   -e CRDB_SHUTDOWN_GRACE_SECONDS=3
 wait_for_command "${compound_case}" "/cockroach/cockroach init "
 kill_real_server "${compound_case}"
-assert_failed_cleanly "${compound_case}" "CockroachDB exited during cluster initialization" 137 30
+assert_failed_cleanly "${compound_case}" "R1 MeshDB exited during cluster initialization" 137 30
 assert_no_bootstrap_temp "${compound_case}"
 
 cloudflared_case="deeploy-crdb-supervision-cloudflared-${run_id}"
@@ -499,7 +499,7 @@ start_case "${runtime_case}" \
 wait_for_file "${runtime_case}" /tmp/runtime-supervision-sql-complete
 wait_for_log "${runtime_case}" "startup orchestration complete; supervising required processes"
 kill_real_server "${runtime_case}"
-assert_failed_cleanly "${runtime_case}" "CockroachDB exited during runtime" 137
+assert_failed_cleanly "${runtime_case}" "R1 MeshDB exited during runtime" 137
 
 bash scripts/store-recovery-regression.sh "${test_image}" "${run_id}"
 bash scripts/store-recovery-multinode-smoke.sh "${test_image}" "${run_id}"

@@ -1,4 +1,5 @@
 // Copyright 2016 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -37,8 +38,8 @@ var manPath string
 
 var genManCmd = &cobra.Command{
 	Use:   "man",
-	Short: "generate man pages for CockroachDB",
-	Long: `This command generates man pages for CockroachDB.
+	Short: "generate man pages for R1 MeshDB",
+	Long: `This command generates man pages for R1 MeshDB.
 
 By default, this places man pages into the "man/man1" directory under the
 current directory. Use "--path=PATH" to override the output directory. For
@@ -53,8 +54,8 @@ func runGenManCmd(cmd *cobra.Command, args []string) error {
 	info := build.GetInfo()
 	header := &doc.GenManHeader{
 		Section: "1",
-		Manual:  "CockroachDB Manual",
-		Source:  fmt.Sprintf("CockroachDB %s", info.Tag),
+		Manual:  "R1 MeshDB Manual",
+		Source:  fmt.Sprintf("R1 MeshDB %s", info.Tag),
 	}
 
 	if !strings.HasSuffix(manPath, string(os.PathSeparator)) {
@@ -79,7 +80,7 @@ func runGenManCmd(cmd *cobra.Command, args []string) error {
 	// one has to notice the "See Also" section at the bottom of the page to know which commands
 	// are supported. I'd like to make this better somehow.
 
-	fmt.Println("Generated CockroachDB man pages in", manPath)
+	fmt.Println("Generated R1 MeshDB man pages in", manPath)
 	return nil
 }
 
@@ -87,8 +88,8 @@ var autoCompletePath string
 
 var genAutocompleteCmd = &cobra.Command{
 	Use:   "autocomplete [shell]",
-	Short: "generate autocompletion script for CockroachDB",
-	Long: `Generate autocompletion script for CockroachDB.
+	Short: "generate autocompletion script for R1 MeshDB",
+	Long: `Generate autocompletion script for R1 MeshDB.
 
 If no arguments are passed, or if 'bash' is passed, a bash completion file is
 written to ./cockroach.bash. If 'fish' is passed, a fish completion file

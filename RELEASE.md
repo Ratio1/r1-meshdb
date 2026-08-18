@@ -22,7 +22,7 @@ Before the first release, repository administrators must:
    corresponding tagged source public for as long as that image is distributed.
 
 An administrator manually dispatches the workflow from `main` with a version
-matching `v23.1.28-r1.<major>.<patch>`. The workflow requires its source SHA to
+matching `v1.0.<patch>`. The workflow requires its source SHA to
 equal `origin/main` and byte-compares that checkout with an anonymously
 downloaded source archive before it publishes even an untagged candidate. It
 creates no Git or OCI release tag until the candidate has passed validation,
@@ -39,7 +39,7 @@ approved release artifact. Failed candidate digests may remain addressable in
 GHCR, but they receive no version tag, source release, or `latest` tag.
 If remote cleanup fails, the workflow deletes tunnel tokens but retains the
 non-secret tunnel/DNS identifiers as `cloudflare-cleanup-state.json` in the
-attempt-scoped `r1-distributed-sql-cloudflare-cleanup-<run ID>-<run attempt>`
+attempt-scoped `r1-meshdb-cloudflare-cleanup-<run ID>-<run attempt>`
 artifact for seven days. The Cloudflare cleanup recovery workflow, **Recover
 ephemeral Cloudflare resources**, runs automatically after a failed, cancelled,
 or timed-out release. An operator can also dispatch it from `main` with the
@@ -58,7 +58,7 @@ attests it.
 
 GitHub does not expose a supported API for changing a package's visibility.
 After the source repository is public, a package administrator must open the
-`r1-distributed-sql` package settings and set **Package visibility** to
+`r1-meshdb` package settings and set **Package visibility** to
 **Public**. The first release run is expected to stop at the anonymous-pull
 gate after creating the package. Change visibility in the GitHub UI and rerun
 the same release tag; no source or OCI version tag has been created at that
@@ -78,8 +78,9 @@ fails closed.
 ## Evidence
 
 Each GitHub release contains the immutable image reference, source and image
-SPDX/CycloneDX SBOMs, source hashes, provenance, notices, and Ratio1 patch
-record. GitHub's source archive for the immutable tag is publicly available,
+SPDX/CycloneDX SBOMs, source hashes, provenance, notices, the exact Debian
+corresponding-source bundle, and the Ratio1 patch record. GitHub's source
+archive for the immutable tag is publicly available,
 and the release records the SHA-256 of the anonymously downloaded pre-release
 source archive. The image digest also carries GitHub provenance and SPDX attestations
 and a separate keyless Cosign signature bound to the exact release workflow on
@@ -90,8 +91,8 @@ Consumers verify a release with:
 
 ```bash
 scripts/verify-image.sh \
-  ghcr.io/ratio1/r1-distributed-sql@sha256:<digest> \
-  v23.1.28-r1.<major>.<patch>
+  ghcr.io/ratio1/r1-meshdb@sha256:<digest> \
+  v1.0.<patch>
 ```
 
 Do not move an existing version tag. Publish a new patch tag and document

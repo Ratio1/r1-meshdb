@@ -19,17 +19,17 @@ GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-1}"
 [[ "${GITHUB_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
 [[ "${GITHUB_RUN_ATTEMPT}" =~ ^[1-9][0-9]*$ ]]
 run_id="${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}"
-prefix="r1-sql-ci-${run_id}"
+prefix="r1-meshdb-ci-${run_id}"
 [[ "${#prefix}" -le 40 ]]
-tmp="$(mktemp -d /tmp/r1-sql-real-cloudflare.XXXXXXXX)"
+tmp="$(mktemp -d /tmp/r1-meshdb-real-cloudflare.XXXXXXXX)"
 allocation_dir="${tmp}/cloudflare"
 certs_dir="${tmp}/certs"
-nodes=("r1-sql-real-1-${run_id}" "r1-sql-real-2-${run_id}" "r1-sql-real-3-${run_id}")
-networks=("r1-sql-real-net-1-${run_id}" "r1-sql-real-net-2-${run_id}" "r1-sql-real-net-3-${run_id}")
-stores=("r1-sql-real-store-1-${run_id}" "r1-sql-real-store-2-${run_id}" "r1-sql-real-store-3-${run_id}")
+nodes=("r1-meshdb-real-1-${run_id}" "r1-meshdb-real-2-${run_id}" "r1-meshdb-real-3-${run_id}")
+networks=("r1-meshdb-real-net-1-${run_id}" "r1-meshdb-real-net-2-${run_id}" "r1-meshdb-real-net-3-${run_id}")
+stores=("r1-meshdb-real-store-1-${run_id}" "r1-meshdb-real-store-2-${run_id}" "r1-meshdb-real-store-3-${run_id}")
 db_password="r1_real_cloudflare_validation_password"
 cleanup_started=false
-evidence_dir="${R1_SQL_EVIDENCE_DIR:-}"
+evidence_dir="${R1_MESHDB_EVIDENCE_DIR:-${R1_SQL_EVIDENCE_DIR:-}}"
 
 record_evidence() {
   local status="$1"
@@ -92,7 +92,7 @@ preserve_cleanup_state() {
     chmod 700 "${evidence_dir}"
     destination="${evidence_dir}/cloudflare-cleanup-state.json"
   else
-    destination="$(mktemp /tmp/r1-sql-cloudflare-cleanup-state.XXXXXXXX.json)"
+    destination="$(mktemp /tmp/r1-meshdb-cloudflare-cleanup-state.XXXXXXXX.json)"
   fi
   cp "${state}" "${destination}"
   chmod 600 "${destination}"

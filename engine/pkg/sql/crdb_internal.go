@@ -1,4 +1,5 @@
 // Copyright 2017 The Cockroach Authors.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 //
 // Use of this software is governed by the Business Source License
 // included in the file licenses/BSL.txt.
@@ -228,7 +229,7 @@ CREATE TABLE crdb_internal.node_build_info (
 
 		info := build.GetInfo()
 		for k, v := range map[string]string{
-			"Name":         "CockroachDB",
+			"Name":         "R1 MeshDB",
 			"ClusterID":    execCfg.NodeInfo.LogicalClusterID().String(),
 			"Organization": execCfg.Organization(),
 			"Build":        info.Short(),
@@ -661,7 +662,7 @@ func crdbInternalTablesDatabaseLookupFunc(
 }
 
 var crdbInternalPgCatalogTableIsImplementedTable = virtualSchemaTable{
-	comment: `which entries of pg_catalog are implemented in this version of CockroachDB`,
+	comment: `which entries of pg_catalog are implemented in this version of R1 MeshDB`,
 	schema: `
 CREATE TABLE crdb_internal.pg_catalog_table_is_implemented (
   name                     STRING NOT NULL,

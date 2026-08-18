@@ -20,6 +20,26 @@ NATIVE_LICENSES = {
   "libedit": ("BSD-3-Clause", "engine/c-deps/libedit/COPYING"),
   "proj": ("MIT", "engine/c-deps/proj/COPYING"),
 }
+GEOS_TUT_PREFIX = "c-deps/geos/tests/unit/tut/"
+GEOS_ASTYLE_MIT_FILES = {
+  "c-deps/geos/tools/astyle/ASBeautifier.cpp",
+  "c-deps/geos/tools/astyle/ASEnhancer.cpp",
+  "c-deps/geos/tools/astyle/ASFormatter.cpp",
+  "c-deps/geos/tools/astyle/ASLocalizer.cpp",
+  "c-deps/geos/tools/astyle/ASLocalizer.h",
+  "c-deps/geos/tools/astyle/ASResource.cpp",
+  "c-deps/geos/tools/astyle/astyle.h",
+  "c-deps/geos/tools/astyle/astyle_main.cpp",
+  "c-deps/geos/tools/astyle/astyle_main.h",
+}
+GEOS_TINYXML2_ZLIB_FILES = {
+  "c-deps/geos/tests/xmltester/tinyxml2/tinyxml2.cpp",
+  "c-deps/geos/tests/xmltester/tinyxml2/tinyxml2.h",
+}
+PUBLIC_DOMAIN_FILES = {
+  "c-deps/jemalloc/msvc/test_threads/test_threads.cpp",
+  "c-deps/proj/src/PJ_isea.c",
+}
 VENDOR_NOTICE_LICENSES = {
   "vendor/github.com/mattn/go-localereader/": (
     "MIT",
@@ -108,6 +128,21 @@ def detect_license(text: str, path: Path) -> str:
 
 def classify_native(path: Path, text: str, component: str) -> tuple[str, str]:
   default = NATIVE_LICENSES[component]
+  engine_relative = path.relative_to(ENGINE).as_posix()
+  root_relative = path.relative_to(ROOT).as_posix()
+  if component == "geos" and engine_relative.startswith(GEOS_TUT_PREFIX):
+    return "BSD-2-Clause", "engine/c-deps/geos/tests/unit/tut/LICENSE"
+  if component == "geos" and engine_relative in GEOS_ASTYLE_MIT_FILES:
+    return "MIT", "engine/c-deps/geos/tools/astyle/LICENSE.md"
+  if component == "geos" and engine_relative in GEOS_TINYXML2_ZLIB_FILES:
+    return "Zlib", f"{root_relative} (embedded Zlib license grant)"
+  if engine_relative in PUBLIC_DOMAIN_FILES:
+    return (
+      f"LicenseRef-Public-Domain-Notice-{digest(path)[:12]}",
+      f"{root_relative} (explicit public-domain notice in source header)",
+    )
+  if engine_relative == "c-deps/geos/debian/copyright":
+    return "LGPL-2.0-or-later", f"{root_relative} (embedded license grant)"
   if path == ENGINE / "c-deps" / component / "COPYING":
     return default
   lowered = text.lower()
@@ -251,6 +286,11 @@ def inventory() -> dict:
       spdx, basis = classify_native(path, text, component)
     elif engine_relative.parts[0] == "licenses":
       spdx, basis = "LicenseRef-License-Text", "retained license or notice text"
+    elif engine_relative.as_posix() == "AUTHORS":
+      spdx, basis = (
+        "Apache-2.0",
+        "authorship metadata retained byte-for-byte from CockroachDB v23.1.28",
+      )
     elif engine_relative.as_posix() in {"go.mod", "go.sum"}:
       spdx, basis = "Apache-2.0", "upstream metadata for the transitioned OSS source closure"
     else:

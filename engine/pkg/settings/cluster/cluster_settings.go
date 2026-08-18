@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0, included in the file
 // licenses/APL.txt.
 
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 package cluster
 
 import (
@@ -70,7 +72,7 @@ type OverridesInformer interface {
 }
 
 // TelemetryOptOut controls whether to opt out of telemetry (including Sentry) or not.
-var TelemetryOptOut = envutil.EnvOrDefaultBool("COCKROACH_SKIP_ENABLING_DIAGNOSTIC_REPORTING", false)
+var TelemetryOptOut = envutil.EnvOrDefaultBool("COCKROACH_SKIP_ENABLING_DIAGNOSTIC_REPORTING", true)
 
 // NoSettings is used when a func requires a Settings but none is available
 // (for example, a CLI subcommand that does not connect to a cluster).

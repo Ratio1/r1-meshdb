@@ -8,22 +8,17 @@
 // by the Apache License, Version 2.0, included in the file
 // licenses/APL.txt.
 
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 package docs
-
-import (
-	"fmt"
-
-	"github.com/cockroachdb/cockroach/pkg/build"
-)
 
 // URLBase is the root URL for the version of the docs associated with this
 // binary.
-var URLBase = "https://www.cockroachlabs.com/docs/" + build.BinaryVersionPrefix()
+var URLBase = "https://www.cockroachlabs.com/docs/v23.1"
 
 // URLReleaseNotesBase is the root URL for the release notes for the .0 patch
 // release associated with this binary.
-var URLReleaseNotesBase = fmt.Sprintf("https://www.cockroachlabs.com/docs/releases/%s.0.html",
-	build.BinaryVersionPrefix())
+var URLReleaseNotesBase = "https://www.cockroachlabs.com/docs/releases/v23.1#"
 
 // URL generates the URL to pageName in the version of the docs associated
 // with this binary.

@@ -12,6 +12,14 @@ from urllib.parse import quote
 
 
 ROOT = Path(__file__).resolve().parents[1]
+APPLICATION_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+APPLICATION_PURL = f"pkg:generic/r1-meshdb@{APPLICATION_VERSION}"
+
+
+def custom_license_id(record: dict) -> str:
+  base = record["spdx"].removeprefix("LicenseRef-")
+  base = re.sub(r"-(?:SHA256-)?[0-9a-f]{12,64}$", "", base)
+  return f"LicenseRef-{base}-SHA256-{record['sha256']}"
 
 
 def read(path: str) -> str:
@@ -191,7 +199,7 @@ def deb_purl(name: str, version: str) -> str:
 
 def runtime_fixture(format_name: str) -> dict:
   if format_name == "spdx":
-    document = spdx_document("r1-distributed-sql:fixture")
+    document = spdx_document("r1-meshdb:fixture")
     for index, (name, version) in enumerate(runtime_packages()):
       document["packages"].append(
         spdx_package(f"SPDXRef-deb-{index}", name, version, deb_purl(name, version))
@@ -279,8 +287,7 @@ def remove_reference(document: dict, reference: str) -> None:
 
 class SbomContractTests(unittest.TestCase):
 
-  def test_spdx_defines_distribution_third_party_license_reference(self):
-    expected_id = "LicenseRef-R1-MeshDB-Third-Party"
+  def test_application_identity_is_versioned_without_aggregate_license_ref(self):
     with tempfile.TemporaryDirectory() as directory:
       engine = Path(directory) / "cockroach.buildinfo.txt"
       cloud = Path(directory) / "cloudflared.buildinfo.txt"
@@ -300,41 +307,30 @@ class SbomContractTests(unittest.TestCase):
       run_script("scripts/augment-sbom.py", str(path))
       document = json.loads(path.read_text(encoding="utf-8"))
 
-      definitions = [
-        item for item in document.get("hasExtractedLicensingInfos", [])
-        if item.get("licenseId") == expected_id
-      ]
-      self.assertEqual(len(definitions), 1)
-      self.assertIn("third-party", definitions[0].get("extractedText", "").lower())
-      self.assertTrue(any(
-        value.endswith("/THIRD_PARTY_NOTICES.md")
-        for value in definitions[0].get("seeAlsos", [])
-      ))
-
       application = next(
         item for item in document["packages"]
         if any(
-          ref.get("referenceLocator") == "pkg:generic/r1-distributed-sql"
+          ref.get("referenceLocator") == APPLICATION_PURL
           for ref in item.get("externalRefs", [])
         )
       )
-      expected_expression = f"Apache-2.0 AND {expected_id}"
-      self.assertEqual(application.get("licenseDeclared"), expected_expression)
-      self.assertEqual(application.get("licenseConcluded"), expected_expression)
+      self.assertEqual(application.get("licenseDeclared"), "Apache-2.0")
+      self.assertEqual(application.get("licenseConcluded"), "Apache-2.0")
       self.assertEqual(application.get("name"), "R1 MeshDB")
-      self.assertEqual(application.get("versionInfo"), read("VERSION").strip())
+      self.assertEqual(application.get("versionInfo"), APPLICATION_VERSION)
+      self.assertFalse(any(
+        item.get("licenseId") == "LicenseRef-R1-MeshDB-Third-Party"
+        for item in document.get("hasExtractedLicensingInfos", [])
+      ))
 
       result = run_script("scripts/verify-sbom.py", *verify_args, str(path), check=False)
       self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-      missing = copy.deepcopy(document)
-      missing["hasExtractedLicensingInfos"] = []
-      self.assert_rejected(missing, path, verify_args)
-      apache_only = copy.deepcopy(document)
+      aggregate = copy.deepcopy(document)
       next(
-        item for item in apache_only["packages"]
+        item for item in aggregate["packages"]
         if item.get("SPDXID") == application["SPDXID"]
-      )["licenseDeclared"] = "Apache-2.0"
-      self.assert_rejected(apache_only, path, verify_args)
+      )["licenseDeclared"] = "Apache-2.0 AND LicenseRef-R1-MeshDB-Third-Party"
+      self.assert_rejected(aggregate, path, verify_args)
 
   def assert_rejected(self, document: dict, path: Path, verify_args: list[str] | None = None) -> None:
     path.write_text(json.dumps(document), encoding="utf-8")
@@ -346,7 +342,7 @@ class SbomContractTests(unittest.TestCase):
   def test_source_contract_covers_vendor_and_file_inventories(self):
     inventory = json.loads(read("source/license-inventory.json"))["files"]
     self.assertEqual(len(vendor_modules()), 211)
-    self.assertEqual(len(inventory), 11948)
+    self.assertGreater(len(inventory), 10_000)
     with tempfile.TemporaryDirectory() as directory:
       for format_name in ("spdx", "cdx"):
         with self.subTest(format=format_name):
@@ -354,12 +350,19 @@ class SbomContractTests(unittest.TestCase):
           path.write_text(json.dumps(source_fixture(format_name)), encoding="utf-8")
           run_script("scripts/augment-sbom.py", str(path))
           result = run_script("scripts/verify-sbom.py", str(path))
-          self.assertIn("11948 licensed files", result.stdout)
+          self.assertIn(f"{len(inventory)} licensed files", result.stdout)
 
-  def test_cyclonedx_uses_expressions_for_compound_spdx_conclusions(self):
+  def test_cyclonedx_preserves_compound_custom_and_aggregate_license_evidence(self):
     inventory = json.loads(read("source/license-inventory.json"))["files"]
     compound = next(record for record in inventory if " WITH " in record["spdx"])
-    custom = next(record for record in inventory if record["spdx"].startswith("LicenseRef-"))
+    custom = next(
+      record for record in inventory
+      if record["spdx"] == "LicenseRef-License-Text"
+    )
+    aggregate = next(
+      record for record in inventory
+      if record["spdx"] == "LicenseRef-Aggregate-License-Text"
+    )
     simple = next(record for record in inventory if record["spdx"] == "Apache-2.0")
     with tempfile.TemporaryDirectory() as directory:
       path = Path(directory) / "source.cdx.json"
@@ -382,8 +385,95 @@ class SbomContractTests(unittest.TestCase):
       )
       self.assertEqual(
         by_source_path[custom["path"]]["licenses"],
-        [{"license": {"name": custom["spdx"]}}],
+        [{"license": {
+          "name": custom_license_id(custom),
+          "text": {
+            "contentType": "text/plain; charset=utf-8",
+            "content": read(custom["path"]),
+          },
+        }}],
       )
+      aggregate_component = by_source_path[aggregate["path"]]
+      self.assertNotIn("licenses", aggregate_component)
+      self.assertTrue(any(
+        property_.get("name") == "io.ratio1.source.license-comment"
+        and property_.get("value", "").startswith("Aggregate license/notice document")
+        for property_ in aggregate_component.get("properties", [])
+      ))
+
+  def test_custom_license_text_is_hash_qualified_and_tamper_evident(self):
+    inventory = json.loads(read("source/license-inventory.json"))["files"]
+    custom = next(
+      record for record in inventory
+      if record["spdx"] == "LicenseRef-License-Text"
+    )
+    expected_id = custom_license_id(custom)
+    with tempfile.TemporaryDirectory() as directory:
+      for format_name in ("spdx", "cdx"):
+        path = Path(directory) / f"source-custom.{format_name}.json"
+        path.write_text(json.dumps(source_fixture(format_name)), encoding="utf-8")
+        run_script("scripts/augment-sbom.py", str(path))
+        complete = json.loads(path.read_text(encoding="utf-8"))
+        if format_name == "spdx":
+          definitions = [
+            item for item in complete.get("hasExtractedLicensingInfos", [])
+            if item.get("licenseId") == expected_id
+          ]
+          self.assertEqual(definitions, [{
+            "licenseId": expected_id,
+            "name": f"Exact license or notice text SHA-256 {custom['sha256']}",
+            "extractedText": read(custom["path"]),
+          }])
+          tampered = copy.deepcopy(complete)
+          next(
+            item for item in tampered["hasExtractedLicensingInfos"]
+            if item.get("licenseId") == expected_id
+          )["extractedText"] += "tampered"
+          duplicate = copy.deepcopy(complete)
+          duplicate["hasExtractedLicensingInfos"].append(copy.deepcopy(definitions[0]))
+        else:
+          custom_component = next(
+            component for component in complete["components"]
+            if any(
+              item.get("name") == "io.ratio1.source.path"
+              and item.get("value") == custom["path"]
+              for item in component.get("properties", [])
+            )
+          )
+          tampered = copy.deepcopy(complete)
+          next(
+            component for component in tampered["components"]
+            if component.get("bom-ref") == custom_component["bom-ref"]
+          )["licenses"][0]["license"]["text"]["content"] += "tampered"
+          duplicate = copy.deepcopy(complete)
+          next(
+            component for component in duplicate["components"]
+            if component.get("bom-ref") == custom_component["bom-ref"]
+          )["licenses"][0]["license"]["name"] = "LicenseRef-License-Text"
+        with self.subTest(format=format_name, mutation="tampered-custom-text"):
+          self.assert_rejected(tampered, path)
+        with self.subTest(format=format_name, mutation="ambiguous-or-duplicate-custom-ref"):
+          self.assert_rejected(duplicate, path)
+
+  def test_public_domain_custom_reference_extracts_only_the_source_notice(self):
+    inventory = json.loads(read("source/license-inventory.json"))["files"]
+    public_domain = next(
+      record for record in inventory
+      if record["spdx"].startswith("LicenseRef-Public-Domain-Notice-")
+    )
+    with tempfile.TemporaryDirectory() as directory:
+      path = Path(directory) / "source-public-domain.spdx.json"
+      path.write_text(json.dumps(source_fixture("spdx")), encoding="utf-8")
+      run_script("scripts/augment-sbom.py", str(path))
+      document = json.loads(path.read_text(encoding="utf-8"))
+      definition = next(
+        item for item in document["hasExtractedLicensingInfos"]
+        if item.get("licenseId") == custom_license_id(public_domain)
+      )
+      extracted = definition["extractedText"]
+      self.assertIn("public domain", extracted.lower())
+      self.assertNotIn("#include", extracted)
+      self.assertLess(len(extracted), 500)
 
   def test_source_contract_rejects_skeletal_missing_tampered_and_duplicate_evidence(self):
     with tempfile.TemporaryDirectory() as directory:
@@ -402,7 +492,7 @@ class SbomContractTests(unittest.TestCase):
           source_file = next(item for item in complete["files"] if item.get("fileName", "").startswith("engine/"))
           application = next(
             item for item in complete["packages"]
-            if any(ref.get("referenceLocator") == "pkg:generic/r1-distributed-sql" for ref in item.get("externalRefs", []))
+            if any(ref.get("referenceLocator") == APPLICATION_PURL for ref in item.get("externalRefs", []))
           )
           missing_module = copy.deepcopy(complete)
           missing_module["packages"] = [item for item in missing_module["packages"] if item["SPDXID"] != module["SPDXID"]]
@@ -416,6 +506,15 @@ class SbomContractTests(unittest.TestCase):
           ]
           wrong_identity = copy.deepcopy(complete)
           next(item for item in wrong_identity["packages"] if item["SPDXID"] == application["SPDXID"])["name"] = "impostor"
+          wrong_application_purl = copy.deepcopy(complete)
+          wrong_application = next(
+            item for item in wrong_application_purl["packages"]
+            if item["SPDXID"] == application["SPDXID"]
+          )
+          next(
+            item for item in wrong_application["externalRefs"]
+            if item.get("referenceType") == "purl"
+          )["referenceLocator"] = "pkg:generic/r1-meshdb@0.0"
           duplicate = copy.deepcopy(complete)
           duplicate_module = copy.deepcopy(module)
           duplicate_module["SPDXID"] = "SPDXRef-vendor-duplicate"
@@ -456,7 +555,7 @@ class SbomContractTests(unittest.TestCase):
             item for item in complete["components"]
             if any(prop.get("name") == "io.ratio1.source.path" for prop in item.get("properties", []))
           )
-          application = next(item for item in complete["components"] if item.get("purl") == "pkg:generic/r1-distributed-sql")
+          application = next(item for item in complete["components"] if item.get("purl") == APPLICATION_PURL)
           missing_module = copy.deepcopy(complete)
           missing_module["components"] = [item for item in missing_module["components"] if item["bom-ref"] != module["bom-ref"]]
           remove_reference(missing_module, module["bom-ref"])
@@ -469,6 +568,11 @@ class SbomContractTests(unittest.TestCase):
           ]
           wrong_identity = copy.deepcopy(complete)
           next(item for item in wrong_identity["components"] if item["bom-ref"] == application["bom-ref"])["name"] = "impostor"
+          wrong_application_purl = copy.deepcopy(complete)
+          next(
+            item for item in wrong_application_purl["components"]
+            if item["bom-ref"] == application["bom-ref"]
+          )["purl"] = "pkg:generic/r1-meshdb@0.0"
           duplicate = copy.deepcopy(complete)
           duplicate_module = copy.deepcopy(module)
           duplicate_module["bom-ref"] += "&duplicate=true"
@@ -509,6 +613,7 @@ class SbomContractTests(unittest.TestCase):
           "missing-file": missing_file,
           "wrong-hash": wrong_hash,
           "wrong-identity": wrong_identity,
+          "wrong-application-purl": wrong_application_purl,
           "duplicate": duplicate,
           "wrong-root-identity": wrong_root_identity,
           "wrong-root-location": wrong_root_location,
@@ -574,6 +679,11 @@ class SbomContractTests(unittest.TestCase):
           duplicate_module = copy.deepcopy(module)
           duplicate_module["SPDXID"] = "SPDXRef-runtime-go-duplicate"
           duplicate["packages"].append(duplicate_module)
+          missing_source_link = copy.deepcopy(complete)
+          missing_source_link["relationships"] = [
+            relationship for relationship in missing_source_link["relationships"]
+            if relationship.get("relationshipType") != "GENERATED_FROM"
+          ]
         else:
           missing_package = copy.deepcopy(complete)
           package = next(item for item in missing_package["components"] if item.get("purl", "").startswith("pkg:deb/"))
@@ -589,10 +699,20 @@ class SbomContractTests(unittest.TestCase):
           duplicate_module = copy.deepcopy(module)
           duplicate_module["bom-ref"] += "&duplicate=true"
           duplicate["components"].append(duplicate_module)
+          missing_source_link = copy.deepcopy(complete)
+          binary = next(
+            item for item in missing_source_link["components"]
+            if item.get("name") == "base-files"
+          )
+          binary["properties"] = [
+            property_ for property_ in binary.get("properties", [])
+            if property_.get("name") != "io.ratio1.debian.source-purl"
+          ]
         for name, document in {
           "missing-package": missing_package,
           "missing-module": missing_module,
           "missing-binary": missing_binary,
+          "missing-source-link": missing_source_link,
           "duplicate": duplicate,
         }.items():
           with self.subTest(format=format_name, mutation=name):

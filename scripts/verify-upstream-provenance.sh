@@ -7,7 +7,7 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp="$(mktemp -d)"
 upstream_commit="76e598c9b1c100fd9280b979140b5e377c330a20"
-validator_image="r1-distributed-sql-generated-source-validator:$$-${RANDOM}"
+validator_image="r1-meshdb-generated-source-validator:$$-${RANDOM}"
 builder_go_version="go1.19.10"
 
 cleanup() {

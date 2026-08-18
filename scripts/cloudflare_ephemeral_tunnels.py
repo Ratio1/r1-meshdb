@@ -23,7 +23,7 @@ from urllib.parse import urlencode
 API_ROOT = "https://api.cloudflare.com/client/v4"
 STATE_FILE = "state.json"
 RESOURCE_ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
-RUN_PREFIX = re.compile(r"r1-sql-ci-[1-9][0-9]*-[1-9][0-9]*")
+RUN_PREFIX = re.compile(r"r1-meshdb-ci-[1-9][0-9]*-[1-9][0-9]*")
 
 
 class CloudflareError(RuntimeError):

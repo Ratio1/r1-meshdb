@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Immutable release version (v23.1.28-r1.X.Y)
+        description: Immutable R1 MeshDB release version (v1.0.X)
         required: true
         type: string
 
 concurrency:
-  group: r1-distributed-sql-release
+  group: r1-meshdb-release
   cancel-in-progress: false
 
 permissions:
@@ -39,7 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$GITHUB_REF" == "refs/heads/main" ]]
-          [[ "$RELEASE_TAG" =~ ^v23\.1\.28-r1\.[0-9]+\.[0-9]+$ ]]
+          [[ "$RELEASE_TAG" =~ ^v1\.0\.[0-9]+$ ]]
           git fetch --no-tags origin main
           [[ "$(git rev-parse origin/main)" == "$GITHUB_SHA" ]]
           python3 scripts/verify-source-boundary.py
@@ -68,7 +68,7 @@ jobs:
             echo 'Make the staged source repository public before publishing any image digest.' >&2
             exit 1
           }
-          archive="$RUNNER_TEMP/r1-distributed-sql-${GITHUB_SHA}.tar.gz"
+          archive="$RUNNER_TEMP/r1-meshdb-${GITHUB_SHA}.tar.gz"
           extracted="$RUNNER_TEMP/public-source"
           curl --fail --location --silent --show-error \
             "https://github.com/Ratio1/r1-distributed-sql/archive/${GITHUB_SHA}.tar.gz" \
@@ -153,7 +153,7 @@ jobs:
         with:
           context: .
           platforms: linux/amd64
-          outputs: type=image,name=ghcr.io/ratio1/r1-distributed-sql,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=ghcr.io/ratio1/r1-meshdb,push-by-digest=true,name-canonical=true,push=true
           build-args: |
             BUILD_DATE=${{ steps.metadata.outputs.build_date }}
             RATIO1_REVISION=${{ github.sha }}
@@ -171,7 +171,7 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$CANDIDATE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
-          image_ref="ghcr.io/ratio1/r1-distributed-sql@${CANDIDATE_DIGEST}"
+          image_ref="ghcr.io/ratio1/r1-meshdb@${CANDIDATE_DIGEST}"
           printf 'ref=%s\n' "$image_ref" >> "$GITHUB_OUTPUT"
           printf '%s\n' "$image_ref" > image-reference.txt
 
@@ -187,6 +187,13 @@ jobs:
           docker cp "$container_id:/cockroach/cockroach" ./cockroach
           docker cp "$container_id:/usr/local/bin/cloudflared" ./cloudflared
           docker cp "$container_id:/usr/share/r1-meshdb/VERSION" "$RUNNER_TEMP/image-version.txt"
+          mkdir -p artifacts/debian-corresponding-source
+          docker cp "$container_id:/usr/share/src/r1-meshdb/debian/." \
+            artifacts/debian-corresponding-source/
+          (cd artifacts/debian-corresponding-source && sha256sum -c SHA256SUMS)
+          tar --sort=name --mtime='@1727820937' --owner=0 --group=0 --numeric-owner \
+            -czf artifacts/r1-meshdb-debian-corresponding-source.tar.gz \
+            -C artifacts debian-corresponding-source
           cmp VERSION "$RUNNER_TEMP/image-version.txt"
           chmod 755 ./cockroach
           ./cockroach version | grep -F 'Distribution:     OSS'
@@ -218,7 +225,7 @@ jobs:
       - name: Prove persisted rolling upgrade and rollback compatibility
         env:
           IMAGE_REF: ${{ steps.image.outputs.ref }}
-          R1_SQL_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/rolling-upgrade
+          R1_MESHDB_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/rolling-upgrade
         run: |
           timeout --signal=TERM --kill-after=120s 35m \
             testbed/run-rolling-upgrade.sh "$IMAGE_REF"
@@ -237,7 +244,7 @@ jobs:
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CF_BASE_DOMAIN: ${{ secrets.CF_BASE_DOMAIN }}
-          R1_SQL_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/real-cloudflare
+          R1_MESHDB_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/real-cloudflare
         run: |
           timeout --signal=TERM --kill-after=10m 30m \
             testbed/run-real-cloudflare-cluster.sh "$IMAGE_REF"
@@ -272,7 +279,7 @@ jobs:
           syft-version: v1.51.0
           upload-artifact: false
           upload-release-assets: false
-          output-file: artifacts/r1-distributed-sql-image.spdx.json
+          output-file: artifacts/r1-meshdb-image.spdx.json
 
       - name: Generate image CycloneDX SBOM
         uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
@@ -282,7 +289,7 @@ jobs:
           syft-version: v1.51.0
           upload-artifact: false
           upload-release-assets: false
-          output-file: artifacts/r1-distributed-sql-image.cdx.json
+          output-file: artifacts/r1-meshdb-image.cdx.json
 
       - name: Generate source SPDX SBOM
         uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
@@ -292,7 +299,7 @@ jobs:
           syft-version: v1.51.0
           upload-artifact: false
           upload-release-assets: false
-          output-file: artifacts/r1-distributed-sql-source.spdx.json
+          output-file: artifacts/r1-meshdb-source.spdx.json
 
       - name: Generate source CycloneDX SBOM
         uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
@@ -302,14 +309,14 @@ jobs:
           syft-version: v1.51.0
           upload-artifact: false
           upload-release-assets: false
-          output-file: artifacts/r1-distributed-sql-source.cdx.json
+          output-file: artifacts/r1-meshdb-source.cdx.json
 
       - name: Verify SBOM component coverage
         env:
           JSONSCHEMA_VERSION: 4.25.1
         run: |
           set -euo pipefail
-          for sbom in artifacts/r1-distributed-sql-*.json; do
+          for sbom in artifacts/r1-meshdb-*.json; do
             python3 scripts/augment-sbom.py "$sbom"
           done
           docker run --rm \
@@ -317,31 +324,31 @@ jobs:
             --volume "$PWD:/workspace:ro" \
             --workdir /workspace \
             python:3.13.7-slim@sha256:5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689 \
-            sh -ec 'python -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: -r source/sbom-validation-requirements.txt >/dev/null && python -c '\''import importlib.metadata, os; assert importlib.metadata.version("jsonschema") == os.environ["JSONSCHEMA_VERSION"]'\'' && python scripts/validate-sbom-schema.py artifacts/r1-distributed-sql-*.json'
+            sh -ec 'python -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: -r source/sbom-validation-requirements.txt >/dev/null && python -c '\''import importlib.metadata, os; assert importlib.metadata.version("jsonschema") == os.environ["JSONSCHEMA_VERSION"]'\'' && python scripts/validate-sbom-schema.py artifacts/r1-meshdb-*.json'
           python3 scripts/verify-sbom.py --require-runtime \
             --go-buildinfo artifacts/cockroach.buildinfo.txt \
             --go-buildinfo artifacts/cloudflared.buildinfo.txt \
-            artifacts/r1-distributed-sql-image.spdx.json
+            artifacts/r1-meshdb-image.spdx.json
           python3 scripts/verify-sbom.py --require-runtime \
             --go-buildinfo artifacts/cockroach.buildinfo.txt \
             --go-buildinfo artifacts/cloudflared.buildinfo.txt \
-            artifacts/r1-distributed-sql-image.cdx.json
-          python3 scripts/verify-sbom.py artifacts/r1-distributed-sql-source.spdx.json
-          python3 scripts/verify-sbom.py artifacts/r1-distributed-sql-source.cdx.json
+            artifacts/r1-meshdb-image.cdx.json
+          python3 scripts/verify-sbom.py artifacts/r1-meshdb-source.spdx.json
+          python3 scripts/verify-sbom.py artifacts/r1-meshdb-source.cdx.json
 
       - name: Attest build provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
-          subject-name: ghcr.io/ratio1/r1-distributed-sql
+          subject-name: ghcr.io/ratio1/r1-meshdb
           subject-digest: ${{ steps.candidate.outputs.digest }}
           push-to-registry: true
 
       - name: Attest image SPDX SBOM
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
-          subject-name: ghcr.io/ratio1/r1-distributed-sql
+          subject-name: ghcr.io/ratio1/r1-meshdb
           subject-digest: ${{ steps.candidate.outputs.digest }}
-          sbom-path: artifacts/r1-distributed-sql-image.spdx.json
+          sbom-path: artifacts/r1-meshdb-image.spdx.json
           push-to-registry: true
 
       - name: Install Cosign
@@ -358,7 +365,7 @@ jobs:
           cosign sign --yes "$IMAGE_REF"
           cosign attest --yes \
             --type spdxjson \
-            --predicate artifacts/r1-distributed-sql-image.spdx.json \
+            --predicate artifacts/r1-meshdb-image.spdx.json \
             "$IMAGE_REF"
           cosign attest --yes \
             --type openvex \
@@ -403,7 +410,7 @@ jobs:
           docker image rm --force "$IMAGE_REF" >/dev/null 2>&1 || true
           if ! DOCKER_CONFIG="$anonymous_config" docker pull "$IMAGE_REF"; then
             echo 'Anonymous pull failed. A package administrator must set the' >&2
-            echo 'r1-distributed-sql GHCR package visibility to Public, then rerun this workflow.' >&2
+            echo 'r1-meshdb GHCR package visibility to Public, then rerun this workflow.' >&2
             exit 1
           fi
 
@@ -411,10 +418,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: r1-distributed-sql-${{ inputs.release_tag }}-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          name: r1-meshdb-${{ inputs.release_tag }}-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             artifacts/*.json
             artifacts/*.txt
+            artifacts/*.tar.gz
             artifacts/real-cloudflare/summary.txt
             artifacts/real-cloudflare/topology.json
             artifacts/real-cloudflare/node-*.log
@@ -432,6 +440,7 @@ jobs:
             source/manifest.sha256
             source/provenance.json
             source/runtime-packages.txt
+            source/runtime-package-sources.tsv
           if-no-files-found: warn
           retention-days: 90
 
@@ -439,7 +448,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: r1-distributed-sql-cloudflare-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
+          name: r1-meshdb-cloudflare-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/real-cloudflare/cloudflare-cleanup-state.json
           if-no-files-found: ignore
           retention-days: 7
@@ -489,7 +498,7 @@ jobs:
           fi
           printf 'release_state=%s\n' "$release_state" >> "$GITHUB_OUTPUT"
 
-          tagged_ref="ghcr.io/ratio1/r1-distributed-sql:${RELEASE_TAG}"
+          tagged_ref="ghcr.io/ratio1/r1-meshdb:${RELEASE_TAG}"
           image_tag_exists=false
           tag_state="$(scripts/inspect-ghcr-tag.sh "$tagged_ref")"
           if [[ "$tag_state" != "absent" ]]; then
@@ -513,11 +522,11 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           gh release create "$RELEASE_TAG" \
-            artifacts/*.json artifacts/*.txt image-reference.txt LICENSE LICENSE-OVERVIEW.md \
+            artifacts/*.json artifacts/*.txt artifacts/*.tar.gz image-reference.txt LICENSE LICENSE-OVERVIEW.md \
             NOTICE RATIO1_PATCHES.md \
             THIRD_PARTY_NOTICES.md UPSTREAM.md source/license-inventory.json \
             source/manifest.sha256 source/provenance.json SECURITY.md \
-            source/runtime-packages.txt security/openvex.json \
+            source/runtime-packages.txt source/runtime-package-sources.tsv security/openvex.json \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --draft \
@@ -534,6 +543,7 @@ jobs:
           release_assets=(
             artifacts/*.json
             artifacts/*.txt
+            artifacts/*.tar.gz
             image-reference.txt
             LICENSE
             LICENSE-OVERVIEW.md
@@ -546,6 +556,7 @@ jobs:
             source/provenance.json
             SECURITY.md
             source/runtime-packages.txt
+            source/runtime-package-sources.tsv
             security/openvex.json
           )
           gh release upload "$RELEASE_TAG" "${release_assets[@]}" \
@@ -585,7 +596,7 @@ jobs:
         run: |
           set -euo pipefail
           digest="${IMAGE_REF##*@}"
-          tagged_ref="ghcr.io/ratio1/r1-distributed-sql:${RELEASE_TAG}"
+          tagged_ref="ghcr.io/ratio1/r1-meshdb:${RELEASE_TAG}"
           tag_state="$(scripts/inspect-ghcr-tag.sh "$tagged_ref")"
           if [[ "$tag_state" == "absent" ]]; then
             docker buildx imagetools create --prefer-index=false --tag "$tagged_ref" "$IMAGE_REF"
@@ -608,7 +619,7 @@ jobs:
         run: |
           set -euo pipefail
           digest="${IMAGE_REF##*@}"
-          tagged_ref="ghcr.io/ratio1/r1-distributed-sql:latest"
+          tagged_ref="ghcr.io/ratio1/r1-meshdb:latest"
           docker buildx imagetools create --prefer-index=false --tag "$tagged_ref" "$IMAGE_REF"
           resolved="sha256:$(docker buildx imagetools inspect --raw "$tagged_ref" | sha256sum | awk '{print $1}')"
           [[ "$resolved" == "$digest" ]]

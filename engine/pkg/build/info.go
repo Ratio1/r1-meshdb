@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0, included in the file
 // licenses/APL.txt.
 
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 package build
 
 import (
@@ -110,7 +112,7 @@ func (b Info) Short() string {
 	if b.CgoTargetTriple != "" {
 		plat = b.CgoTargetTriple
 	}
-	return fmt.Sprintf("CockroachDB %s %s (%s, built %s, %s)",
+	return fmt.Sprintf("R1 MeshDB %s %s (%s, built %s, %s)",
 		b.Distribution, b.Tag, plat, b.Time, b.GoVersion)
 }
 
@@ -183,7 +185,10 @@ func TestingOverrideVersion(v string) func() {
 	return func() { binaryVersion = prevBinaryVersion }
 }
 
-// MakeIssueURL produces a URL to a CockroachDB issue.
+// MakeIssueURL produces a URL for reporting an R1 MeshDB compatibility issue.
 func MakeIssueURL(issue int) string {
-	return fmt.Sprintf("https://go.crdb.dev/issue-v/%d/%s", issue, BinaryVersionPrefix())
+	return fmt.Sprintf(
+		"https://github.com/Ratio1/r1-distributed-sql/issues/new?title=Upstream%%20compatibility%%20issue%%20%d",
+		issue,
+	)
 }
