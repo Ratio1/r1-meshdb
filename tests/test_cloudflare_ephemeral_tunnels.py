@@ -46,6 +46,7 @@ class FakeCloudflare:
     self.lose_dns_response_at = lose_dns_response_at
     self.tunnels = {}
     self.dns_records = {}
+    self.active_connectors = set()
 
   def __call__(self, req, timeout):
     body = json.loads(req.data) if req.data else None
@@ -94,10 +95,21 @@ class FakeCloudflare:
           if record["name"] == query.get("name", [None])[0]
           and record["content"] == query.get("content", [None])[0]
         ]
+    elif (
+      req.method == "DELETE"
+      and "/cfd_tunnel/" in parsed.path
+      and parsed.path.endswith("/connections")
+    ):
+      tunnel_id = parsed.path.split("/cfd_tunnel/", 1)[1].split("/", 1)[0]
+      self.active_connectors.discard(tunnel_id)
+      result = {"id": "connections-deleted"}
     elif req.method == "DELETE" and "/cfd_tunnel/" in req.full_url:
       if self.fail_tunnel_delete:
         raise error.HTTPError(req.full_url, 409, "connector active", {}, None)
-      self.tunnels.pop(parsed.path.rsplit("/", 1)[-1], None)
+      tunnel_id = parsed.path.rsplit("/", 1)[-1]
+      if tunnel_id in self.active_connectors:
+        raise error.HTTPError(req.full_url, 409, "connector active", {}, None)
+      self.tunnels.pop(tunnel_id, None)
       result = {"id": "deleted"}
     elif req.method == "DELETE" and "/dns_records/" in req.full_url:
       self.dns_records.pop(parsed.path.rsplit("/", 1)[-1], None)
@@ -141,7 +153,9 @@ class EphemeralTunnelTests(unittest.TestCase):
       deletes,
       [
         ("DELETE", "https://mock.invalid/zones/zone/dns_records/dns-1"),
+        ("DELETE", "https://mock.invalid/accounts/account/cfd_tunnel/tunnel-2/connections"),
         ("DELETE", "https://mock.invalid/accounts/account/cfd_tunnel/tunnel-2"),
+        ("DELETE", "https://mock.invalid/accounts/account/cfd_tunnel/tunnel-1/connections"),
         ("DELETE", "https://mock.invalid/accounts/account/cfd_tunnel/tunnel-1"),
       ],
     )
@@ -159,7 +173,30 @@ class EphemeralTunnelTests(unittest.TestCase):
       [
         "/zones/zone/dns_records/dns-2",
         "/zones/zone/dns_records/dns-1",
+        "/accounts/account/cfd_tunnel/tunnel-2/connections",
         "/accounts/account/cfd_tunnel/tunnel-2",
+        "/accounts/account/cfd_tunnel/tunnel-1/connections",
+        "/accounts/account/cfd_tunnel/tunnel-1",
+      ],
+    )
+
+  def test_cleanup_removes_active_connectors_before_deleting_tunnels(self):
+    fake = FakeCloudflare()
+    fake.tunnels = {
+      "tunnel-1": {"id": "tunnel-1", "name": "node-1"},
+    }
+    fake.active_connectors.add("tunnel-1")
+
+    self.assertEqual(cleanup_allocations(client(fake), [{"id": "tunnel-1"}], retries=1), [])
+    deletes = [
+      url.removeprefix("https://mock.invalid")
+      for method, url, _body, _timeout in fake.calls
+      if method == "DELETE"
+    ]
+    self.assertEqual(
+      deletes,
+      [
+        "/accounts/account/cfd_tunnel/tunnel-1/connections",
         "/accounts/account/cfd_tunnel/tunnel-1",
       ],
     )
@@ -174,7 +211,10 @@ class EphemeralTunnelTests(unittest.TestCase):
     delete_urls = [url for method, url, _body, _timeout in fake.calls if method == "DELETE"]
     self.assertEqual(
       delete_urls,
-      ["https://mock.invalid/accounts/account/cfd_tunnel/tunnel-1"],
+      [
+        "https://mock.invalid/accounts/account/cfd_tunnel/tunnel-1/connections",
+        "https://mock.invalid/accounts/account/cfd_tunnel/tunnel-1",
+      ],
     )
 
   def test_lost_dns_create_response_is_discovered_and_cleaned_by_content(self):
@@ -189,6 +229,7 @@ class EphemeralTunnelTests(unittest.TestCase):
       delete_urls,
       [
         "https://mock.invalid/zones/zone/dns_records/dns-1",
+        "https://mock.invalid/accounts/account/cfd_tunnel/tunnel-1/connections",
         "https://mock.invalid/accounts/account/cfd_tunnel/tunnel-1",
       ],
     )
@@ -197,7 +238,7 @@ class EphemeralTunnelTests(unittest.TestCase):
     fake = FakeCloudflare(fail_dns_at=2, fail_tunnel_delete=True)
     with tempfile.TemporaryDirectory() as tmp:
       output = Path(tmp) / "allocation"
-      with self.assertRaisesRegex(CloudflareError, "cleanup left 2"):
+      with self.assertRaisesRegex(CloudflareError, "cleanup left 2.*HTTP 409"):
         allocate(client(fake), output, 3, "r1-meshdb-ci", lambda: "fixed")
       state = load_state(output / "state.json")
       self.assertEqual([item["id"] for item in state["tunnels"]], ["tunnel-1", "tunnel-2"])
@@ -277,6 +318,7 @@ class EphemeralTunnelTests(unittest.TestCase):
       deletes,
       [
         "https://mock.invalid/zones/zone/dns_records/dns-exact",
+        "https://mock.invalid/accounts/account/cfd_tunnel/tunnel-exact/connections",
         "https://mock.invalid/accounts/account/cfd_tunnel/tunnel-exact",
       ],
     )
@@ -363,7 +405,7 @@ class EphemeralTunnelTests(unittest.TestCase):
     deleted_tunnels = [
       url.rsplit("/", 1)[-1]
       for method, url, _body, _timeout in fake.calls
-      if method == "DELETE" and "/cfd_tunnel/" in url
+      if method == "DELETE" and "/cfd_tunnel/" in url and not url.endswith("/connections")
     ]
     self.assertEqual(deleted_tunnels, ["actual-tunnel"])
     self.assertIn("unrelated-tunnel", fake.tunnels)

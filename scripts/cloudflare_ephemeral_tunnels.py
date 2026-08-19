@@ -169,6 +169,13 @@ class CloudflareClient:
   def delete_dns(self, record_id: str) -> None:
     self.call("DELETE", f"/zones/{self.zone_id}/dns_records/{record_id}", allow_missing=True)
 
+  def delete_tunnel_connections(self, tunnel_id: str) -> None:
+    self.call(
+      "DELETE",
+      f"/accounts/{self.account_id}/cfd_tunnel/{tunnel_id}/connections",
+      allow_missing=True,
+    )
+
   def delete_tunnel(self, tunnel_id: str) -> None:
     self.call("DELETE", f"/accounts/{self.account_id}/cfd_tunnel/{tunnel_id}", allow_missing=True)
 
@@ -239,6 +246,10 @@ def cleanup_allocations(client: CloudflareClient, allocations: list[dict], retri
         failures.append(str(exc))
     for discovered_id in tunnel_ids:
       try:
+        retry_call(
+          lambda tunnel=discovered_id: client.delete_tunnel_connections(tunnel),
+          retries,
+        )
         retry_call(lambda tunnel=discovered_id: client.delete_tunnel(tunnel), retries)
       except CloudflareError as exc:
         failures.append(str(exc))
@@ -293,7 +304,8 @@ def allocate(
       (output_dir / STATE_FILE).unlink(missing_ok=True)
     else:
       raise CloudflareError(
-        f"allocation failed and cleanup left {len(failures)} remote resource failure(s)"
+        f"allocation failed and cleanup left {len(failures)} remote resource failure(s): "
+        + "; ".join(failures)
       ) from exc
     raise
 
@@ -441,7 +453,9 @@ def cleanup_run_prefix(client: CloudflareClient, prefix: str, retries: int = 4) 
   allocations = discover_run_allocations(client, prefix)
   failures = cleanup_allocations(client, allocations, retries=retries)
   if failures:
-    raise CloudflareError(f"ephemeral run cleanup had {len(failures)} failure(s)")
+    raise CloudflareError(
+      f"ephemeral run cleanup had {len(failures)} failure(s): " + "; ".join(failures)
+    )
   if discover_run_allocations(client, prefix):
     raise CloudflareError("ephemeral run cleanup left matching tunnels")
   return len(allocations)
@@ -458,7 +472,9 @@ def cleanup_state_allocations(
     return cleanup_run_prefix(client, expected_run_prefix, retries=retries)
   failures = cleanup_allocations(client, state["tunnels"], retries=retries)
   if failures:
-    raise CloudflareError(f"ephemeral cleanup had {len(failures)} failure(s)")
+    raise CloudflareError(
+      f"ephemeral cleanup had {len(failures)} failure(s): " + "; ".join(failures)
+    )
   return len(state["tunnels"])
 
 
