@@ -1026,6 +1026,15 @@ func value() string {
         workflow,
       )
 
+  def test_release_attestation_verification_has_scoped_github_token(self):
+    release = read(".github/workflows/release.yml")
+    signing_step = release[
+      release.index("      - name: Sign and verify the exact digest"):
+      release.index("      - name: Prove public anonymous pull before tag promotion")
+    ]
+    self.assertIn("GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}", signing_step)
+    self.assertIn("gh attestation verify", signing_step)
+
   def test_ghcr_tag_inspection_fails_closed(self):
     fake_curl = r'''#!/usr/bin/env bash
 set -euo pipefail
