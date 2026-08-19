@@ -1009,6 +1009,23 @@ func value() string {
     ):
       self.assertIn(required, verifier)
 
+  def test_cosign_v3_uses_bundle_aware_installer(self):
+    installer = (
+      "sigstore/cosign-installer@"
+      "6f9f17788090df1f26f669e9d70d6ae9567deba6"
+    )
+    for workflow_path in (
+      ".github/workflows/release.yml",
+      ".github/workflows/security.yml",
+    ):
+      workflow = read(workflow_path)
+      self.assertIn(f"uses: {installer}", workflow)
+      self.assertIn("cosign-release: v3.1.3", workflow)
+      self.assertNotIn(
+        "sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac",
+        workflow,
+      )
+
   def test_ghcr_tag_inspection_fails_closed(self):
     fake_curl = r'''#!/usr/bin/env bash
 set -euo pipefail
