@@ -1221,6 +1221,11 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
       workflow.index('git checkout --detach "${tag_commit}"'),
       workflow.index("TRIVY_VEX: security/openvex.json"),
     )
+    self.assertLess(
+      workflow.index("python3 scripts/generate-source-manifest.py --check"),
+      workflow.index("gh release download"),
+      "generated release evidence must not exist during source-manifest verification",
+    )
 
   def test_runtime_supervision_overlay_is_scratch_compatible(self):
     dockerfile = read("tests/runtime-supervision/Dockerfile")
