@@ -504,6 +504,39 @@ func value() string {
     self.assertIn("--pattern image-reference.txt", published)
     self.assertIn('cmp image-reference.txt "$downloaded/image-reference.txt"', published)
 
+  def test_draft_release_tag_creation_is_explicit_and_resumable(self):
+    release = read(".github/workflows/release.yml")
+    source_preflight = release[
+      release.index("      - name: Validate immutable source release identity"):
+      release.index("      - name: Prepare pristine source snapshot")
+    ]
+    self.assertIn(
+      '[[ "$release_state" == "draft" && "$tag_exists" != "true" ]]',
+      source_preflight,
+    )
+    self.assertNotIn(
+      'if [[ "$release_state" != "missing" && "$tag_exists" != "true" ]]',
+      source_preflight,
+    )
+
+    preflight = release[
+      release.index("      - name: Preflight resumable immutable release identifiers"):
+      release.index("      - name: Verify published release immutability")
+    ]
+    self.assertIn("--json targetCommitish", preflight)
+    self.assertIn('[[ "$release_target" == "$GITHUB_SHA" ]]', preflight)
+    self.assertIn('repos/$GITHUB_REPOSITORY/git/refs', preflight)
+    self.assertIn('-f ref="refs/tags/$RELEASE_TAG"', preflight)
+    self.assertIn('-f sha="$GITHUB_SHA"', preflight)
+
+    create = release[
+      release.index("      - name: Prepare draft release and immutable source tag"):
+      release.index("      - name: Verify the created source tag")
+    ]
+    self.assertLess(create.index("gh release create"), create.index("git/refs"))
+    self.assertIn('-f ref="refs/tags/$RELEASE_TAG"', create)
+    self.assertIn('-f sha="$GITHUB_SHA"', create)
+
   def test_engine_identity_support_and_telemetry_defaults_are_meshdb_owned(self):
     self.assertIn('return fmt.Sprintf("R1 MeshDB %s %s', read("engine/pkg/build/info.go"))
     self.assertIn('"Name":         "R1 MeshDB"', read("engine/pkg/sql/crdb_internal.go"))
