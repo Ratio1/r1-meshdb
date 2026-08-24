@@ -1,10 +1,10 @@
 {
   "@context": "https://openvex.dev/ns/v0.2.0",
-  "@id": "https://github.com/Ratio1/r1-meshdb/security/vex/2",
+  "@id": "https://github.com/Ratio1/r1-meshdb/security/vex/3",
   "author": "Ratio1",
   "role": "Project Maintainer",
-  "timestamp": "2026-08-13T00:00:00Z",
-  "version": 2,
+  "timestamp": "2026-08-24T00:00:00Z",
+  "version": 3,
   "statements": [
     {
       "vulnerability": {
@@ -57,6 +57,23 @@
       "status": "not_affected",
       "justification": "vulnerable_code_not_present",
       "impact_statement": "The minimal runtime retains only the setsid executable from util-linux. The vulnerable DOS/EBR parser, libblkid, blkid, findmnt, mount, and related libraries and utilities are absent; mount checks read /proc/self/mountinfo directly."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://nvd.nist.gov/vuln/detail/CVE-2026-53613",
+        "aliases": [
+          "CVE-2026-53613",
+          "GHSA-8gj5-72r3-428g"
+        ]
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/util-linux@2.38.1-5%2Bdeb12u3?arch=amd64&distro=debian-12.15"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "The advisory affects target-path handling in the setuid mount executable for restricted user mounts. The scratch runtime retains only non-setuid setsid from util-linux; mount, umount, libmount, /etc/fstab, and the vulnerable restricted-mount path are absent."
     },
     {
       "vulnerability": {

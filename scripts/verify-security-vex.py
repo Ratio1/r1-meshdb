@@ -29,6 +29,7 @@ EXPECTED = {
   "CVE-2026-42154": (PROMETHEUS_PURL, "not_affected", "vulnerable_code_not_in_execute_path"),
   "CVE-2026-32286": (PGPROTO_PURL, "fixed", None),
   "CVE-2026-53615": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
+  "CVE-2026-53613": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
   "CVE-2025-69720": (LIBTINFO_PURL, "not_affected", "vulnerable_code_not_present"),
 }
 
@@ -99,7 +100,13 @@ def verify_minimal_runtime() -> None:
   if not required <= package_names or forbidden & package_names:
     fail("minimal runtime package inventory does not match the VEX evidence")
   assembler = (ROOT / "scripts/assemble-runtime-rootfs.sh").read_text(encoding="utf-8")
-  for forbidden_path in ("/usr/bin/blkid", "/usr/bin/findmnt", "/usr/bin/infocmp", "/usr/bin/mount", "/usr/bin/mv"):
+  if "/usr/bin/setsid" not in assembler:
+    fail("the reviewed util-linux setsid executable is absent from the runtime assembler")
+  for forbidden_path in (
+    "/bin/mount", "/bin/umount", "/usr/bin/blkid", "/usr/bin/findmnt",
+    "/usr/bin/infocmp", "/usr/bin/mount", "/usr/bin/mv", "/usr/bin/umount",
+    "/etc/fstab",
+  ):
     if forbidden_path in assembler:
       fail(f"forbidden executable entered the runtime assembler: {forbidden_path}")
   entrypoint = (ROOT / "entrypoint.sh").read_text(encoding="utf-8")
@@ -116,6 +123,10 @@ def main() -> None:
   document = json.loads(VEX.read_text(encoding="utf-8"))
   if document.get("@context") != "https://openvex.dev/ns/v0.2.0":
     fail("unexpected OpenVEX context")
+  if document.get("@id") != "https://github.com/Ratio1/r1-meshdb/security/vex/3":
+    fail("unexpected OpenVEX document identity")
+  if document.get("version") != 3 or document.get("timestamp") != "2026-08-24T00:00:00Z":
+    fail("unexpected OpenVEX document version or timestamp")
   statements = document.get("statements")
   if not isinstance(statements, list) or len(statements) != len(EXPECTED):
     fail(f"the reviewed VEX allowlist must contain exactly {len(EXPECTED)} statements")
