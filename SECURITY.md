@@ -79,6 +79,9 @@ component.
 - `CVE-2026-53615` is in util-linux's DOS/EBR parser. Only `setsid` is retained;
   `libblkid`, `blkid`, `findmnt`, and mount utilities are absent, and the
   entrypoint reads `/proc/self/mountinfo` directly.
+- `CVE-2026-53613` is in util-linux's setuid `mount` target-path handling for
+  restricted user mounts. The scratch runtime retains only non-setuid `setsid`;
+  `mount`, `umount`, `libmount`, and `/etc/fstab` are absent.
 - `CVE-2025-69720` is in the `infocmp` command's `analyze_string` function.
   `infocmp`, ncurses commands, and `libncurses` are absent; only `libtinfo` is
   retained for Bash and the database binary.

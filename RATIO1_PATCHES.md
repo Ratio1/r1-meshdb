@@ -4,6 +4,13 @@ This file records every deliberate difference between upstream CockroachDB
 v23.1.28 commit `76e598c9b1c100fd9280b979140b5e377c330a20` and this distribution.
 Every released file is covered by `source/manifest.sha256`.
 
+R1 MeshDB v1.0.1 adds a reviewed `not_affected` OpenVEX decision for
+`CVE-2026-53613`. The advisory targets util-linux's setuid `mount` path; the
+minimal scratch runtime retains only non-setuid `setsid` from that package and
+contains no `mount`, `umount`, `libmount`, or `/etc/fstab`. The release changes
+security metadata and versioned build identity without changing database,
+wire-protocol, consensus, or store-format behavior.
+
 ## Source Preparation
 
 ### OSS runtime closure
@@ -107,7 +114,7 @@ upstream commit as `Build Commit ID` and requires all of:
 
 ```text
 Distribution:     OSS
-Build Tag:        v1.0.0
+Build Tag:        v1.0.1
 Build Type:       release
 ```
 

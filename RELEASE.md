@@ -100,7 +100,7 @@ Consumers verify a release with:
 ```bash
 scripts/verify-image.sh \
   ghcr.io/ratio1/r1-meshdb@sha256:<digest> \
-  v1.0.0
+  v1.0.1
 ```
 
 Do not move an existing version tag. Publish a new patch tag and document

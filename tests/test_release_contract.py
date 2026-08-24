@@ -474,7 +474,7 @@ func value() string {
       f'baseline_repository != "{source_url}.git"',
       read("scripts/verify-provenance.py"),
     )
-    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/2")
+    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/3")
     self.assertEqual(
       json.loads(read("source/ratio1-engine-overrides.json"))["dependencySnapshot"]
       ["sourceBaseline"]["repository"],
@@ -1429,6 +1429,36 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
       stdout=subprocess.PIPE,
       text=True,
     )
+
+  def test_mount_target_toctou_vex_matches_minimal_runtime(self):
+    cve = "CVE-2026-53613"
+    vex = json.loads(read("security/openvex.json"))
+    statements = [
+      statement for statement in vex["statements"]
+      if statement["vulnerability"]["@id"].endswith(cve)
+    ]
+    self.assertEqual(len(statements), 1)
+    self.assertEqual(statements[0]["status"], "not_affected")
+    self.assertEqual(
+      statements[0]["justification"],
+      "vulnerable_code_not_present",
+    )
+
+    verifier = read("scripts/verify-security-vex.py")
+    security_policy = read("SECURITY.md")
+    self.assertIn(cve, verifier)
+    self.assertIn(cve, security_policy)
+
+    assembler = read("scripts/assemble-runtime-rootfs.sh")
+    self.assertIn("/usr/bin/setsid", assembler)
+    for forbidden_path in (
+      "/bin/mount",
+      "/bin/umount",
+      "/usr/bin/mount",
+      "/usr/bin/umount",
+      "/etc/fstab",
+    ):
+      self.assertNotIn(forbidden_path, assembler)
 
   def test_runtime_and_local_testbed_are_present(self):
     required = (
