@@ -474,7 +474,7 @@ func value() string {
       f'baseline_repository != "{source_url}.git"',
       read("scripts/verify-provenance.py"),
     )
-    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/3")
+    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/4")
     self.assertEqual(
       json.loads(read("source/ratio1-engine-overrides.json"))["dependencySnapshot"]
       ["sourceBaseline"]["repository"],
@@ -1499,6 +1499,57 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
       stdout=subprocess.PIPE,
       text=True,
     )
+
+  def test_x_crypto_ssh_vex_excludes_the_server_authentication_path(self):
+    cve = "CVE-2026-56854"
+    vex = json.loads(read("security/openvex.json"))
+    statements = [
+      statement for statement in vex["statements"]
+      if statement["vulnerability"]["@id"].endswith(cve)
+    ]
+    self.assertEqual(len(statements), 1)
+    self.assertEqual(statements[0]["status"], "not_affected")
+    self.assertEqual(
+      statements[0]["justification"],
+      "vulnerable_code_not_in_execute_path",
+    )
+    self.assertEqual(
+      statements[0]["products"],
+      [{"@id": "pkg:golang/golang.org/x/crypto@v0.53.0"}],
+    )
+    self.assertEqual(
+      set(statements[0]["vulnerability"]["aliases"]),
+      {cve, "GO-2026-6303"},
+    )
+
+    cloudflared_verifier = read("scripts/verify-cloudflared-source.py")
+    vex_verifier = read("scripts/verify-security-vex.py")
+    ssh_verifier = read("scripts/verify_cloudflared_ssh_usage.go")
+    ssh_tests = read("scripts/verify_cloudflared_ssh_usage_test.go")
+    security_policy = read("SECURITY.md")
+    for marker in (
+      cve,
+      "GO-2026-6303",
+      "NewServerConn",
+      "NewPublicKey",
+      "MarshalAuthorizedKey",
+    ):
+      self.assertIn(marker, cloudflared_verifier + vex_verifier + ssh_verifier + ssh_tests + security_policy)
+    self.assertIn("verify_ssh_server_authentication_absence", cloudflared_verifier)
+    self.assertIn("verify_ssh_server_authentication_absence", vex_verifier)
+    for marker in (
+      '"go", "list", "-mod=vendor", "-deps", "-json"',
+      "TestRejectsSSHServerAuthenticationAPIs",
+      "default import NewServerConn",
+      "explicit alias NewServerConn",
+      "dot import NewServerConn",
+      "blank import",
+      "ServerConfig callbacks",
+      "TestAllowsUnrelatedNewServerConnSelector",
+      "TestRejectsSSHImportFromCompiledDependency",
+    ):
+      self.assertIn(marker, ssh_verifier + ssh_tests)
+    self.assertFalse((ROOT / "engine/vendor/golang.org/x/crypto/ssh").exists())
 
   def test_mount_target_toctou_vex_matches_minimal_runtime(self):
     cve = "CVE-2026-53613"

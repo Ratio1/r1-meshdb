@@ -1,10 +1,10 @@
 {
   "@context": "https://openvex.dev/ns/v0.2.0",
-  "@id": "https://github.com/Ratio1/r1-meshdb/security/vex/3",
+  "@id": "https://github.com/Ratio1/r1-meshdb/security/vex/4",
   "author": "Ratio1",
   "role": "Project Maintainer",
-  "timestamp": "2026-08-24T00:00:00Z",
-  "version": 3,
+  "timestamp": "2026-09-01T00:00:00Z",
+  "version": 4,
   "statements": [
     {
       "vulnerability": {
@@ -90,6 +90,23 @@
       "status": "not_affected",
       "justification": "vulnerable_code_not_present",
       "impact_statement": "The vulnerability is confined to analyze_string in the infocmp command. The minimal runtime retains libtinfo for Bash and the database binary but contains no infocmp executable or ncurses command package."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://nvd.nist.gov/vuln/detail/CVE-2026-56854",
+        "aliases": [
+          "CVE-2026-56854",
+          "GO-2026-6303"
+        ]
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/golang.org/x/crypto@v0.53.0"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The advisory affects SSH server authentication reached through ssh.NewServerConn. The database engine excludes golang.org/x/crypto/ssh from its vendored runtime closure. Cloudflared compiles that package only for sshgen public-key parsing and authorized-key marshaling; an exact-source Go AST gate permits only ssh.NewPublicKey and ssh.MarshalAuthorizedKey and rejects server configuration or authentication use."
     }
   ]
 }
