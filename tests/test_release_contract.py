@@ -474,7 +474,7 @@ func value() string {
       f'baseline_repository != "{source_url}.git"',
       read("scripts/verify-provenance.py"),
     )
-    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/3")
+    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/4")
     self.assertEqual(
       json.loads(read("source/ratio1-engine-overrides.json"))["dependencySnapshot"]
       ["sourceBaseline"]["repository"],
@@ -1332,6 +1332,57 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
       r'TEST_CRDB_INIT_MODE=corruption_exit',
     )
 
+  def test_multinode_recovery_requires_stable_exact_range_replication(self):
+    recovery = read("scripts/store-recovery-multinode-smoke.sh")
+    readiness = recovery.split("wait_for_full_replication() {", 1)[1].split(
+      "wait_for_recovered_replication() {", 1
+    )[0]
+    root_sql = recovery.split("root_sql_on() {", 1)[1].split(
+      "root_sql_on_node1() {", 1
+    )[0]
+    scenario = recovery.split("start_node 3", 1)[1]
+    before_corruption = scenario.split('inject_corruption_and_kill "${nodes[0]}"', 1)[0]
+    corruption_position = recovery.index('inject_corruption_and_kill "${nodes[0]}"')
+    canary_position = recovery.index("retry_canary_sql 2")
+    app_position = recovery.index('retry_app_sql 2 -e "UPSERT INTO recovery_smoke')
+
+    self.assertIn("CRDB_TEST_REPLICATION_STABILITY_SECONDS:-30", readiness)
+    self.assertIn("crdb_internal.ranges_no_leases", readiness)
+    self.assertIn("array_length(voting_replicas, 1) < 3", readiness)
+    self.assertIn("array_length(learner_replicas, 1) > 0", readiness)
+    self.assertIn("stable_since", readiness)
+    self.assertNotIn("sleep 30", readiness)
+    self.assertNotIn('app_sql_on "${slot}"', readiness)
+    self.assertIn('--certs-dir=/runtime/certs', root_sql)
+    self.assertNotIn('--certs-dir=/cockroach/certs', root_sql)
+    self.assertNotIn('app_sql_on "2"', before_corruption)
+    self.assertNotIn('app_sql_on "3"', before_corruption)
+    self.assertNotIn("canary_sql_on", before_corruption)
+    self.assertNotIn("retry_canary_sql", before_corruption)
+    self.assertGreater(canary_position, corruption_position)
+    self.assertGreater(app_position, canary_position)
+    self.assertIn("store_recovery_canary", recovery)
+    self.assertIn("store_recovery_canary_secret", recovery)
+    self.assertIn("written-while-node1-down", recovery)
+    self.assertIn(
+      'timeout 15s docker logs --tail 200 "${name}" 2>&1 | sanitize_diagnostic',
+      recovery,
+    )
+    self.assertIn('timeout 15s docker exec "${name}" sh -c', recovery)
+    self.assertNotIn('docker logs "${name}" 2>&1 | sanitize_diagnostic', recovery)
+    self.assertIn("emit_survivor_diagnostics", recovery)
+    self.assertIn("timeout 15s docker exec", recovery)
+    self.assertIn("tail -n 40", recovery)
+    for secret in (
+      "store_recovery_multinode_secret",
+      "store_recovery_canary_secret",
+      "store-recovery-multinode-fake-token",
+    ):
+      self.assertRegex(
+        recovery,
+        rf"(?m)^\s*-e 's/{re.escape(secret)}/\[REDACTED_",
+      )
+
   def test_cloudflare_cleanup_preserves_non_secret_recovery_state(self):
     testbed = read("testbed/run-real-cloudflare-cluster.sh")
     self.assertIn("cloudflare-cleanup-state.json", testbed)
@@ -1392,7 +1443,6 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
     self.assertIn("workflow_dispatch:", cleanup)
     self.assertIn("run_id:", cleanup)
     self.assertIn("run_attempt:", cleanup)
-    self.assertIn("environment: release", cleanup)
     self.assertIn("actions: read", cleanup)
     self.assertIn("contents: read", cleanup)
     self.assertNotIn("packages: write", cleanup)
@@ -1402,13 +1452,33 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
     self.assertIn("cleanup-prefix", cleanup)
     self.assertIn("github.event.workflow_run.id", cleanup)
     self.assertIn("github.event.workflow_run.run_attempt", cleanup)
+
+    self.assertIn("\n  inspect:\n", cleanup)
+    self.assertIn("\n  cleanup:\n", cleanup)
+    inspect_job, cleanup_job = cleanup.split("\n  inspect:\n", 1)[1].split(
+      "\n  cleanup:\n", 1
+    )
+    self.assertNotIn("environment:", inspect_job)
+    self.assertNotIn("secrets.CF_", inspect_job)
+    self.assertIn("permissions:\n      actions: read\n      contents: read", inspect_job)
+    self.assertIn("outputs:", inspect_job)
+    self.assertIn("cleanup_needed:", inspect_job)
+    self.assertIn("needs: inspect", cleanup_job)
+    self.assertIn("needs.inspect.outputs.cleanup_needed == 'true'", cleanup_job)
+    self.assertIn("environment: release-cleanup", cleanup_job)
+    self.assertIn("permissions:\n      actions: read\n      contents: read", cleanup_job)
+    self.assertNotIn("environment: release\n", cleanup)
     for secret in ("CF_ACCOUNT_ID", "CF_ZONE_ID", "CF_API_TOKEN", "CF_BASE_DOMAIN"):
-      self.assertIn("${{ secrets." + secret + " }}", cleanup)
+      reference = "${{ secrets." + secret + " }}"
+      self.assertNotIn(reference, inspect_job)
+      self.assertIn(reference, cleanup_job)
     self.assertIn("Cloudflare cleanup recovery", runbook)
     self.assertRegex(runbook, r"Recover\s+ephemeral Cloudflare resources")
     self.assertIn("run ID", runbook)
     self.assertIn("run attempt", runbook)
     self.assertIn("seven days", runbook)
+    self.assertIn("release-cleanup", runbook)
+    self.assertRegex(runbook, r"without a second release\s+approval")
     self.assertNotIn("in the release evidence", runbook)
     self.assertNotIn("cloudflare_ephemeral_tunnels.py cleanup", runbook)
 
@@ -1429,6 +1499,57 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
       stdout=subprocess.PIPE,
       text=True,
     )
+
+  def test_x_crypto_ssh_vex_excludes_the_server_authentication_path(self):
+    cve = "CVE-2026-56854"
+    vex = json.loads(read("security/openvex.json"))
+    statements = [
+      statement for statement in vex["statements"]
+      if statement["vulnerability"]["@id"].endswith(cve)
+    ]
+    self.assertEqual(len(statements), 1)
+    self.assertEqual(statements[0]["status"], "not_affected")
+    self.assertEqual(
+      statements[0]["justification"],
+      "vulnerable_code_not_in_execute_path",
+    )
+    self.assertEqual(
+      statements[0]["products"],
+      [{"@id": "pkg:golang/golang.org/x/crypto@v0.53.0"}],
+    )
+    self.assertEqual(
+      set(statements[0]["vulnerability"]["aliases"]),
+      {cve, "GO-2026-6303"},
+    )
+
+    cloudflared_verifier = read("scripts/verify-cloudflared-source.py")
+    vex_verifier = read("scripts/verify-security-vex.py")
+    ssh_verifier = read("scripts/verify_cloudflared_ssh_usage.go")
+    ssh_tests = read("scripts/verify_cloudflared_ssh_usage_test.go")
+    security_policy = read("SECURITY.md")
+    for marker in (
+      cve,
+      "GO-2026-6303",
+      "NewServerConn",
+      "NewPublicKey",
+      "MarshalAuthorizedKey",
+    ):
+      self.assertIn(marker, cloudflared_verifier + vex_verifier + ssh_verifier + ssh_tests + security_policy)
+    self.assertIn("verify_ssh_server_authentication_absence", cloudflared_verifier)
+    self.assertIn("verify_ssh_server_authentication_absence", vex_verifier)
+    for marker in (
+      '"go", "list", "-mod=vendor", "-deps", "-json"',
+      "TestRejectsSSHServerAuthenticationAPIs",
+      "default import NewServerConn",
+      "explicit alias NewServerConn",
+      "dot import NewServerConn",
+      "blank import",
+      "ServerConfig callbacks",
+      "TestAllowsUnrelatedNewServerConnSelector",
+      "TestRejectsSSHImportFromCompiledDependency",
+    ):
+      self.assertIn(marker, ssh_verifier + ssh_tests)
+    self.assertFalse((ROOT / "engine/vendor/golang.org/x/crypto/ssh").exists())
 
   def test_mount_target_toctou_vex_matches_minimal_runtime(self):
     cve = "CVE-2026-53613"

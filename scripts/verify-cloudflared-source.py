@@ -28,6 +28,8 @@ EXTERNAL_LICENSES = {
     "f657f99d3fb9647db92628e96007aabb46e5f04f33e49999075aab8e250ca7ce",
   ),
 }
+SSH_USAGE_VERIFIER = ROOT / "scripts" / "verify_cloudflared_ssh_usage.go"
+SSH_USAGE_TESTS = ROOT / "scripts" / "verify_cloudflared_ssh_usage_test.go"
 
 
 def fail(message: str) -> None:
@@ -78,6 +80,14 @@ def compiled_packages(source_root: Path) -> str:
     source_root,
   )
   return "\n".join(sorted(set(output.splitlines()))) + "\n"
+
+
+def verify_ssh_server_authentication_absence(source_root: Path) -> None:
+  run(["go", "test", str(SSH_USAGE_VERIFIER), str(SSH_USAGE_TESTS)], source_root)
+  run(
+    ["go", "run", str(SSH_USAGE_VERIFIER), "--source-root", str(source_root)],
+    source_root,
+  )
 
 
 def module_paths(build_info: str) -> set[str]:
@@ -236,6 +246,7 @@ def main() -> None:
 
   build_info = normalized_build_info(binary, source_root)
   packages = compiled_packages(source_root)
+  verify_ssh_server_authentication_absence(source_root)
   if args.write:
     BUILD_INFO.write_text(build_info, encoding="utf-8")
     PACKAGES.write_text(packages, encoding="utf-8")

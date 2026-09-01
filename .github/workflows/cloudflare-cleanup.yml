@@ -24,16 +24,24 @@ permissions:
   contents: read
 
 jobs:
-  cleanup:
+  inspect:
     if: >-
       (github.event_name == 'workflow_run' &&
        contains(fromJSON('["failure","cancelled","timed_out"]'), github.event.workflow_run.conclusion)) ||
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
-    environment: release
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      run_id: ${{ steps.source.outputs.run_id }}
+      run_attempt: ${{ steps.source.outputs.run_attempt }}
+      prefix: ${{ steps.source.outputs.prefix }}
+      artifact_pattern: ${{ steps.source.outputs.artifact_pattern }}
+      cleanup_needed: ${{ steps.source.outputs.cleanup_needed }}
     steps:
-      - name: Check out trusted cleanup implementation
+      - name: Check out trusted inspection implementation
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: main
@@ -86,17 +94,52 @@ jobs:
             --run-attempt "$run_attempt" \
             --github-output "$GITHUB_OUTPUT"
 
+      - name: Record no-op recovery decision
+        if: steps.source.outputs.cleanup_needed != 'true'
+        run: |
+          printf '%s\n' \
+            'Inspection proved that the release attempt allocated no recoverable Cloudflare resources.' \
+            >> "$GITHUB_STEP_SUMMARY"
+
+  cleanup:
+    needs: inspect
+    if: needs.inspect.outputs.cleanup_needed == 'true'
+    environment: release-cleanup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Check out trusted cleanup implementation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Install pinned GitHub CLI
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/gh_2.97.0_linux_amd64.tar.gz"
+          curl --fail --location --silent --show-error \
+            https://github.com/cli/cli/releases/download/v2.97.0/gh_2.97.0_linux_amd64.tar.gz \
+            --output "$archive"
+          printf '%s  %s\n' \
+            a2c9b8497e1f85b1ad0dfcb78b5a622e098801b8e461e459e88e1ee12f018112 \
+            "$archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          printf '%s\n' "$RUNNER_TEMP/gh_2.97.0_linux_amd64/bin" >> "$GITHUB_PATH"
+
       - name: Recover the exact attempt's Cloudflare resources
-        if: steps.source.outputs.cleanup_needed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CF_BASE_DOMAIN: ${{ secrets.CF_BASE_DOMAIN }}
-          SOURCE_RUN_ID: ${{ steps.source.outputs.run_id }}
-          RUN_PREFIX: ${{ steps.source.outputs.prefix }}
-          ARTIFACT_NAME: ${{ steps.source.outputs.artifact_pattern }}
+          SOURCE_RUN_ID: ${{ needs.inspect.outputs.run_id }}
+          RUN_PREFIX: ${{ needs.inspect.outputs.prefix }}
+          ARTIFACT_NAME: ${{ needs.inspect.outputs.artifact_pattern }}
         run: |
           set -euo pipefail
           recovery_dir="$RUNNER_TEMP/cloudflare-recovery"

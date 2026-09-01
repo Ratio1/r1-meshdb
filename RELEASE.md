@@ -11,12 +11,20 @@ Before the first release, repository administrators must:
 1. Protect `main` and require the CI workflow before merge.
 2. Create the `release` environment with required reviewers and restrict it to
    the protected `main` branch.
-3. Prevent tag deletion or mutation for released tags.
-4. Permit the repository workflow to publish the connected GHCR package.
-5. Add `CF_ACCOUNT_ID`, `CF_ZONE_ID`, `CF_API_TOKEN`, and `CF_BASE_DOMAIN` as
+3. Create the `release-cleanup` environment without required reviewers and
+   restrict it to the protected `main` branch. This environment is only for
+   exact-attempt rollback and must contain no signing, package, or release
+   publication secrets.
+4. Prevent tag deletion or mutation for released tags.
+5. Permit the repository workflow to publish the connected GHCR package.
+6. Add `CF_ACCOUNT_ID`, `CF_ZONE_ID`, `CF_API_TOKEN`, and `CF_BASE_DOMAIN` as
    protected release-environment secrets. Use a dedicated token restricted to
    Cloudflare Tunnel edit plus DNS edit and zone read for one disposable zone.
-6. Make the source repository public before merging a `VERSION` change. It may stay
+   Add only those same four names to `release-cleanup`, preferably with a
+   separate token of the same minimum scope. If the release token must be reused
+   temporarily, record that operational exception and rotate it when separate
+   token-management access is available.
+7. Make the source repository public before merging a `VERSION` change. It may stay
    private while changes are staged and reviewed, but a public image is not
    published from source that anonymous recipients cannot retrieve. Keep the
    corresponding tagged source public for as long as that image is distributed.
@@ -54,8 +62,13 @@ or timed-out release. An operator can also dispatch it from `main` with the
 source run ID and, when needed, its run attempt. The recovery validates the
 source run and re-discovers only resources in that exact attempt namespace;
 identifiers from the artifact never select resources for deletion.
-Release-environment approval rules can delay cleanup, so operators must confirm
-that the recovery run completes.
+Its `inspect` job has no environment and no Cloudflare secrets, so a release that
+failed before allocation is classified immediately. Only a positive inspection
+starts the `cleanup` job in `release-cleanup`. That job rolls back resources
+already attributable to the approved release attempt without a second release
+approval; it does not authorize signing, publication, arbitrary prefixes, or
+resources from another run. Operators must still confirm that automatic or
+manually dispatched recovery completes and leaves the exact prefix empty.
 
 ## First Package Publication
 

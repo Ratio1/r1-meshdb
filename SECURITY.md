@@ -70,6 +70,17 @@ identifies the upstream module version, so the exact VEX decision is `fixed`;
 the patch and test hashes are enforced by
 `source/ratio1-engine-overrides.json`.
 
+`CVE-2026-56854` / `GO-2026-6303` affects SSH server authentication reached
+through `golang.org/x/crypto/ssh.NewServerConn` before x/crypto v0.55.0. The
+database engine's verified vendored runtime closure contains no x/crypto SSH
+package. The pinned Cloudflared binary does compile that package, but its
+first-party `sshgen` code uses only `NewPublicKey` and `MarshalAuthorizedKey`.
+The exact pinned source is checked with Go's compiled-package list and AST;
+the gate rejects `NewServerConn`, `ServerConfig`, authentication callbacks,
+dot imports, or any SSH import outside `sshgen`. A future upstream Cloudflared
+pin should move to x/crypto v0.55.0 or newer, at which point this VEX exception
+must be removed.
+
 The final image is assembled from a tracked minimal root filesystem rather
 than a complete Debian userspace. This removes Perl, gzip, zlib, block-device
 parsers, mount tools, package managers, login tools, and ncurses commands while

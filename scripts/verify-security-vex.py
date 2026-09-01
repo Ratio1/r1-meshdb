@@ -23,6 +23,7 @@ UTIL_LINUX_PURL = (
   "arch=amd64&distro=debian-12.15"
 )
 LIBTINFO_PURL = "pkg:deb/debian/libtinfo6@6.4-4?arch=amd64&distro=debian-12.15"
+X_CRYPTO_PURL = "pkg:golang/golang.org/x/crypto@v0.53.0"
 REMOTE_PREFIX = "engine/vendor/github.com/prometheus/prometheus/storage/remote/"
 
 EXPECTED = {
@@ -31,6 +32,10 @@ EXPECTED = {
   "CVE-2026-53615": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
   "CVE-2026-53613": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
   "CVE-2025-69720": (LIBTINFO_PURL, "not_affected", "vulnerable_code_not_present"),
+  "CVE-2026-56854": (X_CRYPTO_PURL, "not_affected", "vulnerable_code_not_in_execute_path"),
+}
+REQUIRED_ALIASES = {
+  "CVE-2026-56854": {"CVE-2026-56854", "GO-2026-6303"},
 }
 
 
@@ -53,6 +58,10 @@ def validate_statement(statement: dict) -> str:
     fail(f"VEX product differs for {cve}")
   if statement.get("status") != status or statement.get("justification") != justification:
     fail(f"VEX status or justification differs for {cve}")
+  if cve in REQUIRED_ALIASES:
+    aliases = statement.get("vulnerability", {}).get("aliases")
+    if not isinstance(aliases, list) or set(aliases) != REQUIRED_ALIASES[cve]:
+      fail(f"VEX aliases differ for {cve}")
   evidence_key = "status_notes" if status == "fixed" else "impact_statement"
   if not statement.get(evidence_key):
     fail(f"VEX decision has no evidence for {cve}")
@@ -119,13 +128,59 @@ def verify_minimal_runtime() -> None:
     fail("the constrained atomic replacement helper is not enforced")
 
 
+def verify_ssh_server_authentication_absence() -> None:
+  ssh_package = "golang.org/x/crypto/ssh"
+  engine_ssh_source = ROOT / "engine" / "vendor" / "golang.org" / "x" / "crypto" / "ssh"
+  if engine_ssh_source.exists():
+    fail("the engine unexpectedly distributes the x/crypto/ssh source package")
+
+  engine_go_mod = (ROOT / "engine" / "go.mod").read_text(encoding="utf-8")
+  if "\tgolang.org/x/crypto v0.53.0\n" not in engine_go_mod:
+    fail("the engine go.mod x/crypto version differs from the VEX product")
+  engine_modules = (ROOT / "engine" / "vendor" / "modules.txt").read_text(encoding="utf-8")
+  if "# golang.org/x/crypto v0.53.0\n" not in engine_modules:
+    fail("the engine x/crypto version differs from the VEX product")
+  if re.search(r"(?m)^golang\.org/x/crypto/ssh(?:/|$)", engine_modules):
+    fail("the engine vendor manifest unexpectedly includes x/crypto/ssh")
+
+  runtime_files = RUNTIME_FILES.read_text(encoding="utf-8").splitlines()
+  if any(path.startswith("vendor/golang.org/x/crypto/ssh/") for path in runtime_files):
+    fail("the engine runtime closure unexpectedly includes x/crypto/ssh")
+
+  cloudflared_build = (ROOT / "source" / "cloudflared-buildinfo.txt").read_text(encoding="utf-8")
+  if "\tdep\tgolang.org/x/crypto\tv0.53.0\t\n" not in cloudflared_build:
+    fail("the Cloudflared x/crypto version differs from the VEX product")
+  cloudflared_packages = set(
+    (ROOT / "source" / "cloudflared-compiled-packages.txt").read_text(encoding="utf-8").splitlines()
+  )
+  required_packages = {ssh_package, "github.com/cloudflare/cloudflared/sshgen"}
+  if not required_packages <= cloudflared_packages:
+    fail("Cloudflared SSH package evidence is incomplete")
+
+  cloudflared_verifier = (ROOT / "scripts" / "verify-cloudflared-source.py").read_text(encoding="utf-8")
+  ssh_verifier = ROOT / "scripts" / "verify_cloudflared_ssh_usage.go"
+  ssh_tests = ROOT / "scripts" / "verify_cloudflared_ssh_usage_test.go"
+  if not ssh_verifier.is_file() or not ssh_tests.is_file():
+    fail("Cloudflared SSH AST verifier or negative tests are missing")
+  for marker in (
+    "verify_ssh_server_authentication_absence",
+    "verify_cloudflared_ssh_usage.go",
+    "verify_cloudflared_ssh_usage_test.go",
+  ):
+    if marker not in cloudflared_verifier:
+      fail(f"Cloudflared source verifier does not enforce SSH evidence: {marker}")
+  dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+  if "python3 scripts/verify-cloudflared-source.py" not in dockerfile:
+    fail("the image build does not verify exact Cloudflared source")
+
+
 def main() -> None:
   document = json.loads(VEX.read_text(encoding="utf-8"))
   if document.get("@context") != "https://openvex.dev/ns/v0.2.0":
     fail("unexpected OpenVEX context")
-  if document.get("@id") != "https://github.com/Ratio1/r1-meshdb/security/vex/3":
+  if document.get("@id") != "https://github.com/Ratio1/r1-meshdb/security/vex/4":
     fail("unexpected OpenVEX document identity")
-  if document.get("version") != 3 or document.get("timestamp") != "2026-08-24T00:00:00Z":
+  if document.get("version") != 4 or document.get("timestamp") != "2026-09-01T00:00:00Z":
     fail("unexpected OpenVEX document version or timestamp")
   statements = document.get("statements")
   if not isinstance(statements, list) or len(statements) != len(EXPECTED):
@@ -137,6 +192,7 @@ def main() -> None:
   verify_prometheus()
   verify_pgproto_backport()
   verify_minimal_runtime()
+  verify_ssh_server_authentication_absence()
   security_policy = (ROOT / "SECURITY.md").read_text(encoding="utf-8")
   for cve in EXPECTED:
     if cve not in security_policy:
