@@ -20,6 +20,16 @@ stores=(
 )
 volumes=("${runtime_volume}" "${stores[@]}")
 
+sanitize_diagnostic() {
+  sed -E \
+    -e 's/store_recovery_multinode_secret/[REDACTED_DB_PASSWORD]/g' \
+    -e 's/store_recovery_canary_secret/[REDACTED_CANARY_PASSWORD]/g' \
+    -e 's/store-recovery-multinode-fake-token/[REDACTED_TUNNEL_TOKEN]/g' \
+    -e 's/(PGPASSWORD=)[^[:space:]]+/\1[REDACTED]/g' \
+    -e 's/-----BEGIN [^-]*PRIVATE KEY-----/[REDACTED_PRIVATE_KEY]/g' \
+    -e 's/-----END [^-]*PRIVATE KEY-----/[REDACTED_PRIVATE_KEY]/g'
+}
+
 cleanup() {
   local status=$?
   local cleanup_failed=0
@@ -27,10 +37,10 @@ cleanup() {
   trap - EXIT
   if [[ "${status}" != "0" ]]; then
     for name in "${nodes[@]}"; do
-      docker logs "${name}" >&2 || true
-      docker exec "${name}" sh -c \
+      timeout 15s docker logs --tail 200 "${name}" 2>&1 | sanitize_diagnostic >&2 || true
+      timeout 15s docker exec "${name}" sh -c \
         'find /cockroach/cockroach-data/logs -type f -name "*.log" -exec grep -hE "r4|quorum|unavailable|acquire lease|leaseholder|liveness" {} + 2>/dev/null | tail -n 120' \
-        >&2 || true
+        2>&1 | sanitize_diagnostic >&2 || true
     done
   fi
   docker ps -aq --filter "label=${test_label}" | xargs -r docker rm -f >/dev/null 2>&1 || true
@@ -127,9 +137,23 @@ app_sql_on() {
     --url "postgresql://app_user@roach${node_id}:26257/appdb?sslmode=require" "$@"
 }
 
+canary_sql_on() {
+  local node_id="$1"
+  shift
+  docker exec -e PGPASSWORD=store_recovery_canary_secret "${nodes[$((node_id - 1))]}" \
+    /cockroach/cockroach-real sql \
+    --url "postgresql://recovery_canary@roach${node_id}:26257/appdb?sslmode=require" "$@"
+}
+
+root_sql_on() {
+  local node_id="$1"
+  shift
+  docker exec "${nodes[$((node_id - 1))]}" /cockroach/cockroach-real sql \
+    --certs-dir=/runtime/certs --host="roach${node_id}:26257" "$@"
+}
+
 root_sql_on_node1() {
-  docker exec "${nodes[0]}" /cockroach/cockroach-real sql \
-    --certs-dir=/cockroach/certs --host=roach1:26257 "$@"
+  root_sql_on 1 "$@"
 }
 
 wait_for_sql() {
@@ -147,24 +171,37 @@ wait_for_sql() {
 }
 
 wait_for_full_replication() {
-  local deadline=$(( $(date +%s) + 180 ))
-  local under_replicated="" critical_ranges="" applied_snapshots="" slot store_id
+  local deadline=$(( $(date +%s) + 300 ))
+  local stability_seconds="${CRDB_TEST_REPLICATION_STABILITY_SECONDS:-30}"
+  local stable_since="" now="" incomplete_ranges="" critical_ranges=""
+  local applied_snapshots="" metadata_ready="" metadata_sample="" slot store_id
   local -A store_ids=()
+  if [[ ! "${stability_seconds}" =~ ^[1-9][0-9]*$ || "${stability_seconds}" -gt 60 ]]; then
+    echo "CRDB_TEST_REPLICATION_STABILITY_SECONDS must be an integer from 1 through 60" >&2
+    return 1
+  fi
   while [[ "$(date +%s)" -lt "${deadline}" ]]; do
-    under_replicated="$(root_sql_on_node1 --format=csv \
-      -e "select coalesce(sum((metrics->>'ranges.underreplicated')::int), 0) from crdb_internal.kv_store_status;" \
+    incomplete_ranges="$(root_sql_on_node1 --format=csv \
+      -e 'select count(*) from crdb_internal.ranges_no_leases where array_length(voting_replicas, 1) < 3 or array_length(learner_replicas, 1) > 0;' \
       2>/dev/null | tail -n 1 | tr -d '\r' || true)"
     critical_ranges="$(root_sql_on_node1 --format=csv \
       -e 'select count(*) from crdb_internal.ranges where range_id in (1, 4) and array_length(replicas, 1) = 3;' \
       2>/dev/null | tail -n 1 | tr -d '\r' || true)"
     applied_snapshots=0
+    metadata_ready=0
     for slot in 2 3; do
       if [[ -z "${store_ids[${slot}]:-}" ]]; then
-        store_id="$(app_sql_on "${slot}" --format=csv \
+        store_id="$(root_sql_on "${slot}" --format=csv \
           -e 'select crdb_internal.node_id();' 2>/dev/null | tail -n 1 | tr -d '\r' || true)"
         if [[ "${store_id}" =~ ^[1-9][0-9]*$ ]]; then
           store_ids["${slot}"]="${store_id}"
         fi
+      fi
+      metadata_sample="$(root_sql_on "${slot}" --format=csv \
+        -e "select (select count(*) from system.users where username = 'app_user'), (select count(*) from system.role_members where member = 'app_user'), (select count(*) from system.role_options where username = 'app_user'), (select count(*) from appdb.public.recovery_smoke);" \
+        2>/dev/null | tail -n 1 | tr -d '\r' || true)"
+      if [[ "${metadata_sample}" =~ ^1,[0-9]+,[0-9]+,1000$ ]]; then
+        metadata_ready=$((metadata_ready + 1))
       fi
       for range_id in 1 4; do
         store_id="${store_ids[${slot}]:-}"
@@ -174,13 +211,39 @@ wait_for_full_replication() {
         fi
       done
     done
-    if [[ "${under_replicated}" == "0" && "${critical_ranges}" == "2" && "${applied_snapshots}" == "4" ]]; then
-      return 0
+    now="$(date +%s)"
+    if [[ "${incomplete_ranges}" == "0" && "${critical_ranges}" == "2" && \
+          "${applied_snapshots}" == "4" && "${metadata_ready}" == "2" ]]; then
+      if [[ -z "${stable_since}" ]]; then
+        stable_since="${now}"
+        echo "exact three-voter replication and survivor metadata reads are stable; observing for ${stability_seconds} seconds" >&2
+      elif [[ $((now - stable_since)) -ge "${stability_seconds}" ]]; then
+        return 0
+      fi
+    else
+      if [[ -n "${stable_since}" ]]; then
+        echo "replication readiness changed during the stability window; restarting observation" >&2
+      fi
+      stable_since=""
     fi
     sleep 1
   done
-  echo "cluster replication did not converge: under-replicated=${under_replicated:-unknown}, critical=${critical_ranges:-unknown}/2, applied-snapshots=${applied_snapshots:-unknown}/4" >&2
+  echo "cluster replication did not remain stable: incomplete=${incomplete_ranges:-unknown}, critical=${critical_ranges:-unknown}/2, applied-snapshots=${applied_snapshots:-unknown}/4, survivor-metadata=${metadata_ready:-unknown}/2" >&2
   return 1
+}
+
+emit_survivor_diagnostics() {
+  local node_id="$1"
+  local name="${nodes[$((node_id - 1))]}"
+  local diagnostic=""
+  docker inspect "${name}" \
+    --format 'container={{.Name}} status={{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}}' \
+    2>&1 | sanitize_diagnostic >&2 || true
+  diagnostic="$(timeout 15s docker exec "${name}" /cockroach/cockroach-real sql \
+    --certs-dir=/runtime/certs --host="roach${node_id}:26257" --format=csv \
+    -e 'select count(*) as gossip_nodes from crdb_internal.gossip_nodes; select count(*) as incomplete_ranges from crdb_internal.ranges_no_leases where array_length(voting_replicas, 1) < 3 or array_length(learner_replicas, 1) > 0; select range_id, lease_holder, replicas from crdb_internal.ranges where range_id in (1, 4) order by range_id;' \
+    2>&1 || true)"
+  printf '%s\n' "${diagnostic}" | sanitize_diagnostic | tail -n 40 >&2
 }
 
 wait_for_recovered_replication() {
@@ -214,16 +277,40 @@ wait_for_recovered_replication() {
 retry_app_sql() {
   local node_id="$1"
   shift
-  local started_at
+  local started_at output=""
   started_at="$(date +%s)"
   local deadline=$((started_at + ${CRDB_TEST_OUTAGE_TIMEOUT_SECONDS:-180}))
   while [[ "$(date +%s)" -lt "${deadline}" ]]; do
-    if app_sql_on "${node_id}" "$@"; then
+    if output="$(app_sql_on "${node_id}" "$@" 2>&1)"; then
+      printf '%s\n' "${output}"
       echo "node ${node_id} accepted the post-failure SQL operation after $(( $(date +%s) - started_at )) seconds" >&2
       return 0
     fi
     sleep 1
   done
+  printf '%s\n' "${output}" | sanitize_diagnostic >&2
+  echo "node ${node_id} did not accept the post-failure app-user SQL operation" >&2
+  emit_survivor_diagnostics "${node_id}"
+  return 1
+}
+
+retry_canary_sql() {
+  local node_id="$1"
+  shift
+  local started_at output=""
+  started_at="$(date +%s)"
+  local deadline=$((started_at + ${CRDB_TEST_OUTAGE_TIMEOUT_SECONDS:-180}))
+  while [[ "$(date +%s)" -lt "${deadline}" ]]; do
+    if output="$(canary_sql_on "${node_id}" "$@" 2>&1)"; then
+      printf '%s\n' "${output}"
+      echo "node ${node_id} accepted the cold canary authentication after $(( $(date +%s) - started_at )) seconds" >&2
+      return 0
+    fi
+    sleep 1
+  done
+  printf '%s\n' "${output}" | sanitize_diagnostic >&2
+  echo "node ${node_id} did not accept the post-failure cold canary authentication" >&2
+  emit_survivor_diagnostics "${node_id}"
   return 1
 }
 
@@ -267,6 +354,8 @@ root_sql_on_node1 -e "SET CLUSTER SETTING server.time_until_store_dead = '1m';" 
 root_sql_on_node1 -e "CREATE TABLE IF NOT EXISTS appdb.public.recovery_smoke (id INT PRIMARY KEY, payload STRING);" >/dev/null
 root_sql_on_node1 -e "UPSERT INTO appdb.public.recovery_smoke SELECT i, repeat('before-', 16) FROM generate_series(1, 1000) AS g(i);" >/dev/null
 root_sql_on_node1 -e "GRANT ALL ON TABLE appdb.public.recovery_smoke TO app_user;" >/dev/null
+root_sql_on_node1 -e "CREATE USER IF NOT EXISTS recovery_canary WITH PASSWORD 'store_recovery_canary_secret';" >/dev/null
+root_sql_on_node1 -e "GRANT CONNECT ON DATABASE appdb TO recovery_canary; GRANT USAGE ON SCHEMA appdb.public TO recovery_canary; GRANT SELECT ON TABLE appdb.public.recovery_smoke TO recovery_canary;" >/dev/null
 wait_for_full_replication
 
 gossip_count="$(root_sql_on_node1 --format=csv -e 'select count(*) from crdb_internal.gossip_nodes;' | tail -n 1 | tr -d '\r')"
@@ -290,6 +379,11 @@ if ! inspect_node1_store 'test -f /store/.deeploy-recovery-v1/state && test ! -L
   exit 1
 fi
 
+canary_count="$(retry_canary_sql 2 --format=csv -e 'select count(*) from recovery_smoke where id = 1;' | tail -n 1 | tr -d '\r')"
+if [[ "${canary_count}" != "1" ]]; then
+  echo "cold survivor authentication did not read replicated data after node 1 failed" >&2
+  exit 1
+fi
 retry_app_sql 2 -e "UPSERT INTO recovery_smoke VALUES (1001, 'written-while-node1-down');" >/dev/null
 outage_value="$(retry_app_sql 3 --format=csv -e 'select payload from recovery_smoke where id = 1001;' | tail -n 1 | tr -d '\r')"
 if [[ "${outage_value}" != "written-while-node1-down" ]]; then
@@ -341,6 +435,7 @@ fi
 for name in "${nodes[@]}"; do
   logs="$(docker logs "${name}" 2>&1 || true)"
   if grep -Fq 'store_recovery_multinode_secret' <<< "${logs}" || \
+     grep -Fq 'store_recovery_canary_secret' <<< "${logs}" || \
      grep -Fq 'store-recovery-multinode-fake-token' <<< "${logs}"; then
     echo "secret leaked into ${name} logs" >&2
     exit 1
