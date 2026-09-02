@@ -341,6 +341,67 @@
           "sha256": "21266f38da239e8cad359b9e21f0305332cf06d2b253f203b92275e07c6b54ba"
         }
       ]
+    },
+    {
+      "module": "google.golang.org/grpc@v1.82.1",
+      "advisory": "CVE-2026-84304",
+      "source": "https://github.com/grpc/grpc-go/commit/8cfeca0e1ee5ea0980dcc320e20240fa1079ec77",
+      "preimageCommit": "c0a7be65040b6aceaeb42cadd223a20db1630c5d",
+      "files": [
+        {
+          "path": "engine/vendor/google.golang.org/grpc/internal/envconfig/envconfig.go",
+          "changeType": "modified-upstream",
+          "preimageSha256": "6878cf4ac6f7c980be3a5728fd8d49ed0c9d361d61219585e67f9f4ab8d07eeb",
+          "sha256": "e6d70a399a5731c7e589f4e695362abbe466fd7cde7ac24e12f6ed02f63f3fef"
+        },
+        {
+          "path": "engine/vendor/google.golang.org/grpc/internal/mem/buffer_pool.go",
+          "changeType": "modified-upstream",
+          "preimageSha256": "2a30acb99325c3aa624a32a0e3205b9f5e4a3a8874b0aeccbcc7fcec60da34fd",
+          "sha256": "a12190d506587f35df838456d2b9b383605e2f9d68dd5fd3431198964b0bc37e"
+        },
+        {
+          "path": "engine/vendor/google.golang.org/grpc/internal/transport/handler_server.go",
+          "changeType": "modified-upstream",
+          "preimageSha256": "33b03ba6ff18b4114a8042be82d6a02d2a1ce64be59a76e0497e9030667ffcf5",
+          "sha256": "1a8d2bd83479720ad778e8aae9c4a67606a3c0ef94866d97b74dff1766fd29b0"
+        },
+        {
+          "path": "engine/vendor/google.golang.org/grpc/internal/transport/http2_client.go",
+          "changeType": "modified-upstream",
+          "preimageSha256": "71830eb7918bccbc3b2718689cc7971f74b5a177981f182bf4fdfe1dcafe860f",
+          "sha256": "780f41c5de446215de3b3f12c511bfdd5c44e8ff6a9ccca22ae6000fa0465e12"
+        },
+        {
+          "path": "engine/vendor/google.golang.org/grpc/internal/transport/http2_server.go",
+          "changeType": "modified-upstream",
+          "preimageSha256": "b74a585d5c247df8d30894271c92fccb431bcbf165780c46b6aabd17cdffd6b3",
+          "sha256": "abe9bc2f39ce79580ab155b3125f4cef60cc1be04f4c3a37854bc0c6cf4c5d73"
+        },
+        {
+          "path": "engine/vendor/google.golang.org/grpc/internal/transport/transport.go",
+          "changeType": "modified-upstream",
+          "preimageSha256": "99d5017abb839720cce3c96b3af753d0183f1dcb6dff16fd1be9d14de0e4dcf2",
+          "sha256": "2f705c6c539dfe94effa83350af6705974d30c8386c3893200bd9da50a811bef"
+        },
+        {
+          "path": "engine/vendor/google.golang.org/grpc/mem/buffer_pool.go",
+          "changeType": "modified-upstream",
+          "preimageSha256": "64c9863332bad069a10ad838b2ffa40d05c3f0efb22075891df154d83bc529b1",
+          "sha256": "fa497ba4663f687847a39f1eeae4c8048231154a37c11c1502639db4cc2c92bf"
+        },
+        {
+          "path": "engine/vendor/google.golang.org/grpc/mem/buffers.go",
+          "changeType": "modified-upstream",
+          "preimageSha256": "1655293f6339682b3f8889cfbd725229315c9d0088d0a9d5d042a6fa99008d0c",
+          "sha256": "52a29467514485fe9ad47168d45891ae89448d1b5eeaaf0fbdff36468f3bfe77"
+        },
+        {
+          "path": "engine/vendor/google.golang.org/grpc/internal/transport/recv_buffer_compaction_r1_test.go",
+          "changeType": "ratio1-added",
+          "sha256": "038d26c58fbd6eb287f95ee6be9b46d41e46612e74cc390a0385bde99a38baa4"
+        }
+      ]
     }
   ]
 }

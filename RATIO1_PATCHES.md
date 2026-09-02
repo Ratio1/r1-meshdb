@@ -157,6 +157,23 @@ non-cancellable contexts.
   recognizes PostgreSQL dollar-quoted strings and clamps overflowing
   placeholders. `sanitize_r1_test.go` covers both cases; the backport follows
   upstream fix commit `60644f84918a8af66d14a4b0d865d4edafd955da`.
+- `CVE-2026-84304`: the official gRPC-Go receive-buffer compaction fix from
+  commit `8cfeca0e1ee5ea0980dcc320e20240fa1079ec77` is backported to the engine's
+  vendored v1.82.1 source and Cloudflared's vendored v1.83.0 source. The engine
+  changes are hash-pinned at:
+  - `engine/vendor/google.golang.org/grpc/internal/envconfig/envconfig.go`
+  - `engine/vendor/google.golang.org/grpc/internal/mem/buffer_pool.go`
+  - `engine/vendor/google.golang.org/grpc/internal/transport/handler_server.go`
+  - `engine/vendor/google.golang.org/grpc/internal/transport/http2_client.go`
+  - `engine/vendor/google.golang.org/grpc/internal/transport/http2_server.go`
+  - `engine/vendor/google.golang.org/grpc/internal/transport/transport.go`
+  - `engine/vendor/google.golang.org/grpc/mem/buffer_pool.go`
+  - `engine/vendor/google.golang.org/grpc/mem/buffers.go`
+  - `engine/vendor/google.golang.org/grpc/internal/transport/recv_buffer_compaction_r1_test.go`
+  Cloudflared applies the exact v1.83.0 patch in
+  `security/backports/grpc-go-cve-2026-84304-v1.83.0.patch` before its tests and
+  reproducible build. The regression bounds fragmented receive backlogs to a
+  pooled compacted buffer instead of retaining one heap object per DATA frame.
 
 ## Ratio1 Runtime Layer
 
@@ -210,8 +227,9 @@ operation is no longer supported.
 - Uses digest-pinned neutral Go and Debian images.
 - Builds Cloudflared from exact source commit
   `b4f47e2ab538ab6e31d3dc6adc5489455ad446de` and a checksum-pinned source
-  archive, then enforces the reviewed reproducible binary hash. Its focused
-  command, carrier, and tunnel RPC tests run during the image build.
+  archive, applies the hash-pinned `CVE-2026-84304` gRPC backport, then enforces
+  the reviewed reproducible binary hash. Its focused command, carrier, and
+  tunnel RPC tests run during the image build.
 - Resolves Debian packages from a dated snapshot and pins direct package
   versions.
 - Accompanies retained Debian object code with exact binary-to-source mappings,

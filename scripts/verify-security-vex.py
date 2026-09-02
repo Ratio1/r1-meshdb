@@ -24,17 +24,21 @@ UTIL_LINUX_PURL = (
 )
 LIBTINFO_PURL = "pkg:deb/debian/libtinfo6@6.4-4?arch=amd64&distro=debian-12.15"
 X_CRYPTO_PURL = "pkg:golang/golang.org/x/crypto@v0.53.0"
+GRPC_ENGINE_PURL = "pkg:golang/google.golang.org/grpc@v1.82.1"
+GRPC_CLOUDFLARED_PURL = "pkg:golang/google.golang.org/grpc@v1.83.0"
 REMOTE_PREFIX = "engine/vendor/github.com/prometheus/prometheus/storage/remote/"
 
 EXPECTED = {
   "CVE-2026-42154": (PROMETHEUS_PURL, "not_affected", "vulnerable_code_not_in_execute_path"),
   "CVE-2026-32286": (PGPROTO_PURL, "fixed", None),
+  "CVE-2026-84304": ((GRPC_ENGINE_PURL, GRPC_CLOUDFLARED_PURL), "fixed", None),
   "CVE-2026-53615": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
   "CVE-2026-53613": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
   "CVE-2025-69720": (LIBTINFO_PURL, "not_affected", "vulnerable_code_not_present"),
   "CVE-2026-56854": (X_CRYPTO_PURL, "not_affected", "vulnerable_code_not_in_execute_path"),
 }
 REQUIRED_ALIASES = {
+  "CVE-2026-84304": {"CVE-2026-84304", "GHSA-vp52-pcj8-j9qc"},
   "CVE-2026-56854": {"CVE-2026-56854", "GO-2026-6303"},
 }
 
@@ -54,7 +58,8 @@ def validate_statement(statement: dict) -> str:
   if cve not in EXPECTED or vulnerability_id != f"https://nvd.nist.gov/vuln/detail/{cve}":
     fail(f"unexpected vulnerability decision: {vulnerability_id}")
   product, status, justification = EXPECTED[cve]
-  if statement.get("products") != [{"@id": product}]:
+  products = product if isinstance(product, tuple) else (product,)
+  if statement.get("products") != [{"@id": item} for item in products]:
     fail(f"VEX product differs for {cve}")
   if statement.get("status") != status or statement.get("justification") != justification:
     fail(f"VEX status or justification differs for {cve}")
@@ -96,6 +101,63 @@ def verify_pgproto_backport() -> None:
   for evidence in ("negative two", "minimum int32", "RetainsNullField", "FrontendReceive"):
     if evidence not in tests:
       fail(f"pgproto3 regression evidence is absent: {evidence}")
+
+
+def verify_grpc_backport() -> None:
+  overrides = json.loads((ROOT / "source/ratio1-engine-overrides.json").read_text(encoding="utf-8"))
+  records = [
+    item for item in overrides["securityBackports"]
+    if item["advisory"] == "CVE-2026-84304"
+  ]
+  if len(records) != 1 or records[0].get("module") != "google.golang.org/grpc@v1.82.1":
+    fail("engine gRPC backport metadata differs from the VEX product")
+  if len(records[0].get("files", [])) != 9:
+    fail("engine gRPC backport file set is incomplete")
+  for file_record in records[0]["files"]:
+    path = ROOT / file_record["path"]
+    if not path.is_file() or sha256(path) != file_record.get("sha256"):
+      fail(f"engine gRPC backport hash differs: {file_record.get('path')}")
+
+  modules = (ROOT / "engine/vendor/modules.txt").read_text(encoding="utf-8")
+  if "# google.golang.org/grpc v1.82.1\n" not in modules:
+    fail("engine gRPC version differs from the VEX product")
+  implementation = (
+    ROOT / "engine/vendor/google.golang.org/grpc/internal/transport/transport.go"
+  ).read_text(encoding="utf-8")
+  for marker in (
+    "compactionThreshold",
+    "EnableReceiveBufferCompaction",
+    "uncompactedSuffixLen",
+    "mem.NewBuffer(newBuf",
+  ):
+    if marker not in implementation:
+      fail(f"engine gRPC receive-buffer backport evidence is absent: {marker}")
+  tests = (
+    ROOT
+    / "engine/vendor/google.golang.org/grpc/internal/transport/recv_buffer_compaction_r1_test.go"
+  ).read_text(encoding="utf-8")
+  for marker in ("TestRatio1RecvBufferCompactsFragmentedBacklog", "BufferPoolingThreshold"):
+    if marker not in tests:
+      fail(f"engine gRPC backport regression evidence is absent: {marker}")
+
+  provenance = json.loads((ROOT / "source/provenance.json").read_text(encoding="utf-8"))
+  cloudflared = provenance["buildInputs"]["cloudflared"]
+  cloud_records = cloudflared.get("securityBackports", [])
+  if len(cloud_records) != 1 or cloud_records[0].get("module") != "google.golang.org/grpc@v1.83.0":
+    fail("Cloudflared gRPC backport metadata differs from the VEX product")
+  patch = ROOT / cloud_records[0].get("patch", "")
+  if not patch.is_file() or sha256(patch) != cloud_records[0].get("patchSha256"):
+    fail("Cloudflared gRPC backport patch hash differs")
+  cloudflared_build = (ROOT / "source/cloudflared-buildinfo.txt").read_text(encoding="utf-8")
+  if "\tdep\tgoogle.golang.org/grpc\tv1.83.0\t\n" not in cloudflared_build:
+    fail("Cloudflared gRPC version differs from the VEX product")
+  dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+  for marker in (cloud_records[0]["patch"], cloud_records[0]["patchSha256"], "git -C /cloudflared apply"):
+    if marker not in dockerfile:
+      fail(f"Cloudflared gRPC backport is not enforced by the image build: {marker}")
+  cloud_verifier = (ROOT / "scripts/verify-cloudflared-source.py").read_text(encoding="utf-8")
+  if "verify_grpc_security_backport" not in cloud_verifier:
+    fail("Cloudflared source verifier does not enforce the gRPC backport")
 
 
 def verify_minimal_runtime() -> None:
@@ -178,9 +240,9 @@ def main() -> None:
   document = json.loads(VEX.read_text(encoding="utf-8"))
   if document.get("@context") != "https://openvex.dev/ns/v0.2.0":
     fail("unexpected OpenVEX context")
-  if document.get("@id") != "https://github.com/Ratio1/r1-meshdb/security/vex/4":
+  if document.get("@id") != "https://github.com/Ratio1/r1-meshdb/security/vex/5":
     fail("unexpected OpenVEX document identity")
-  if document.get("version") != 4 or document.get("timestamp") != "2026-09-01T00:00:00Z":
+  if document.get("version") != 5 or document.get("timestamp") != "2026-09-02T00:00:00Z":
     fail("unexpected OpenVEX document version or timestamp")
   statements = document.get("statements")
   if not isinstance(statements, list) or len(statements) != len(EXPECTED):
@@ -191,6 +253,7 @@ def main() -> None:
 
   verify_prometheus()
   verify_pgproto_backport()
+  verify_grpc_backport()
   verify_minimal_runtime()
   verify_ssh_server_authentication_absence()
   security_policy = (ROOT / "SECURITY.md").read_text(encoding="utf-8")

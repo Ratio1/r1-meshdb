@@ -1,3 +1,5 @@
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 /*
  *
  * Copyright 2014 gRPC authors.
@@ -407,7 +409,7 @@ func (t *http2Server) operateHeaders(ctx context.Context, frame *http2.MetaHeade
 		st:               t,
 		headerWireLength: int(frame.Header().Length),
 	}
-	s.Stream.buf.init()
+	s.Stream.buf.init(t.bufferPool)
 	var (
 		// if false, content-type was missing or invalid
 		isGRPC      = false

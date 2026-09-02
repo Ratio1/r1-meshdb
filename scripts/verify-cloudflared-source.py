@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +23,24 @@ INVENTORY = ROOT / "source" / "cloudflared-license-inventory.csv"
 LICENSE_ROOT = ROOT / "licenses" / "cloudflared"
 LICENSE_NAMES = {"license", "licence", "copying", "notice", "patents"}
 COMMIT = "b4f47e2ab538ab6e31d3dc6adc5489455ad446de"
+GRPC_BACKPORT_ADVISORY = "CVE-2026-84304"
+GRPC_BACKPORT_MODULE = "google.golang.org/grpc@v1.83.0"
+GRPC_BACKPORT_SOURCE = (
+  "https://github.com/grpc/grpc-go/commit/"
+  "8cfeca0e1ee5ea0980dcc320e20240fa1079ec77"
+)
+GRPC_BACKPORT_PATCH = ROOT / "security/backports/grpc-go-cve-2026-84304-v1.83.0.patch"
+GRPC_BACKPORT_PATCH_SHA256 = "c98442d4f6badbb1b0adcfa79dc28478eb105d1cdbad4ca232c85f4a3c653043"
+GRPC_BACKPORT_FILES = {
+  "vendor/google.golang.org/grpc/internal/envconfig/envconfig.go",
+  "vendor/google.golang.org/grpc/internal/mem/buffer_pool.go",
+  "vendor/google.golang.org/grpc/internal/transport/handler_server.go",
+  "vendor/google.golang.org/grpc/internal/transport/http2_client.go",
+  "vendor/google.golang.org/grpc/internal/transport/http2_server.go",
+  "vendor/google.golang.org/grpc/internal/transport/transport.go",
+  "vendor/google.golang.org/grpc/mem/buffer_pool.go",
+  "vendor/google.golang.org/grpc/mem/buffers.go",
+}
 EXTERNAL_LICENSES = {
   "github.com/facebookgo/grace": (
     "dependencies/github.com/facebookgo/grace/license",
@@ -215,6 +234,60 @@ def verify_source_hashes(source_root: Path) -> None:
       fail(f"Cloudflared provenance hash differs: {key}")
 
 
+def verify_grpc_security_backport(source_root: Path) -> None:
+  provenance = json.loads((ROOT / "source" / "provenance.json").read_text(encoding="utf-8"))
+  records = provenance["buildInputs"]["cloudflared"].get("securityBackports", [])
+  if len(records) != 1:
+    fail("Cloudflared security backport set changed")
+  record = records[0]
+  expected_metadata = {
+    "advisory": GRPC_BACKPORT_ADVISORY,
+    "module": GRPC_BACKPORT_MODULE,
+    "source": GRPC_BACKPORT_SOURCE,
+    "patch": GRPC_BACKPORT_PATCH.relative_to(ROOT).as_posix(),
+    "patchSha256": GRPC_BACKPORT_PATCH_SHA256,
+  }
+  for key, expected in expected_metadata.items():
+    if record.get(key) != expected:
+      fail(f"Cloudflared gRPC backport metadata differs: {key}")
+  if not GRPC_BACKPORT_PATCH.is_file() or sha256(GRPC_BACKPORT_PATCH) != GRPC_BACKPORT_PATCH_SHA256:
+    fail("Cloudflared gRPC backport patch hash differs")
+
+  files = record.get("files", [])
+  if {item.get("path") for item in files} != GRPC_BACKPORT_FILES:
+    fail("Cloudflared gRPC backport file set changed")
+  for item in files:
+    path = source_root / item["path"]
+    for key in ("upstreamSha256", "distributedSha256"):
+      if not re.fullmatch(r"[0-9a-f]{64}", item.get(key, "")):
+        fail(f"Cloudflared gRPC backport has an invalid {key}: {item['path']}")
+    if not path.is_file() or sha256(path) != item["distributedSha256"]:
+      fail(f"Cloudflared gRPC backport file hash differs: {item['path']}")
+
+  with tempfile.TemporaryDirectory(prefix="r1-cloudflared-grpc-preimage-") as directory:
+    reverse_root = Path(directory)
+    for item in files:
+      source = source_root / item["path"]
+      target = reverse_root / item["path"]
+      target.parent.mkdir(parents=True, exist_ok=True)
+      shutil.copyfile(source, target)
+    reverse = subprocess.run(
+      [
+        "git", "apply", "--directory=vendor/google.golang.org/grpc",
+        "--unidiff-zero", "--reverse", str(GRPC_BACKPORT_PATCH),
+      ],
+      cwd=reverse_root,
+      check=False,
+      stdout=subprocess.DEVNULL,
+      stderr=subprocess.DEVNULL,
+    )
+    if reverse.returncode != 0:
+      fail("Cloudflared gRPC source is not the pinned backport result")
+    for item in files:
+      if sha256(reverse_root / item["path"]) != item["upstreamSha256"]:
+        fail(f"Cloudflared gRPC backport preimage hash differs: {item['path']}")
+
+
 def verify_binary(build_info: str, binary: Path) -> None:
   provenance = json.loads((ROOT / "source" / "provenance.json").read_text(encoding="utf-8"))
   cloudflared = provenance["buildInputs"]["cloudflared"]
@@ -259,6 +332,7 @@ def main() -> None:
   if PACKAGES.read_text(encoding="utf-8") != packages:
     fail("checked-in Cloudflared compiled package closure is stale")
   verify_source_hashes(source_root)
+  verify_grpc_security_backport(source_root)
   verify_binary(build_info, binary)
   verify_inventory(build_info, source_root)
   print(f"verified Cloudflared source build: {len(packages.splitlines())} compiled packages")

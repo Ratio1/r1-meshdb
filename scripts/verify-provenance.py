@@ -59,7 +59,7 @@ EXPECTED_ADDED_FILES = {
   "engine/pkg/util/goschedstats/runtime_go1.26.go",
   "engine/pkg/util/goschedstats/runtime_go1.26_test.go",
 }
-EXPECTED_SECURITY_BACKPORTS = {"GO-2026-4518", "GO-2026-5004"}
+EXPECTED_SECURITY_BACKPORTS = {"CVE-2026-84304", "GO-2026-4518", "GO-2026-5004"}
 EXPECTED_COMPATIBILITY_BACKPORTS = {"google-api-grpc-credentials-options"}
 MIN_RETAINED_UPSTREAM_PACKAGE_FILES = 3000
 MODIFICATION_NOTICE = b"Modified by Ratio1 in 2026; see RATIO1_PATCHES.md."
@@ -545,11 +545,34 @@ def check_engine_overrides(upstream_commit: str, patch_record: str, upstream_roo
     files = backport.get("files")
     if not files:
       fail(f"security backport has no files: {backport['advisory']}")
+    preimage_commit = backport.get("preimageCommit")
+    if preimage_commit is not None and not re.fullmatch(r"[0-9a-f]{40}", preimage_commit):
+      fail(f"security backport preimage commit is invalid: {backport['advisory']}")
     for record in files:
       target = ROOT / record.get("path", "")
       if not target.is_file() or file_sha256(target) != record.get("sha256"):
         fail(f"security backport file hash differs: {record.get('path')}")
       check_source_notice(target, record.get("changeType", ""))
+      preimage_hash = record.get("preimageSha256")
+      if preimage_hash is not None:
+        if preimage_commit is None or not re.fullmatch(r"[0-9a-f]{64}", preimage_hash):
+          fail(f"security backport preimage hash is invalid: {record.get('path')}")
+        probe = subprocess.run(
+          ["git", "cat-file", "-e", f"{preimage_commit}^{{commit}}"],
+          cwd=ROOT,
+          check=False,
+          stdout=subprocess.DEVNULL,
+          stderr=subprocess.DEVNULL,
+        )
+        if probe.returncode == 0:
+          source = subprocess.run(
+            ["git", "show", f"{preimage_commit}:{record['path']}"],
+            cwd=ROOT,
+            check=True,
+            stdout=subprocess.PIPE,
+          ).stdout
+          if hashlib.sha256(source).hexdigest() != preimage_hash:
+            fail(f"security backport preimage hash differs: {record.get('path')}")
 
   compatibility_backports = overrides.get("dependencyCompatibilityBackports")
   backport_ids = {

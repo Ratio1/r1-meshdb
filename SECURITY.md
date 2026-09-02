@@ -70,6 +70,17 @@ identifies the upstream module version, so the exact VEX decision is `fixed`;
 the patch and test hashes are enforced by
 `source/ratio1-engine-overrides.json`.
 
+`CVE-2026-84304` / `GHSA-vp52-pcj8-j9qc` permits unauthenticated HTTP/2 DATA
+frame fragmentation to retain excessive heap objects in gRPC-Go servers. The
+database engine embeds gRPC v1.82.1 and Cloudflared embeds v1.83.0, so both are
+treated as affected. R1 MeshDB backports the official v1.83.1 receive-buffer
+compaction fix from commit `8cfeca0e1ee5ea0980dcc320e20240fa1079ec77` to both
+source trees. Engine preimage, result, and regression hashes are enforced by
+`source/ratio1-engine-overrides.json`; Cloudflared patch, preimage, result, and
+binary hashes are enforced by `source/provenance.json` and
+`scripts/verify-cloudflared-source.py`. The exact VEX decision is `fixed` for
+both scanner-visible module versions.
+
 `CVE-2026-56854` / `GO-2026-6303` affects SSH server authentication reached
 through `golang.org/x/crypto/ssh.NewServerConn` before x/crypto v0.55.0. The
 database engine's verified vendored runtime closure contains no x/crypto SSH

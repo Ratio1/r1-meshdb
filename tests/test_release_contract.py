@@ -484,7 +484,7 @@ func value() string {
       f'baseline_repository != "{source_url}.git"',
       read("scripts/verify-provenance.py"),
     )
-    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/4")
+    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/5")
     self.assertEqual(
       json.loads(read("source/ratio1-engine-overrides.json"))["dependencySnapshot"]
       ["sourceBaseline"]["repository"],
@@ -594,7 +594,7 @@ func value() string {
     )
     self.assertEqual(
       cloudflared["binarySha256"],
-      "77d66f9223e8ec418ef31613ee861e2e9067f6b2544ec93d185a2e468fcb2e47",
+      "d6e54c10c671c061bcb04404c9e2fd7dedb4f5f8a4d9b9ec1b35b6fa1973b62d",
     )
     self.assertEqual(
       provenance["buildInputs"]["releaseTooling"],
@@ -620,7 +620,7 @@ func value() string {
     )
     self.assertEqual(
       {record["advisory"] for record in overrides["securityBackports"]},
-      {"GO-2026-4518", "GO-2026-5004"},
+      {"CVE-2026-84304", "GO-2026-4518", "GO-2026-5004"},
     )
     self.assertEqual(
       {record["id"] for record in overrides["dependencyCompatibilityBackports"]},
@@ -878,9 +878,10 @@ func value() string {
     self.assertIn("go test -mod=vendor", dockerfile)
     self.assertIn("github.com/jackc/pgproto3/v2", dockerfile)
     self.assertIn("github.com/jackc/pgx/v4/internal/sanitize", dockerfile)
+    self.assertIn("google.golang.org/grpc/internal/transport", dockerfile)
     self.assertIn("./pkg/util/ctxutil", dockerfile)
     self.assertIn("./pkg/util/goschedstats", dockerfile)
-    self.assertIn("77d66f9223e8ec418ef31613ee861e2e9067f6b2544ec93d185a2e468fcb2e47", dockerfile)
+    self.assertIn("d6e54c10c671c061bcb04404c9e2fd7dedb4f5f8a4d9b9ec1b35b6fa1973b62d", dockerfile)
     self.assertIn("ADD --checksum=sha256:e897f2cdb6f63964bb7b5841df80087489a65ab9fda356ef48dd13202bba59c0", dockerfile)
     self.assertNotRegex(lowered, r"from\s+cloudflare/cloudflared")
     self.assertIn("scripts/verify-cloudflared-source.py", dockerfile)

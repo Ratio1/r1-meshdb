@@ -116,14 +116,65 @@
       "sourceArchiveSha256": "e897f2cdb6f63964bb7b5841df80087489a65ab9fda356ef48dd13202bba59c0",
       "sourceDateEpoch": 1786553853,
       "version": "2026.7.3-r1.b4f47e2",
-      "binarySha256": "77d66f9223e8ec418ef31613ee861e2e9067f6b2544ec93d185a2e468fcb2e47",
+      "binarySha256": "d6e54c10c671c061bcb04404c9e2fd7dedb4f5f8a4d9b9ec1b35b6fa1973b62d",
       "goModSha256": "00e9b735fef2b05a1830734f12987ff6ea653958909bc59417af5a22daaf2b9d",
       "goSumSha256": "cbc8ab59b002a5efc843e2c8470cc9b7ee717f1b24a9049f6acfad65e232da85",
       "vendorModulesSha256": "1f1cdee78c7b5e841d10a5f8b9c73537c12dcc4f5026638ed62d569347c9553c",
       "licenseSha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
       "buildInfo": "source/cloudflared-buildinfo.txt",
       "compiledPackages": "source/cloudflared-compiled-packages.txt",
-      "licenseInventory": "source/cloudflared-license-inventory.csv"
+      "licenseInventory": "source/cloudflared-license-inventory.csv",
+      "securityBackports": [
+        {
+          "advisory": "CVE-2026-84304",
+          "module": "google.golang.org/grpc@v1.83.0",
+          "source": "https://github.com/grpc/grpc-go/commit/8cfeca0e1ee5ea0980dcc320e20240fa1079ec77",
+          "patch": "security/backports/grpc-go-cve-2026-84304-v1.83.0.patch",
+          "patchSha256": "c98442d4f6badbb1b0adcfa79dc28478eb105d1cdbad4ca232c85f4a3c653043",
+          "files": [
+            {
+              "path": "vendor/google.golang.org/grpc/internal/envconfig/envconfig.go",
+              "upstreamSha256": "6878cf4ac6f7c980be3a5728fd8d49ed0c9d361d61219585e67f9f4ab8d07eeb",
+              "distributedSha256": "aa818c505bde622bb6ca010c49d6b5739391777cbd0bcad55dc78ca8fde40b80"
+            },
+            {
+              "path": "vendor/google.golang.org/grpc/internal/mem/buffer_pool.go",
+              "upstreamSha256": "2a30acb99325c3aa624a32a0e3205b9f5e4a3a8874b0aeccbcc7fcec60da34fd",
+              "distributedSha256": "ffcb191777909f96dd1677977c9fef2f897cca5243439f76780d7ddc576ad92a"
+            },
+            {
+              "path": "vendor/google.golang.org/grpc/internal/transport/handler_server.go",
+              "upstreamSha256": "33b03ba6ff18b4114a8042be82d6a02d2a1ce64be59a76e0497e9030667ffcf5",
+              "distributedSha256": "65c8274e186e499ad61541934983eeb5d43c29cebb2151cdae458d9b8cb4e73a"
+            },
+            {
+              "path": "vendor/google.golang.org/grpc/internal/transport/http2_client.go",
+              "upstreamSha256": "c0d5aede25dcde78c1d88bd227a344d7cb9f90d0ea1ae9d92df857165316fd18",
+              "distributedSha256": "662dcd02a306a82c8a62645512e843806ea594084a213f31a6e43f3b607374b6"
+            },
+            {
+              "path": "vendor/google.golang.org/grpc/internal/transport/http2_server.go",
+              "upstreamSha256": "b74a585d5c247df8d30894271c92fccb431bcbf165780c46b6aabd17cdffd6b3",
+              "distributedSha256": "623de23950faf74126b53ea18d02cabdca1f128e59bcb673d91995bd0a760466"
+            },
+            {
+              "path": "vendor/google.golang.org/grpc/internal/transport/transport.go",
+              "upstreamSha256": "9a7457b8096fecb0ab130963eeb05c23c2b04831b64bb3691d17ab77cf9b3664",
+              "distributedSha256": "108257c2c87b3cb6c5520d831a3abf3a7c54ee4995adae98f1f9900611071722"
+            },
+            {
+              "path": "vendor/google.golang.org/grpc/mem/buffer_pool.go",
+              "upstreamSha256": "64c9863332bad069a10ad838b2ffa40d05c3f0efb22075891df154d83bc529b1",
+              "distributedSha256": "1d5943e9b040303eb71146b513a4fb2c9630bf047a3d064c70aa6dafd735846a"
+            },
+            {
+              "path": "vendor/google.golang.org/grpc/mem/buffers.go",
+              "upstreamSha256": "1655293f6339682b3f8889cfbd725229315c9d0088d0a9d5d042a6fa99008d0c",
+              "distributedSha256": "77fdd82c81c40258eb67e20cf83f42c1ae6f30191a5f27634b59c300a27ebb4d"
+            }
+          ]
+        }
+      ]
     },
     "debianSnapshot": "20260812T000000Z",
     "sourceDateEpoch": 1727820937
