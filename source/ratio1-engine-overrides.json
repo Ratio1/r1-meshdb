@@ -215,9 +215,9 @@
     {
       "path": "engine/pkg/ui/ui.go",
       "upstreamSha256": "a69f40de750b5757ebbd7d73056c4d64cfa797f13fe1dc5a110c2c0d7ebedb06",
-      "distributedSha256": "97a0d3e4aeb2c7f9141582a4e830240c23be3fd836f1d9c98d4a6bed25f2c751",
+      "distributedSha256": "808a36cb077d04db57e71e3b0116e9f50013279dfee1441695732afe7d55e1fa",
       "changeClass": "product-identity-and-privacy",
-      "reason": "Use R1 MeshDB for console page titles while retaining neutral wording for excluded upstream console assets."
+      "reason": "Use R1 MeshDB for console page titles and link the first-party browser console assets while retaining neutral wording for excluded upstream console assets."
     },
     {
       "path": "engine/pkg/util/ctxutil/context.go",
@@ -239,6 +239,16 @@
       "path": "engine/pkg/storage/pebble_iterator_r1_test.go",
       "sha256": "3a9ede812d155ffa4b442a42eebfccc60c61179c68af8325bea9d2a6e1316348",
       "reason": "Regression coverage that signals direct and wrapped Pebble corruption markers while rejecting matching text and nil errors."
+    },
+    {
+      "path": "engine/pkg/ui/distoss/assets/bundle.js",
+      "sha256": "943c18a71d962e3a8a5eb8bb7d3c37e005869378a8d38d6955a05ec114c654a8",
+      "reason": "Dependency-free first-party browser console for authenticated cluster overview, table discovery, and SQL execution."
+    },
+    {
+      "path": "engine/pkg/ui/distoss/assets/favicon.svg",
+      "sha256": "01cb533ab1aa424a4d2f7a50d568a5deb40450533fd2374f439b334cee29fc13",
+      "reason": "First-party R1 MeshDB browser console icon."
     },
     {
       "path": "engine/pkg/util/ctxutil/context_go1.20_test.go",

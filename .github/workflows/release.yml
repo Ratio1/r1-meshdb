@@ -291,6 +291,11 @@ jobs:
           timeout --signal=TERM --kill-after=60s 20m \
             testbed/run-local-cluster.sh "$IMAGE_REF"
 
+      - name: Prove the browser console asset and authenticated API
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: scripts/secure-single-node-smoke.sh "$IMAGE_REF"
+
       - name: Prove persisted rolling upgrade and rollback compatibility
         env:
           IMAGE_REF: ${{ steps.image.outputs.ref }}

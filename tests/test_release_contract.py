@@ -41,6 +41,16 @@ def source_baseline(repository: Path, commit: str, content: bytes) -> dict:
 
 class ReleaseContractTests(unittest.TestCase):
 
+  def test_console_has_a_renderable_first_party_asset(self):
+    bundle_path = ROOT / "engine/pkg/ui/distoss/assets/bundle.js"
+    self.assertTrue(bundle_path.is_file(), "R1 MeshDB console bundle is missing")
+    bundle = bundle_path.read_text(encoding="utf-8")
+    self.assertGreater(len(bundle), 10_000)
+    self.assertIn("data-r1-meshdb-console", bundle)
+    self.assertIn("/api/v2/login/", bundle)
+    self.assertIn("/api/v2/sql/", bundle)
+    self.assertNotRegex(bundle, r"https?://")
+
   def test_release_version_resolution_is_strict_and_monotonic(self):
     resolver = load_script("scripts/resolve-release-version.py")
     resolved = resolver.resolve_release_version(
@@ -944,6 +954,17 @@ func value() string {
     self.assertIn("testbed/run-real-cloudflare-cluster.sh", read(".github/workflows/release.yml"))
     self.assertIn("scripts/runtime-supervision-smoke.sh", read(".github/workflows/ci.yml"))
     self.assertIn("scripts/runtime-supervision-smoke.sh", read(".github/workflows/release.yml"))
+    self.assertIn("scripts/secure-single-node-smoke.sh", read(".github/workflows/ci.yml"))
+    self.assertIn("scripts/secure-single-node-smoke.sh", read(".github/workflows/release.yml"))
+    secure_smoke = read("scripts/secure-single-node-smoke.sh")
+    for console_contract in (
+      "/bundle.js",
+      "data-r1-meshdb-console",
+      "/api/v2/login/",
+      "X-Cockroach-API-Session",
+      "/api/v2/sql/",
+    ):
+      self.assertIn(console_contract, secure_smoke)
     self.assertEqual(read(".github/workflows/ci.yml").count("path: source-snapshot"), 2)
     for secret in ("CF_ACCOUNT_ID", "CF_ZONE_ID", "CF_API_TOKEN", "CF_BASE_DOMAIN"):
       self.assertIn("${{ secrets." + secret + " }}", read(".github/workflows/release.yml"))

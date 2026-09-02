@@ -4,12 +4,17 @@ This file records every deliberate difference between upstream CockroachDB
 v23.1.28 commit `76e598c9b1c100fd9280b979140b5e377c330a20` and this distribution.
 Every released file is covered by `source/manifest.sha256`.
 
-R1 MeshDB v1.0.1 adds a reviewed `not_affected` OpenVEX decision for
+R1 MeshDB v1.0.1 adds a first-party, dependency-free browser console at
+`engine/pkg/ui/distoss/assets/bundle.js`, with its icon at
+`engine/pkg/ui/distoss/assets/favicon.svg`. The console uses the retained
+authenticated v2 login and SQL APIs to show cluster identity, list user tables,
+and run SQL. `engine/pkg/ui/ui.go` links these assets from the console page.
+
+The release also adds a reviewed `not_affected` OpenVEX decision for
 `CVE-2026-53613`. The advisory targets util-linux's setuid `mount` path; the
 minimal scratch runtime retains only non-setuid `setsid` from that package and
-contains no `mount`, `umount`, `libmount`, or `/etc/fstab`. The release changes
-security metadata and versioned build identity without changing database,
-wire-protocol, consensus, or store-format behavior.
+contains no `mount`, `umount`, `libmount`, or `/etc/fstab`. These changes do not
+alter database, wire-protocol, consensus, or store-format behavior.
 
 ## Source Preparation
 
@@ -62,7 +67,7 @@ documentation, and telemetry defaults in these retained upstream files:
 - `engine/pkg/settings/cluster/cluster_settings.go`
 - `engine/pkg/sql/crdb_internal.go`
 - `engine/pkg/sql/vars.go`
-- `engine/pkg/ui/ui.go`
+- `engine/pkg/ui/ui.go` (product identity and first-party console asset links)
 - `engine/pkg/util/log/clog.go`
 - `engine/pkg/util/log/logcrash/crash_reporting.go`
 - `engine/pkg/util/tracing/tracer.go`

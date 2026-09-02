@@ -32059,6 +32059,18 @@
       "spdx": "Apache-2.0"
     },
     {
+      "basis": "Apache-2.0 source header",
+      "path": "engine/pkg/ui/distoss/assets/bundle.js",
+      "sha256": "943c18a71d962e3a8a5eb8bb7d3c37e005869378a8d38d6955a05ec114c654a8",
+      "spdx": "Apache-2.0"
+    },
+    {
+      "basis": "Apache-2.0 source header",
+      "path": "engine/pkg/ui/distoss/assets/favicon.svg",
+      "sha256": "01cb533ab1aa424a4d2f7a50d568a5deb40450533fd2374f439b334cee29fc13",
+      "spdx": "Apache-2.0"
+    },
+    {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/ui/distoss/distoss_no_bazel.go",
       "sha256": "180e745fc3d0dc9a2c4520d722326e3feb2c01b42adbc7168e8a6fdcb59b4933",
@@ -32067,7 +32079,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/ui/ui.go",
-      "sha256": "97a0d3e4aeb2c7f9141582a4e830240c23be3fd836f1d9c98d4a6bed25f2c751",
+      "sha256": "808a36cb077d04db57e71e3b0116e9f50013279dfee1441695732afe7d55e1fa",
       "spdx": "Apache-2.0"
     },
     {

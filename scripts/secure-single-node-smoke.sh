@@ -88,6 +88,7 @@ rm -f "${tmp}/certs/ca.key"
 
 start_container() {
   docker_cmd run -d --name "${name}" \
+    -p 127.0.0.1:0:8080 \
     -v "${tmp}/certs/ca.crt:/runtime/ca.crt:ro" \
     -v "${tmp}/certs/node.crt:/runtime/node.crt:ro" \
     -v "${tmp}/certs/node.key:/runtime/node.key:ro" \
@@ -104,6 +105,7 @@ start_container() {
     -e CRDB_PASSWORD=app_secret_123 \
     -e "CRDB_MAX_OFFSET=${test_max_offset}" \
     -e CRDB_LISTEN_HOST=127.0.0.1 \
+    -e CRDB_HTTP_HOST=0.0.0.0 \
     -e CRDB_CA_CRT_FILE=/runtime/ca.crt \
     -e CRDB_NODE_CRT_FILE=/runtime/node.crt \
     -e CRDB_NODE_KEY_FILE=/runtime/node.key \
@@ -291,6 +293,96 @@ wait_for_sql() {
   return 1
 }
 
+assert_console_contract() {
+  local -a curl_args
+  local port base_url root_file bundle_file login_file sql_file
+  local root_status bundle_status anonymous_status login_status session sql_status
+  port="$(docker_cmd port "${name}" 8080/tcp | sed -n 's/.*://p')"
+  if [[ ! "${port}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "console port is not published on loopback" >&2
+    exit 1
+  fi
+
+  base_url="https://localhost:${port}"
+  root_file="${tmp}/console-index.html"
+  bundle_file="${tmp}/console-bundle.js"
+  login_file="${tmp}/console-login.json"
+  sql_file="${tmp}/console-sql.json"
+  curl_args=(
+    --noproxy '*'
+    --silent
+    --show-error
+    --max-time "${test_docker_timeout}"
+    --cacert "${tmp}/certs/ca.crt"
+  )
+
+  root_status="$(curl "${curl_args[@]}" --output "${root_file}" \
+    --write-out '%{http_code}' "${base_url}/")"
+  if [[ "${root_status}" != "200" ]] || ! grep -Fq '<title>R1 MeshDB Console</title>' "${root_file}"; then
+    echo "console root did not return the R1 MeshDB page" >&2
+    exit 1
+  fi
+
+  bundle_status="$(curl "${curl_args[@]}" --output "${bundle_file}" \
+    --write-out '%{http_code}' "${base_url}/bundle.js")"
+  if [[ "${bundle_status}" != "200" ]] || \
+      [[ "$(wc -c < "${bundle_file}")" -le 10000 ]] || \
+      ! grep -Fq 'data-r1-meshdb-console' "${bundle_file}"; then
+    echo "console bundle is missing or not renderable" >&2
+    exit 1
+  fi
+
+  anonymous_status="$(curl "${curl_args[@]}" --output /dev/null \
+    --write-out '%{http_code}' --header 'Content-Type: application/json' \
+    --data '{"execute":true,"database":"appdb","statements":[{"sql":"SELECT 1"}]}' \
+    "${base_url}/api/v2/sql/")"
+  if [[ "${anonymous_status}" != "401" ]]; then
+    echo "console SQL API accepted an anonymous request" >&2
+    exit 1
+  fi
+
+  login_status="$(curl "${curl_args[@]}" --output "${login_file}" \
+    --write-out '%{http_code}' --header 'Content-Type: application/x-www-form-urlencoded' \
+    --data 'username=app_user&password=app_secret_123' \
+    "${base_url}/api/v2/login/")"
+  if [[ "${login_status}" != "200" ]]; then
+    echo "console login failed" >&2
+    exit 1
+  fi
+  session="$(python3 - "${login_file}" <<'PY'
+import json
+import pathlib
+import sys
+
+value = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+print(value.get("session", ""))
+PY
+)"
+  if [[ -z "${session}" ]]; then
+    echo "console login did not return a session" >&2
+    exit 1
+  fi
+
+  sql_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${session}" | \
+    curl --config - "${curl_args[@]}" --output "${sql_file}" \
+      --write-out '%{http_code}' --header 'Content-Type: application/json' \
+      --data '{"execute":true,"database":"appdb","statements":[{"sql":"SELECT current_user AS username, current_database() AS database_name"}]}' \
+      "${base_url}/api/v2/sql/")"
+  if [[ "${sql_status}" != "200" ]] || ! python3 - "${sql_file}" <<'PY'
+import json
+import pathlib
+import sys
+
+value = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+row = value["execution"]["txn_results"][0]["rows"][0]
+raise SystemExit(0 if row == {"username": "app_user", "database_name": "appdb"} else 1)
+PY
+  then
+    echo "console authenticated SQL request failed" >&2
+    exit 1
+  fi
+}
+
 start_container
 wait_for_sql
 
@@ -343,6 +435,7 @@ if [[ "${persisted_note}" != "secure" ]]; then
   echo "persisted row was not readable after restart" >&2
   exit 1
 fi
+assert_console_contract
 assert_operator_privileges
 
 if [[ "${initial_image}" != "${image}" ]]; then

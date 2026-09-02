@@ -74,7 +74,8 @@ var indexHTML = []byte(`<!DOCTYPE html>
 	<head>
 		<title>R1 MeshDB Console</title>
 		<meta charset="UTF-8">
-		<link href="favicon.ico" rel="shortcut icon">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link href="favicon.svg" rel="icon" type="image/svg+xml">
 	</head>
 	<body>
 		<div id="react-layout"></div>
