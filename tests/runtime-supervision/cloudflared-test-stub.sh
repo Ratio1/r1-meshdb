@@ -94,15 +94,12 @@ if [[ "${1:-}" == "access" && "${TEST_CLOUDFLARED_ACCESS_MODE:-}" == "proxy" ]];
     esac
   done
 
-  case "${hostname}" in
-    roach1.local) target_address="target-roach1:26257" ;;
-    roach2.local) target_address="target-roach2:26257" ;;
-    roach3.local) target_address="target-roach3:26257" ;;
-    *)
-      echo "unknown test hostname: ${hostname}" >&2
-      exit 2
-      ;;
-  esac
+  if [[ "${hostname}" =~ ^roach([1-9][0-9]*)\.local$ ]]; then
+    target_address="target-roach${BASH_REMATCH[1]}:26257"
+  else
+    echo "unknown test hostname: ${hostname}" >&2
+    exit 2
+  fi
 
   listen_host="${listen_address%:*}"
   listen_port="${listen_address##*:}"

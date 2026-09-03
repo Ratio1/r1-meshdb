@@ -1,4 +1,4 @@
-# Local Three-Node Testbed
+# Local Multi-Node Testbed
 
 Run the testbed only after the candidate image passes the source/release
 contract checks. First it runs the unmodified candidate image as a three-node
@@ -13,9 +13,17 @@ persistence, and assert cleanup. The co-located entrypoint phase uses fixed
 reserve a quarter of the entire Docker VM; the unmodified-image phase still
 exercises the image defaults.
 
+The entrypoint phase defaults to three nodes. Set `CRDB_TEST_NODE_COUNT=4` to
+verify that an explicit four-node configuration converges application ranges
+to four voters while retaining the same persistence, failover, and cleanup
+checks. Engine-managed system ranges retain their built-in policies.
+
 ```bash
 python3 -m unittest tests.test_release_contract
 testbed/run-local-cluster.sh \
+  ghcr.io/ratio1/r1-meshdb@sha256:<verified-digest>
+
+CRDB_TEST_NODE_COUNT=4 testbed/run-local-cluster.sh \
   ghcr.io/ratio1/r1-meshdb@sha256:<verified-digest>
 ```
 

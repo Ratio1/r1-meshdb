@@ -6,11 +6,26 @@ run_id="${2:-$$-${RANDOM}}"
 test_max_offset="${CRDB_TEST_MAX_OFFSET:-500ms}"
 test_cache="${CRDB_TEST_CACHE:-128MiB}"
 test_sql_memory="${CRDB_TEST_MAX_SQL_MEMORY:-128MiB}"
+test_node_count="${CRDB_TEST_NODE_COUNT:-3}"
+if [[ ! "${test_node_count}" =~ ^[1-9][0-9]*$ ]] || \
+   ! awk -v value="${test_node_count}" 'BEGIN { exit !(value >= 3) }'; then
+  echo "CRDB_TEST_NODE_COUNT must be an integer of at least 3" >&2
+  exit 1
+fi
 network="deeploy-crdb-entrypoint-${run_id}"
-node1="deeploy-crdb-entrypoint-1-${run_id}"
-node2="deeploy-crdb-entrypoint-2-${run_id}"
-node3="deeploy-crdb-entrypoint-3-${run_id}"
-stores=("deeploy-crdb-entrypoint-store-1-${run_id}" "deeploy-crdb-entrypoint-store-2-${run_id}" "deeploy-crdb-entrypoint-store-3-${run_id}")
+nodes=()
+stores=()
+certificate_hostnames=()
+cluster_hostnames=()
+for node_id in $(seq 1 "${test_node_count}"); do
+  nodes+=("deeploy-crdb-entrypoint-${node_id}-${run_id}")
+  stores+=("deeploy-crdb-entrypoint-store-${node_id}-${run_id}")
+  certificate_hostnames+=("roach${node_id}")
+  cluster_hostnames+=("roach${node_id}.local")
+done
+node1="${nodes[0]}"
+node2="${nodes[1]}"
+node3="${nodes[2]}"
 runtime_volume="deeploy-crdb-entrypoint-runtime-${run_id}"
 volumes=("${stores[@]}" "${runtime_volume}")
 tmp="$(mktemp -d /tmp/deeploy-crdb-entrypoint-multinode.XXXXXX)"
@@ -20,14 +35,14 @@ cleanup() {
   local cleanup_failed=0
   trap - EXIT
   if [[ "${status}" != "0" ]]; then
-    docker logs "${node1}" >&2 2>/dev/null || true
-    docker logs "${node2}" >&2 2>/dev/null || true
-    docker logs "${node3}" >&2 2>/dev/null || true
+    for name in "${nodes[@]}"; do
+      docker logs "${name}" >&2 2>/dev/null || true
+    done
   fi
-  docker rm -f "${node1}" "${node2}" "${node3}" >/dev/null 2>&1 || true
-  docker inspect "${node1}" >/dev/null 2>&1 && cleanup_failed=1
-  docker inspect "${node2}" >/dev/null 2>&1 && cleanup_failed=1
-  docker inspect "${node3}" >/dev/null 2>&1 && cleanup_failed=1
+  docker rm -f "${nodes[@]}" >/dev/null 2>&1 || true
+  for name in "${nodes[@]}"; do
+    docker inspect "${name}" >/dev/null 2>&1 && cleanup_failed=1
+  done
   docker volume rm -f "${volumes[@]}" >/dev/null 2>&1 || true
   for volume in "${volumes[@]}"; do
     docker volume inspect "${volume}" >/dev/null 2>&1 && cleanup_failed=1
@@ -54,7 +69,7 @@ docker run --rm -v "${runtime_volume}:/runtime" --entrypoint /bin/sh "${image}" 
 docker run --rm -v "${runtime_volume}:/runtime" --entrypoint /cockroach/cockroach "${image}" \
   cert create-ca --certs-dir=/runtime/certs --ca-key=/runtime/certs/ca.key >/dev/null
 docker run --rm -v "${runtime_volume}:/runtime" --entrypoint /cockroach/cockroach "${image}" \
-  cert create-node roach1 roach2 roach3 localhost 127.0.0.1 \
+  cert create-node "${certificate_hostnames[@]}" localhost 127.0.0.1 \
   --certs-dir=/runtime/certs --ca-key=/runtime/certs/ca.key >/dev/null
 docker run --rm -v "${runtime_volume}:/runtime" --entrypoint /cockroach/cockroach "${image}" \
   cert create-client root --certs-dir=/runtime/certs --ca-key=/runtime/certs/ca.key >/dev/null
@@ -89,8 +104,10 @@ start_node() {
     -v "${runtime_volume}:/runtime:ro" \
     -v "${stores[$((node_id - 1))]}:/cockroach/cockroach-data" \
     -e "CRDB_NODE_ID=${node_id}" \
-    -e CRDB_NODE_COUNT=3 \
-    -e CRDB_HOSTNAMES=roach1.local,roach2.local,roach3.local \
+    -e "CRDB_NODE_COUNT=${test_node_count}" \
+    -e "CRDB_HOSTNAMES=$(IFS=,; printf '%s' "${cluster_hostnames[*]}")" \
+    -e "CRDB_NUM_REPLICAS=${test_node_count}" \
+    -e "CRDB_NUM_VOTERS=${test_node_count}" \
     -e CRDB_DATABASE=appdb \
     -e CRDB_USER=app_user \
     -e CRDB_PASSWORD=entrypoint_multinode_secret \
@@ -111,8 +128,9 @@ read_runtime_file() {
     -c 'cat "/runtime/certs/$1"' read-runtime-file "${name}"
 }
 
-start_node 2 "${node2}"
-start_node 3 "${node3}"
+for node_id in $(seq 2 "${test_node_count}"); do
+  start_node "${node_id}" "${nodes[$((node_id - 1))]}"
+done
 start_node 1 "${node1}"
 
 ready=0
@@ -127,11 +145,11 @@ for _ in $(seq 1 120); do
   sleep 1
 done
 if [[ "${ready}" != "1" ]]; then
-  echo "three-node entrypoint cluster did not become SQL-ready" >&2
+  echo "${test_node_count}-node entrypoint cluster did not become SQL-ready" >&2
   exit 1
 fi
 
-for name in "${node1}" "${node2}" "${node3}"; do
+for name in "${nodes[@]}"; do
   docker exec "${name}" /bin/bash -c '
     set -euo pipefail
     scanner_pid="$$"
@@ -223,11 +241,21 @@ if [[ "${row_count}" != "10000" ]]; then
   exit 1
 fi
 
-node_count="$(docker exec "${node1}" timeout --kill-after=2s 20s /cockroach/cockroach sql \
+gossip_node_count="$(docker exec "${node1}" timeout --kill-after=2s 20s /cockroach/cockroach sql \
   --certs-dir=/cockroach/certs --host=roach1:26257 \
   --format=csv -e "select count(*) from crdb_internal.gossip_nodes;" | tail -n 1 | tr -d '\r')"
-if [[ "${node_count}" != "3" ]]; then
-  echo "expected 3 gossip nodes, got ${node_count}" >&2
+if [[ "${gossip_node_count}" != "${test_node_count}" ]]; then
+  echo "expected ${test_node_count} gossip nodes, got ${gossip_node_count}" >&2
+  exit 1
+fi
+
+zone_config="$(docker exec "${node1}" timeout --kill-after=2s 20s /cockroach/cockroach sql \
+  --certs-dir=/cockroach/certs --host=roach1:26257 --format=csv \
+  -e "show zone configuration for range default;")"
+if ! grep -Fq "num_replicas = ${test_node_count}" <<< "${zone_config}" || \
+   ! grep -Fq "num_voters = ${test_node_count}" <<< "${zone_config}"; then
+  printf '%s\n' "${zone_config}" >&2
+  echo "default range does not use ${test_node_count} replicas and voters" >&2
   exit 1
 fi
 
@@ -242,19 +270,25 @@ fi
 
 replication_ready=false
 for _ in $(seq 1 300); do
-  incomplete_voter_sets="$(docker exec "${node1}" \
+  incomplete_baseline_voter_sets="$(docker exec "${node1}" \
     timeout --kill-after=2s 20s /cockroach/cockroach sql \
     --certs-dir=/cockroach/certs --host=roach1:26257 --format=csv \
     -e "select count(*) from crdb_internal.ranges_no_leases where array_length(voting_replicas, 1) < 3 or array_length(learner_replicas, 1) > 0;" \
     2>/dev/null | tail -n 1 | tr -d '\r' || true)"
-  if [[ "${incomplete_voter_sets}" == "0" ]]; then
+  incomplete_application_voter_sets="$(docker exec "${node1}" \
+    timeout --kill-after=2s 20s /cockroach/cockroach sql \
+    --certs-dir=/cockroach/certs --host=roach1:26257 --format=csv \
+    -e "select count(*) from [show ranges from table appdb.public.entrypoint_smoke] where array_length(voting_replicas, 1) < ${test_node_count} or coalesce(array_length(non_voting_replicas, 1), 0) > 0;" \
+    2>/dev/null | tail -n 1 | tr -d '\r' || true)"
+  if [[ "${incomplete_baseline_voter_sets}" == "0" && \
+        "${incomplete_application_voter_sets}" == "0" ]]; then
     replication_ready=true
     break
   fi
   sleep 1
 done
 if [[ "${replication_ready}" != "true" ]]; then
-  echo "three-node cluster did not reach full replication before failover" >&2
+  echo "${test_node_count}-node cluster did not reach application replication before failover" >&2
   exit 1
 fi
 
@@ -276,7 +310,7 @@ while [[ "$(date +%s)" -lt "${surviving_deadline}" ]]; do
 done
 if [[ "${surviving_count}" != "1" ]]; then
   [[ ! -s "${surviving_error}" ]] || cat "${surviving_error}" >&2
-  echo "three-node cluster lost delegated data with one node stopped" >&2
+  echo "${test_node_count}-node cluster lost delegated data with one node stopped" >&2
   exit 1
 fi
 docker start "${node1}" >/dev/null
@@ -298,8 +332,8 @@ if [[ "${rejoined_count}" != "1" ]]; then
   exit 1
 fi
 
-docker stop --time 15 "${node1}" "${node2}" "${node3}" >/dev/null
-docker start "${node1}" "${node2}" "${node3}" >/dev/null
+docker stop --time 15 "${nodes[@]}" >/dev/null
+docker start "${nodes[@]}" >/dev/null
 restart_count=""
 restart_deadline=$(( $(date +%s) + 180 ))
 while [[ "$(date +%s)" -lt "${restart_deadline}" ]]; do
@@ -316,7 +350,7 @@ if [[ "${restart_count}" != "10000" ]]; then
   exit 1
 fi
 
-for name in "${node1}" "${node2}" "${node3}"; do
+for name in "${nodes[@]}"; do
   logs="$(docker logs "${name}" 2>&1 || true)"
   if grep -Fq 'entrypoint_multinode_secret' <<< "${logs}"; then
     echo "database password leaked into ${name} logs" >&2
@@ -332,4 +366,4 @@ for name in "${node1}" "${node2}" "${node3}"; do
   fi
 done
 
-echo "entrypoint multinode smoke ok"
+echo "${test_node_count}-node entrypoint smoke ok"
