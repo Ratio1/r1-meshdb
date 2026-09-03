@@ -1,4 +1,4 @@
-name: Release signed image
+name: Release latest signed image
 
 on:
   push:

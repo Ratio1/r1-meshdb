@@ -1051,6 +1051,35 @@ func value() string {
           floating.append(f"{path.name}: {line.strip()}")
     self.assertEqual(floating, [], f"workflow actions must be commit-pinned: {floating}")
 
+  def test_stable_promotion_requires_an_exact_verified_published_release(self):
+    promotion = read(".github/workflows/promote-stable.yml")
+    self.assertIn("name: Promote stable image", promotion)
+    self.assertIn("workflow_dispatch:", promotion)
+    self.assertIn("release_tag:", promotion)
+    self.assertNotIn("\n  push:", promotion)
+    self.assertIn("if: github.ref == 'refs/heads/main'", promotion)
+    self.assertIn("environment: release", promotion)
+    self.assertIn("group: r1-meshdb-stable-promotion", promotion)
+    self.assertIn("cancel-in-progress: false", promotion)
+    self.assertIn("attestations: read", promotion)
+    self.assertIn("contents: read", promotion)
+    self.assertIn("packages: write", promotion)
+    self.assertNotIn("id-token: write", promotion)
+    self.assertIn("ref: ${{ github.sha }}", promotion)
+    self.assertIn('[[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]', promotion)
+    self.assertIn("tagName,isDraft,isPrerelease", promotion)
+    self.assertIn("--pattern image-reference.txt", promotion)
+    self.assertIn('printf \'%s\\n\' "$image_ref" | cmp -', promotion)
+    self.assertIn('scripts/inspect-ghcr-tag.sh "$version_ref"', promotion)
+    self.assertIn('scripts/verify-image.sh "$IMAGE_REF" "$RELEASE_TAG"', promotion)
+    self.assertIn("imagetools create --prefer-index=false", promotion)
+    self.assertIn('scripts/inspect-ghcr-tag.sh "$stable_ref"', promotion)
+    self.assertNotIn("r1-meshdb:latest", promotion)
+    self.assertLess(
+      promotion.index('scripts/verify-image.sh "$IMAGE_REF" "$RELEASE_TAG"'),
+      promotion.index("imagetools create --prefer-index=false"),
+    )
+
   def test_published_image_verifier_binds_release_source_and_binary(self):
     verifier = read("scripts/verify-image.sh")
     for required in (
@@ -1073,6 +1102,7 @@ func value() string {
     for workflow_path in (
       ".github/workflows/release.yml",
       ".github/workflows/security.yml",
+      ".github/workflows/promote-stable.yml",
     ):
       workflow = read(workflow_path)
       self.assertIn(f"uses: {installer}", workflow)
@@ -1155,6 +1185,27 @@ printf '%s' "${FAKE_REGISTRY_STATUS}"
         stderr=subprocess.PIPE,
       )
       self.assertNotEqual(result.returncode, 0)
+
+      stable_result = subprocess.run(
+        ["bash", "scripts/inspect-ghcr-tag.sh", "ghcr.io/ratio1/r1-meshdb:stable"],
+        cwd=ROOT,
+        env={**environment, "FAKE_REGISTRY_STATUS": "200"},
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+      )
+      self.assertEqual(stable_result.returncode, 0, stable_result.stderr)
+      self.assertEqual(stable_result.stdout.strip(), digest)
+
+      latest_result = subprocess.run(
+        ["bash", "scripts/inspect-ghcr-tag.sh", "ghcr.io/ratio1/r1-meshdb:latest"],
+        cwd=ROOT,
+        env={**environment, "FAKE_REGISTRY_STATUS": "200"},
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+      )
+      self.assertEqual(latest_result.returncode, 2)
 
   def test_github_release_inspection_fails_closed(self):
     fake_curl = r'''#!/usr/bin/env bash
@@ -1462,7 +1513,7 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
 
     self.assertIn("${{ github.run_id }}-${{ github.run_attempt }}", release)
     self.assertIn("workflow_run:", cleanup)
-    self.assertIn("workflows: [Release signed image]", cleanup)
+    self.assertIn("workflows: [Release signed image, Release latest signed image]", cleanup)
     self.assertIn("workflow_dispatch:", cleanup)
     self.assertIn("run_id:", cleanup)
     self.assertIn("run_attempt:", cleanup)

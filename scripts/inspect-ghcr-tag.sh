@@ -5,12 +5,12 @@
 set -euo pipefail
 umask 077
 
-tagged_ref="${1:?usage: inspect-ghcr-tag.sh <ghcr-version-tag>}"
+tagged_ref="${1:?usage: inspect-ghcr-tag.sh <ghcr-version-or-stable-tag>}"
 : "${GHCR_USERNAME:?GHCR_USERNAME is required}"
 : "${GHCR_TOKEN:?GHCR_TOKEN is required}"
 
-if [[ ! "${tagged_ref}" =~ ^ghcr\.io/ratio1/r1-meshdb:(v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$ ]]; then
-  echo "invalid R1 MeshDB GHCR version tag: ${tagged_ref}" >&2
+if [[ ! "${tagged_ref}" =~ ^ghcr\.io/ratio1/r1-meshdb:(v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)|stable)$ ]]; then
+  echo "invalid R1 MeshDB GHCR tag: ${tagged_ref}" >&2
   exit 2
 fi
 tag="${BASH_REMATCH[1]}"

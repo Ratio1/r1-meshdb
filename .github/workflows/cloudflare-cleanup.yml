@@ -2,7 +2,7 @@ name: Recover ephemeral Cloudflare resources
 
 on:
   workflow_run:
-    workflows: [Release signed image]
+    workflows: [Release signed image, Release latest signed image]
     types: [completed]
   workflow_dispatch:
     inputs:

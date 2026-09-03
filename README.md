@@ -25,9 +25,12 @@ The release image is published as:
 ghcr.io/ratio1/r1-meshdb
 ```
 
-Production deployments must use an immutable digest. Release workflows publish
-an immutable version tag and update `latest` only after release publication,
-but those tags are not a substitute for a digest pin.
+Release workflows publish an immutable version tag and update `latest` only
+after release publication. The separate protected promotion workflow moves
+`stable` to an explicitly selected published version. Ratio1 Deeploy consumes
+`stable` with an always-pull policy so a service restart can adopt the promoted
+digest; consumers that require a fixed runtime must continue to use an
+immutable digest.
 
 The executable intentionally remains `/cockroach/cockroach` to preserve the
 upstream wire protocol, on-disk format, diagnostic tooling, and existing
