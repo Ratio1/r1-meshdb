@@ -1,3 +1,5 @@
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 /*
  *
  * Copyright 2024 gRPC authors.
@@ -58,10 +60,6 @@ func init() {
 
 	internal.SetDefaultBufferPool = func(pool BufferPool) {
 		defaultBufferPool = pool
-	}
-
-	internal.SetBufferPoolingThresholdForTesting = func(threshold int) {
-		bufferPoolingThreshold = threshold
 	}
 }
 

@@ -32059,6 +32059,18 @@
       "spdx": "Apache-2.0"
     },
     {
+      "basis": "Apache-2.0 source header",
+      "path": "engine/pkg/ui/distoss/assets/bundle.js",
+      "sha256": "943c18a71d962e3a8a5eb8bb7d3c37e005869378a8d38d6955a05ec114c654a8",
+      "spdx": "Apache-2.0"
+    },
+    {
+      "basis": "Apache-2.0 source header",
+      "path": "engine/pkg/ui/distoss/assets/favicon.svg",
+      "sha256": "01cb533ab1aa424a4d2f7a50d568a5deb40450533fd2374f439b334cee29fc13",
+      "spdx": "Apache-2.0"
+    },
+    {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/ui/distoss/distoss_no_bazel.go",
       "sha256": "180e745fc3d0dc9a2c4520d722326e3feb2c01b42adbc7168e8a6fdcb59b4933",
@@ -32067,7 +32079,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/ui/ui.go",
-      "sha256": "97a0d3e4aeb2c7f9141582a4e830240c23be3fd836f1d9c98d4a6bed25f2c751",
+      "sha256": "808a36cb077d04db57e71e3b0116e9f50013279dfee1441695732afe7d55e1fa",
       "spdx": "Apache-2.0"
     },
     {
@@ -69669,7 +69681,7 @@
     {
       "basis": "engine/vendor/google.golang.org/grpc/LICENSE",
       "path": "engine/vendor/google.golang.org/grpc/internal/envconfig/envconfig.go",
-      "sha256": "6878cf4ac6f7c980be3a5728fd8d49ed0c9d361d61219585e67f9f4ab8d07eeb",
+      "sha256": "e6d70a399a5731c7e589f4e695362abbe466fd7cde7ac24e12f6ed02f63f3fef",
       "spdx": "Apache-2.0"
     },
     {
@@ -69783,7 +69795,7 @@
     {
       "basis": "engine/vendor/google.golang.org/grpc/LICENSE",
       "path": "engine/vendor/google.golang.org/grpc/internal/mem/buffer_pool.go",
-      "sha256": "2a30acb99325c3aa624a32a0e3205b9f5e4a3a8874b0aeccbcc7fcec60da34fd",
+      "sha256": "a12190d506587f35df838456d2b9b383605e2f9d68dd5fd3431198964b0bc37e",
       "spdx": "Apache-2.0"
     },
     {
@@ -69939,19 +69951,19 @@
     {
       "basis": "engine/vendor/google.golang.org/grpc/LICENSE",
       "path": "engine/vendor/google.golang.org/grpc/internal/transport/handler_server.go",
-      "sha256": "33b03ba6ff18b4114a8042be82d6a02d2a1ce64be59a76e0497e9030667ffcf5",
+      "sha256": "1a8d2bd83479720ad778e8aae9c4a67606a3c0ef94866d97b74dff1766fd29b0",
       "spdx": "Apache-2.0"
     },
     {
       "basis": "engine/vendor/google.golang.org/grpc/LICENSE",
       "path": "engine/vendor/google.golang.org/grpc/internal/transport/http2_client.go",
-      "sha256": "71830eb7918bccbc3b2718689cc7971f74b5a177981f182bf4fdfe1dcafe860f",
+      "sha256": "780f41c5de446215de3b3f12c511bfdd5c44e8ff6a9ccca22ae6000fa0465e12",
       "spdx": "Apache-2.0"
     },
     {
       "basis": "engine/vendor/google.golang.org/grpc/LICENSE",
       "path": "engine/vendor/google.golang.org/grpc/internal/transport/http2_server.go",
-      "sha256": "b74a585d5c247df8d30894271c92fccb431bcbf165780c46b6aabd17cdffd6b3",
+      "sha256": "abe9bc2f39ce79580ab155b3125f4cef60cc1be04f4c3a37854bc0c6cf4c5d73",
       "spdx": "Apache-2.0"
     },
     {
@@ -70004,6 +70016,12 @@
     },
     {
       "basis": "engine/vendor/google.golang.org/grpc/LICENSE",
+      "path": "engine/vendor/google.golang.org/grpc/internal/transport/recv_buffer_compaction_r1_test.go",
+      "sha256": "038d26c58fbd6eb287f95ee6be9b46d41e46612e74cc390a0385bde99a38baa4",
+      "spdx": "Apache-2.0"
+    },
+    {
+      "basis": "engine/vendor/google.golang.org/grpc/LICENSE",
       "path": "engine/vendor/google.golang.org/grpc/internal/transport/server_stream.go",
       "sha256": "aa8d18fb85ba760bef634e337cca4160e4b221808bb9f777fb87841b1457eda2",
       "spdx": "Apache-2.0"
@@ -70011,7 +70029,7 @@
     {
       "basis": "engine/vendor/google.golang.org/grpc/LICENSE",
       "path": "engine/vendor/google.golang.org/grpc/internal/transport/transport.go",
-      "sha256": "99d5017abb839720cce3c96b3af753d0183f1dcb6dff16fd1be9d14de0e4dcf2",
+      "sha256": "2f705c6c539dfe94effa83350af6705974d30c8386c3893200bd9da50a811bef",
       "spdx": "Apache-2.0"
     },
     {
@@ -70041,7 +70059,7 @@
     {
       "basis": "engine/vendor/google.golang.org/grpc/LICENSE",
       "path": "engine/vendor/google.golang.org/grpc/mem/buffer_pool.go",
-      "sha256": "64c9863332bad069a10ad838b2ffa40d05c3f0efb22075891df154d83bc529b1",
+      "sha256": "fa497ba4663f687847a39f1eeae4c8048231154a37c11c1502639db4cc2c92bf",
       "spdx": "Apache-2.0"
     },
     {
@@ -70053,7 +70071,7 @@
     {
       "basis": "engine/vendor/google.golang.org/grpc/LICENSE",
       "path": "engine/vendor/google.golang.org/grpc/mem/buffers.go",
-      "sha256": "1655293f6339682b3f8889cfbd725229315c9d0088d0a9d5d042a6fa99008d0c",
+      "sha256": "52a29467514485fe9ad47168d45891ae89448d1b5eeaaf0fbdff36468f3bfe77",
       "spdx": "Apache-2.0"
     },
     {

@@ -3042,6 +3042,8 @@ pkg/ts/tspb/timeseries.pb.go
 pkg/ts/tspb/timeseries.pb.gw.go
 pkg/ts/tsutil/util.go
 pkg/ui/distoss/assets/.gitkeep
+pkg/ui/distoss/assets/bundle.js
+pkg/ui/distoss/assets/favicon.svg
 pkg/ui/distoss/distoss_no_bazel.go
 pkg/ui/ui.go
 pkg/upgrade/doc.go

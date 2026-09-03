@@ -4,12 +4,17 @@ This file records every deliberate difference between upstream CockroachDB
 v23.1.28 commit `76e598c9b1c100fd9280b979140b5e377c330a20` and this distribution.
 Every released file is covered by `source/manifest.sha256`.
 
-R1 MeshDB v1.0.1 adds a reviewed `not_affected` OpenVEX decision for
+R1 MeshDB v1.0.1 adds a first-party, dependency-free browser console at
+`engine/pkg/ui/distoss/assets/bundle.js`, with its icon at
+`engine/pkg/ui/distoss/assets/favicon.svg`. The console uses the retained
+authenticated v2 login and SQL APIs to show cluster identity, list user tables,
+and run SQL. `engine/pkg/ui/ui.go` links these assets from the console page.
+
+The release also adds a reviewed `not_affected` OpenVEX decision for
 `CVE-2026-53613`. The advisory targets util-linux's setuid `mount` path; the
 minimal scratch runtime retains only non-setuid `setsid` from that package and
-contains no `mount`, `umount`, `libmount`, or `/etc/fstab`. The release changes
-security metadata and versioned build identity without changing database,
-wire-protocol, consensus, or store-format behavior.
+contains no `mount`, `umount`, `libmount`, or `/etc/fstab`. These changes do not
+alter database, wire-protocol, consensus, or store-format behavior.
 
 ## Source Preparation
 
@@ -62,7 +67,7 @@ documentation, and telemetry defaults in these retained upstream files:
 - `engine/pkg/settings/cluster/cluster_settings.go`
 - `engine/pkg/sql/crdb_internal.go`
 - `engine/pkg/sql/vars.go`
-- `engine/pkg/ui/ui.go`
+- `engine/pkg/ui/ui.go` (product identity and first-party console asset links)
 - `engine/pkg/util/log/clog.go`
 - `engine/pkg/util/log/logcrash/crash_reporting.go`
 - `engine/pkg/util/tracing/tracer.go`
@@ -152,6 +157,23 @@ non-cancellable contexts.
   recognizes PostgreSQL dollar-quoted strings and clamps overflowing
   placeholders. `sanitize_r1_test.go` covers both cases; the backport follows
   upstream fix commit `60644f84918a8af66d14a4b0d865d4edafd955da`.
+- `CVE-2026-84304`: the official gRPC-Go receive-buffer compaction fix from
+  commit `8cfeca0e1ee5ea0980dcc320e20240fa1079ec77` is backported to the engine's
+  vendored v1.82.1 source and Cloudflared's vendored v1.83.0 source. The engine
+  changes are hash-pinned at:
+  - `engine/vendor/google.golang.org/grpc/internal/envconfig/envconfig.go`
+  - `engine/vendor/google.golang.org/grpc/internal/mem/buffer_pool.go`
+  - `engine/vendor/google.golang.org/grpc/internal/transport/handler_server.go`
+  - `engine/vendor/google.golang.org/grpc/internal/transport/http2_client.go`
+  - `engine/vendor/google.golang.org/grpc/internal/transport/http2_server.go`
+  - `engine/vendor/google.golang.org/grpc/internal/transport/transport.go`
+  - `engine/vendor/google.golang.org/grpc/mem/buffer_pool.go`
+  - `engine/vendor/google.golang.org/grpc/mem/buffers.go`
+  - `engine/vendor/google.golang.org/grpc/internal/transport/recv_buffer_compaction_r1_test.go`
+  Cloudflared applies the exact v1.83.0 patch in
+  `security/backports/grpc-go-cve-2026-84304-v1.83.0.patch` before its tests and
+  reproducible build. The regression bounds fragmented receive backlogs to a
+  pooled compacted buffer instead of retaining one heap object per DATA frame.
 
 ## Ratio1 Runtime Layer
 
@@ -205,8 +227,9 @@ operation is no longer supported.
 - Uses digest-pinned neutral Go and Debian images.
 - Builds Cloudflared from exact source commit
   `b4f47e2ab538ab6e31d3dc6adc5489455ad446de` and a checksum-pinned source
-  archive, then enforces the reviewed reproducible binary hash. Its focused
-  command, carrier, and tunnel RPC tests run during the image build.
+  archive, applies the hash-pinned `CVE-2026-84304` gRPC backport, then enforces
+  the reviewed reproducible binary hash. Its focused command, carrier, and
+  tunnel RPC tests run during the image build.
 - Resolves Debian packages from a dated snapshot and pins direct package
   versions.
 - Accompanies retained Debian object code with exact binary-to-source mappings,

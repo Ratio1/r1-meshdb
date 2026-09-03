@@ -113,6 +113,9 @@ jobs:
             timeout --signal=TERM --kill-after=60s 20m \
             testbed/run-local-cluster.sh r1-meshdb:ci
 
+      - name: Prove the browser console asset and authenticated API
+        run: scripts/secure-single-node-smoke.sh r1-meshdb:ci
+
       - name: Prove persisted rolling upgrade and rollback compatibility
         run: |
           R1_MESHDB_REQUIRE_DIGEST=false \

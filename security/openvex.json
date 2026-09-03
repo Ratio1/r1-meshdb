@@ -1,10 +1,10 @@
 {
   "@context": "https://openvex.dev/ns/v0.2.0",
-  "@id": "https://github.com/Ratio1/r1-meshdb/security/vex/4",
+  "@id": "https://github.com/Ratio1/r1-meshdb/security/vex/5",
   "author": "Ratio1",
   "role": "Project Maintainer",
-  "timestamp": "2026-09-01T00:00:00Z",
-  "version": 4,
+  "timestamp": "2026-09-02T00:00:00Z",
+  "version": 5,
   "statements": [
     {
       "vulnerability": {
@@ -40,6 +40,25 @@
       ],
       "status": "fixed",
       "status_notes": "Ratio1 backports the maintained negative DataRow field-length check from pgx commit 7f382f5190f58c16f5bd9d60f4443b658a5a3a22. The patched source and direct plus full-frame regressions are hash-pinned in source/ratio1-engine-overrides.json."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://nvd.nist.gov/vuln/detail/CVE-2026-84304",
+        "aliases": [
+          "CVE-2026-84304",
+          "GHSA-vp52-pcj8-j9qc"
+        ]
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/google.golang.org/grpc@v1.82.1"
+        },
+        {
+          "@id": "pkg:golang/google.golang.org/grpc@v1.83.0"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "Ratio1 backports the official gRPC-Go receive-buffer compaction fix from commit 8cfeca0e1ee5ea0980dcc320e20240fa1079ec77 to the engine's vendored v1.82.1 source and the Cloudflared build's vendored v1.83.0 source. Exact preimage, patch, distributed-source, and regression hashes are enforced by the provenance and security verifiers."
     },
     {
       "vulnerability": {

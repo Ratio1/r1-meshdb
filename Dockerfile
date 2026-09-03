@@ -12,9 +12,19 @@ ADD --checksum=sha256:e897f2cdb6f63964bb7b5841df80087489a65ab9fda356ef48dd13202b
   https://github.com/cloudflare/cloudflared/archive/b4f47e2ab538ab6e31d3dc6adc5489455ad446de.tar.gz \
   /tmp/cloudflared.tar.gz
 
-RUN mkdir /cloudflared \
+COPY security/backports/grpc-go-cve-2026-84304-v1.83.0.patch /tmp/grpc-go-cve-2026-84304.patch
+
+RUN printf '%s  %s\n' \
+      'c98442d4f6badbb1b0adcfa79dc28478eb105d1cdbad4ca232c85f4a3c653043' \
+      '/tmp/grpc-go-cve-2026-84304.patch' \
+    | sha256sum -c - \
+  && mkdir /cloudflared \
   && tar -xzf /tmp/cloudflared.tar.gz --strip-components=1 -C /cloudflared \
-  && rm /tmp/cloudflared.tar.gz
+  && git -C /cloudflared apply --directory=vendor/google.golang.org/grpc --unidiff-zero \
+       --check /tmp/grpc-go-cve-2026-84304.patch \
+  && git -C /cloudflared apply --directory=vendor/google.golang.org/grpc --unidiff-zero \
+       /tmp/grpc-go-cve-2026-84304.patch \
+  && rm /tmp/cloudflared.tar.gz /tmp/grpc-go-cve-2026-84304.patch
 
 WORKDIR /cloudflared
 
@@ -27,7 +37,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     -ldflags="-s -w -X main.Version=${CLOUDFLARED_VERSION} -X main.BuildTime=2026-08-12-16:57_UTC -X github.com/cloudflare/cloudflared/metrics.Runtime=virtual" \
     -o /out/cloudflared ./cmd/cloudflared \
   && printf '%s  %s\n' \
-      '77d66f9223e8ec418ef31613ee861e2e9067f6b2544ec93d185a2e468fcb2e47' \
+      'd6e54c10c671c061bcb04404c9e2fd7dedb4f5f8a4d9b9ec1b35b6fa1973b62d' \
       '/out/cloudflared' \
     | sha256sum -c -
 
@@ -91,6 +101,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   && go test -mod=vendor \
     github.com/jackc/pgproto3/v2 \
     github.com/jackc/pgx/v4/internal/sanitize \
+    google.golang.org/grpc/internal/transport \
     ./pkg/util/ctxutil \
     ./pkg/util/goschedstats \
   && go test -vet=off -mod=vendor \

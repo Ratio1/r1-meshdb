@@ -1,0 +1,5 @@
+<!-- Copyright 2026 Ratio1. Licensed under the Apache License, Version 2.0 (the "License"). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="12" fill="#172126"/>
+  <path d="M15 17h19c9 0 15 5 15 13 0 6-3 10-9 12l10 8H38L27 41v9H15V17zm12 9v7h7c3 0 4-1 4-4s-1-3-4-3h-7z" fill="#fff"/>
+</svg>

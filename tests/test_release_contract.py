@@ -41,6 +41,16 @@ def source_baseline(repository: Path, commit: str, content: bytes) -> dict:
 
 class ReleaseContractTests(unittest.TestCase):
 
+  def test_console_has_a_renderable_first_party_asset(self):
+    bundle_path = ROOT / "engine/pkg/ui/distoss/assets/bundle.js"
+    self.assertTrue(bundle_path.is_file(), "R1 MeshDB console bundle is missing")
+    bundle = bundle_path.read_text(encoding="utf-8")
+    self.assertGreater(len(bundle), 10_000)
+    self.assertIn("data-r1-meshdb-console", bundle)
+    self.assertIn("/api/v2/login/", bundle)
+    self.assertIn("/api/v2/sql/", bundle)
+    self.assertNotRegex(bundle, r"https?://")
+
   def test_release_version_resolution_is_strict_and_monotonic(self):
     resolver = load_script("scripts/resolve-release-version.py")
     resolved = resolver.resolve_release_version(
@@ -474,7 +484,7 @@ func value() string {
       f'baseline_repository != "{source_url}.git"',
       read("scripts/verify-provenance.py"),
     )
-    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/4")
+    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/5")
     self.assertEqual(
       json.loads(read("source/ratio1-engine-overrides.json"))["dependencySnapshot"]
       ["sourceBaseline"]["repository"],
@@ -584,7 +594,7 @@ func value() string {
     )
     self.assertEqual(
       cloudflared["binarySha256"],
-      "77d66f9223e8ec418ef31613ee861e2e9067f6b2544ec93d185a2e468fcb2e47",
+      "d6e54c10c671c061bcb04404c9e2fd7dedb4f5f8a4d9b9ec1b35b6fa1973b62d",
     )
     self.assertEqual(
       provenance["buildInputs"]["releaseTooling"],
@@ -610,7 +620,7 @@ func value() string {
     )
     self.assertEqual(
       {record["advisory"] for record in overrides["securityBackports"]},
-      {"GO-2026-4518", "GO-2026-5004"},
+      {"CVE-2026-84304", "GO-2026-4518", "GO-2026-5004"},
     )
     self.assertEqual(
       {record["id"] for record in overrides["dependencyCompatibilityBackports"]},
@@ -868,9 +878,10 @@ func value() string {
     self.assertIn("go test -mod=vendor", dockerfile)
     self.assertIn("github.com/jackc/pgproto3/v2", dockerfile)
     self.assertIn("github.com/jackc/pgx/v4/internal/sanitize", dockerfile)
+    self.assertIn("google.golang.org/grpc/internal/transport", dockerfile)
     self.assertIn("./pkg/util/ctxutil", dockerfile)
     self.assertIn("./pkg/util/goschedstats", dockerfile)
-    self.assertIn("77d66f9223e8ec418ef31613ee861e2e9067f6b2544ec93d185a2e468fcb2e47", dockerfile)
+    self.assertIn("d6e54c10c671c061bcb04404c9e2fd7dedb4f5f8a4d9b9ec1b35b6fa1973b62d", dockerfile)
     self.assertIn("ADD --checksum=sha256:e897f2cdb6f63964bb7b5841df80087489a65ab9fda356ef48dd13202bba59c0", dockerfile)
     self.assertNotRegex(lowered, r"from\s+cloudflare/cloudflared")
     self.assertIn("scripts/verify-cloudflared-source.py", dockerfile)
@@ -944,6 +955,17 @@ func value() string {
     self.assertIn("testbed/run-real-cloudflare-cluster.sh", read(".github/workflows/release.yml"))
     self.assertIn("scripts/runtime-supervision-smoke.sh", read(".github/workflows/ci.yml"))
     self.assertIn("scripts/runtime-supervision-smoke.sh", read(".github/workflows/release.yml"))
+    self.assertIn("scripts/secure-single-node-smoke.sh", read(".github/workflows/ci.yml"))
+    self.assertIn("scripts/secure-single-node-smoke.sh", read(".github/workflows/release.yml"))
+    secure_smoke = read("scripts/secure-single-node-smoke.sh")
+    for console_contract in (
+      "/bundle.js",
+      "data-r1-meshdb-console",
+      "/api/v2/login/",
+      "X-Cockroach-API-Session",
+      "/api/v2/sql/",
+    ):
+      self.assertIn(console_contract, secure_smoke)
     self.assertEqual(read(".github/workflows/ci.yml").count("path: source-snapshot"), 2)
     for secret in ("CF_ACCOUNT_ID", "CF_ZONE_ID", "CF_API_TOKEN", "CF_BASE_DOMAIN"):
       self.assertIn("${{ secrets." + secret + " }}", read(".github/workflows/release.yml"))

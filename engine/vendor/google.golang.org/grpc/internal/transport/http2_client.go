@@ -1,3 +1,5 @@
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 /*
  *
  * Copyright 2014 gRPC authors.
@@ -501,7 +503,7 @@ func (t *http2Client) newStream(ctx context.Context, callHdr *CallHdr, handler s
 		doneFunc:     callHdr.DoneFunc,
 		statsHandler: handler,
 	}
-	s.Stream.buf.init()
+	s.Stream.buf.init(t.bufferPool)
 	s.Stream.wq.init(defaultWriteQuota, s.done)
 	s.readRequester = s
 	// The client side stream context should have exactly the same life cycle with the user provided context.
