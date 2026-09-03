@@ -1,0 +1,128 @@
+name: Promote stable image
+run-name: Promote ${{ inputs.release_tag }} to stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Published immutable release tag to promote (for example, v1.0.1)
+        required: true
+        type: string
+
+concurrency:
+  group: r1-meshdb-stable-promotion
+  cancel-in-progress: false
+
+permissions:
+  attestations: read
+  contents: read
+  packages: write
+
+jobs:
+  promote:
+    if: github.ref == 'refs/heads/main'
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out trusted promotion implementation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned GitHub CLI
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/gh_2.97.0_linux_amd64.tar.gz"
+          curl --fail --location --silent --show-error \
+            https://github.com/cli/cli/releases/download/v2.97.0/gh_2.97.0_linux_amd64.tar.gz \
+            --output "$archive"
+          printf '%s  %s\n' \
+            a2c9b8497e1f85b1ad0dfcb78b5a622e098801b8e461e459e88e1ee12f018112 \
+            "$archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          printf '%s\n' "$RUNNER_TEMP/gh_2.97.0_linux_amd64/bin" >> "$GITHUB_PATH"
+
+      - name: Resolve the published immutable release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USERNAME: ${{ github.actor }}
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          release_tag="$INPUT_RELEASE_TAG"
+          [[ "$release_tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+
+          metadata="$(gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" \
+            --json tagName,isDraft,isPrerelease --jq '[.tagName, .isDraft, .isPrerelease] | @tsv')"
+          IFS=$'\t' read -r published_tag is_draft is_prerelease <<< "$metadata"
+          [[ "$published_tag" == "$release_tag" ]]
+          [[ "$is_draft" == "false" ]]
+          [[ "$is_prerelease" == "false" ]]
+
+          release_dir="$RUNNER_TEMP/release"
+          mkdir "$release_dir"
+          gh release download "$release_tag" --repo "$GITHUB_REPOSITORY" \
+            --pattern image-reference.txt --dir "$release_dir"
+          image_ref="$(tr -d '\r\n' < "$release_dir/image-reference.txt")"
+          [[ "$image_ref" =~ ^ghcr\.io/ratio1/r1-meshdb@sha256:[0-9a-f]{64}$ ]]
+          printf '%s\n' "$image_ref" | cmp - "$release_dir/image-reference.txt"
+
+          digest="${image_ref##*@}"
+          version_ref="ghcr.io/ratio1/r1-meshdb:${release_tag}"
+          [[ "$(scripts/inspect-ghcr-tag.sh "$version_ref")" == "$digest" ]]
+          {
+            printf 'image_ref=%s\n' "$image_ref"
+            printf 'release_tag=%s\n' "$release_tag"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
+        with:
+          cosign-release: v3.1.3
+
+      - name: Verify release identity, signatures, attestations, and public pull
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_REF: ${{ steps.release.outputs.image_ref }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+        run: scripts/verify-image.sh "$IMAGE_REF" "$RELEASE_TAG"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+        with:
+          version: v0.36.1
+          driver-opts: image=moby/buildkit:v0.32.2@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8
+
+      - name: Log in to GHCR for stable promotion
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Promote and verify stable
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USERNAME: ${{ github.actor }}
+          IMAGE_REF: ${{ steps.release.outputs.image_ref }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          digest="${IMAGE_REF##*@}"
+          stable_ref="ghcr.io/ratio1/r1-meshdb:stable"
+          previous="$(scripts/inspect-ghcr-tag.sh "$stable_ref")"
+          if [[ "$previous" != "$digest" ]]; then
+            docker buildx imagetools create --prefer-index=false --tag "$stable_ref" "$IMAGE_REF"
+          fi
+          [[ "$(scripts/inspect-ghcr-tag.sh "$stable_ref")" == "$digest" ]]
+          {
+            printf 'Promoted `%s` to `%s`.\n\n' "$RELEASE_TAG" "$stable_ref"
+            printf -- '- Previous: `%s`\n' "$previous"
+            printf -- '- Current: `%s`\n' "$digest"
+          } >> "$GITHUB_STEP_SUMMARY"

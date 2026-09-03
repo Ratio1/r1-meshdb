@@ -40,7 +40,7 @@ release SHA with an anonymously downloaded source archive before it publishes ev
 creates no Git or OCI release tag until the candidate has passed validation,
 signing, and anonymous digest pull.
 
-The workflow uses one repository-wide concurrency group with its maximum queue,
+The **Release latest signed image** workflow uses one repository-wide concurrency group with its maximum queue,
 so release promotion cannot overlap and pending version releases are retained
 up to GitHub's concurrency-group limit.
 
@@ -95,6 +95,27 @@ If a run stops between those promotion steps, the next run may resume only
 when the existing source tag resolves to the same source commit and the
 existing OCI version tag resolves to the same candidate digest. Any mismatch
 fails closed.
+
+## Release Channels
+
+`latest` identifies the newest successfully published release. Only the
+**Release latest signed image** workflow moves it, after every release gate and
+publication step succeeds.
+
+`stable` identifies the release selected for Ratio1 Deeploy. Dispatch
+**Promote stable image** from `main`, enter an exact published `vMAJOR.MINOR.PATCH`
+tag, and approve the protected `release` environment. The workflow rejects
+drafts and prereleases, checks the release's canonical `image-reference.txt`,
+requires the immutable version tag to resolve to that digest, and reruns
+`scripts/verify-image.sh` before moving `stable`. Promotions are serialized and
+the previous and resulting digests are recorded in the run summary. Roll back
+by promoting an earlier published version through the same workflow.
+
+`stable` is deliberately mutable. Deeploy uses it with an always-pull policy,
+so different nodes can adopt a promotion at different restart times. Promote
+only versions that have completed the required Deeploy local and hybrid
+validation; use an immutable digest wherever staggered restart adoption is not
+acceptable.
 
 ## Evidence
 
