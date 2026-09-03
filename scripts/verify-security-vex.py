@@ -18,6 +18,7 @@ PROMETHEUS_PURL = (
   "v1.8.2-0.20210914090109-37468d88dce8"
 )
 PGPROTO_PURL = "pkg:golang/github.com/jackc/pgproto3/v2@v2.3.3"
+THRIFT_PURL = "pkg:golang/github.com/apache/thrift@v0.23.0"
 UTIL_LINUX_PURL = (
   "pkg:deb/debian/util-linux@2.38.1-5%2Bdeb12u3?"
   "arch=amd64&distro=debian-12.15"
@@ -31,6 +32,7 @@ REMOTE_PREFIX = "engine/vendor/github.com/prometheus/prometheus/storage/remote/"
 EXPECTED = {
   "CVE-2026-42154": (PROMETHEUS_PURL, "not_affected", "vulnerable_code_not_in_execute_path"),
   "CVE-2026-32286": (PGPROTO_PURL, "fixed", None),
+  "CVE-2026-43871": (THRIFT_PURL, "fixed", None),
   "CVE-2026-84304": ((GRPC_ENGINE_PURL, GRPC_CLOUDFLARED_PURL), "fixed", None),
   "CVE-2026-53615": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
   "CVE-2026-53613": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
@@ -38,6 +40,7 @@ EXPECTED = {
   "CVE-2026-56854": (X_CRYPTO_PURL, "not_affected", "vulnerable_code_not_in_execute_path"),
 }
 REQUIRED_ALIASES = {
+  "CVE-2026-43871": {"CVE-2026-43871", "GHSA-8wv5-x4w7-5gww"},
   "CVE-2026-84304": {"CVE-2026-84304", "GHSA-vp52-pcj8-j9qc"},
   "CVE-2026-56854": {"CVE-2026-56854", "GO-2026-6303"},
 }
@@ -101,6 +104,46 @@ def verify_pgproto_backport() -> None:
   for evidence in ("negative two", "minimum int32", "RetainsNullField", "FrontendReceive"):
     if evidence not in tests:
       fail(f"pgproto3 regression evidence is absent: {evidence}")
+
+
+def verify_thrift_backport() -> None:
+  overrides = json.loads((ROOT / "source/ratio1-engine-overrides.json").read_text(encoding="utf-8"))
+  records = [
+    item for item in overrides["securityBackports"]
+    if item["advisory"] == "CVE-2026-43871"
+  ]
+  if len(records) != 1 or records[0].get("module") != "github.com/apache/thrift@v0.23.0":
+    fail("Apache Thrift backport metadata differs from the VEX product")
+  if len(records[0].get("files", [])) != 2:
+    fail("Apache Thrift backport file set is incomplete")
+  for file_record in records[0]["files"]:
+    path = ROOT / file_record["path"]
+    if not path.is_file() or sha256(path) != file_record.get("sha256"):
+      fail(f"Apache Thrift backport hash differs: {file_record.get('path')}")
+
+  modules = (ROOT / "engine/vendor/modules.txt").read_text(encoding="utf-8")
+  if "# github.com/apache/thrift v0.23.0\n" not in modules:
+    fail("Apache Thrift version differs from the VEX product")
+  implementation = (
+    ROOT / "engine/vendor/github.com/apache/thrift/lib/go/thrift/compact_protocol.go"
+  ).read_text(encoding="utf-8")
+  for marker in (
+    "const maxVarint64Bytes = 10",
+    "for rsize := 0; rsize < maxVarint64Bytes; rsize++",
+    'errors.New("variable-length int over 10 bytes")',
+  ):
+    if marker not in implementation:
+      fail(f"Apache Thrift varint backport evidence is absent: {marker}")
+  tests = (
+    ROOT / "engine/vendor/github.com/apache/thrift/lib/go/thrift/compact_protocol_r1_test.go"
+  ).read_text(encoding="utf-8")
+  for marker in (
+    "TestRatio1CompactProtocolRejectsOverlongVarint",
+    "TestRatio1CompactProtocolAcceptsValidTenByteVarint",
+    "transport.Len(), 1",
+  ):
+    if marker not in tests:
+      fail(f"Apache Thrift backport regression evidence is absent: {marker}")
 
 
 def verify_grpc_backport() -> None:
@@ -240,9 +283,9 @@ def main() -> None:
   document = json.loads(VEX.read_text(encoding="utf-8"))
   if document.get("@context") != "https://openvex.dev/ns/v0.2.0":
     fail("unexpected OpenVEX context")
-  if document.get("@id") != "https://github.com/Ratio1/r1-meshdb/security/vex/5":
+  if document.get("@id") != "https://github.com/Ratio1/r1-meshdb/security/vex/6":
     fail("unexpected OpenVEX document identity")
-  if document.get("version") != 5 or document.get("timestamp") != "2026-09-02T00:00:00Z":
+  if document.get("version") != 6 or document.get("timestamp") != "2026-09-03T00:00:00Z":
     fail("unexpected OpenVEX document version or timestamp")
   statements = document.get("statements")
   if not isinstance(statements, list) or len(statements) != len(EXPECTED):
@@ -253,6 +296,7 @@ def main() -> None:
 
   verify_prometheus()
   verify_pgproto_backport()
+  verify_thrift_backport()
   verify_grpc_backport()
   verify_minimal_runtime()
   verify_ssh_server_authentication_absence()

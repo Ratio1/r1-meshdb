@@ -59,7 +59,12 @@ EXPECTED_ADDED_FILES = {
   "engine/pkg/util/goschedstats/runtime_go1.26.go",
   "engine/pkg/util/goschedstats/runtime_go1.26_test.go",
 }
-EXPECTED_SECURITY_BACKPORTS = {"CVE-2026-84304", "GO-2026-4518", "GO-2026-5004"}
+EXPECTED_SECURITY_BACKPORTS = {
+  "CVE-2026-43871",
+  "CVE-2026-84304",
+  "GO-2026-4518",
+  "GO-2026-5004",
+}
 EXPECTED_COMPATIBILITY_BACKPORTS = {"google-api-grpc-credentials-options"}
 MIN_RETAINED_UPSTREAM_PACKAGE_FILES = 3000
 MODIFICATION_NOTICE = b"Modified by Ratio1 in 2026; see RATIO1_PATCHES.md."

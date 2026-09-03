@@ -99,6 +99,7 @@ RUN --mount=from=cloudflared-builder,source=/cloudflared,target=/cloudflared,ro 
 RUN --mount=type=cache,target=/root/.cache/go-build \
   cd /workspace/engine \
   && go test -mod=vendor \
+    github.com/apache/thrift/lib/go/thrift \
     github.com/jackc/pgproto3/v2 \
     github.com/jackc/pgx/v4/internal/sanitize \
     google.golang.org/grpc/internal/transport \

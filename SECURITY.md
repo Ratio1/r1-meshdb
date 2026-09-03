@@ -70,6 +70,14 @@ identifies the upstream module version, so the exact VEX decision is `fixed`;
 the patch and test hashes are enforced by
 `source/ratio1-engine-overrides.json`.
 
+`CVE-2026-43871` / `GHSA-8wv5-x4w7-5gww` permits an unauthenticated remote
+peer to cause unbounded compact-protocol varint reads in Apache Thrift Go
+versions before v0.24.0. The engine's vendored v0.23.0 source contains the
+official 10-byte bound from Apache Thrift commit
+`d5152211af61f850ec393604316804096dd4632e`. The implementation preimage,
+patched source, and boundary regressions are hash-pinned in
+`source/ratio1-engine-overrides.json`, so the exact VEX decision is `fixed`.
+
 `CVE-2026-84304` / `GHSA-vp52-pcj8-j9qc` permits unauthenticated HTTP/2 DATA
 frame fragmentation to retain excessive heap objects in gRPC-Go servers. The
 database engine embeds gRPC v1.82.1 and Cloudflared embeds v1.83.0, so both are
