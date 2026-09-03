@@ -1,10 +1,10 @@
 {
   "@context": "https://openvex.dev/ns/v0.2.0",
-  "@id": "https://github.com/Ratio1/r1-meshdb/security/vex/5",
+  "@id": "https://github.com/Ratio1/r1-meshdb/security/vex/6",
   "author": "Ratio1",
   "role": "Project Maintainer",
-  "timestamp": "2026-09-02T00:00:00Z",
-  "version": 5,
+  "timestamp": "2026-09-03T00:00:00Z",
+  "version": 6,
   "statements": [
     {
       "vulnerability": {
@@ -40,6 +40,22 @@
       ],
       "status": "fixed",
       "status_notes": "Ratio1 backports the maintained negative DataRow field-length check from pgx commit 7f382f5190f58c16f5bd9d60f4443b658a5a3a22. The patched source and direct plus full-frame regressions are hash-pinned in source/ratio1-engine-overrides.json."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://nvd.nist.gov/vuln/detail/CVE-2026-43871",
+        "aliases": [
+          "CVE-2026-43871",
+          "GHSA-8wv5-x4w7-5gww"
+        ]
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/github.com/apache/thrift@v0.23.0"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "Ratio1 backports the official Apache Thrift Go compact-protocol varint bound from commit d5152211af61f850ec393604316804096dd4632e. Exact implementation preimage, patched source, and boundary regression hashes are enforced by source/ratio1-engine-overrides.json."
     },
     {
       "vulnerability": {

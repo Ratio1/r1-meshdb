@@ -157,6 +157,12 @@ non-cancellable contexts.
   recognizes PostgreSQL dollar-quoted strings and clamps overflowing
   placeholders. `sanitize_r1_test.go` covers both cases; the backport follows
   upstream fix commit `60644f84918a8af66d14a4b0d865d4edafd955da`.
+- `CVE-2026-43871`:
+  `engine/vendor/github.com/apache/thrift/lib/go/thrift/compact_protocol.go`
+  rejects compact-protocol varints longer than the valid 10-byte encoding for
+  a 64-bit integer. `compact_protocol_r1_test.go` covers the overlong input and
+  valid 10-byte boundary; the backport is the exact Go fix from Apache Thrift
+  commit `d5152211af61f850ec393604316804096dd4632e`.
 - `CVE-2026-84304`: the official gRPC-Go receive-buffer compaction fix from
   commit `8cfeca0e1ee5ea0980dcc320e20240fa1079ec77` is backported to the engine's
   vendored v1.82.1 source and Cloudflared's vendored v1.83.0 source. The engine

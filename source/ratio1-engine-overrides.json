@@ -343,6 +343,25 @@
       ]
     },
     {
+      "module": "github.com/apache/thrift@v0.23.0",
+      "advisory": "CVE-2026-43871",
+      "source": "https://github.com/apache/thrift/commit/d5152211af61f850ec393604316804096dd4632e",
+      "preimageCommit": "38e4c896cab7a547b3be3df5ac203f3afcc38a6d",
+      "files": [
+        {
+          "path": "engine/vendor/github.com/apache/thrift/lib/go/thrift/compact_protocol.go",
+          "changeType": "modified-upstream",
+          "preimageSha256": "3a703697f986dd339b7a2cdfa31c117dfbf553431e1847c4c01175eb2d66fbe4",
+          "sha256": "d2784d15f4f9e57510b30f9bc3d5424f895dd7f0db050138985b3550a7c097ec"
+        },
+        {
+          "path": "engine/vendor/github.com/apache/thrift/lib/go/thrift/compact_protocol_r1_test.go",
+          "changeType": "ratio1-added",
+          "sha256": "a41d68c6ddc3c7839bb586af8604b772c8bfdbff4ae9ae7531e8bcd842d290a8"
+        }
+      ]
+    },
+    {
       "module": "google.golang.org/grpc@v1.82.1",
       "advisory": "CVE-2026-84304",
       "source": "https://github.com/grpc/grpc-go/commit/8cfeca0e1ee5ea0980dcc320e20240fa1079ec77",

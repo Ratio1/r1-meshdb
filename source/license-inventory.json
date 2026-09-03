@@ -38769,7 +38769,13 @@
     {
       "basis": "engine/vendor/github.com/apache/thrift/LICENSE",
       "path": "engine/vendor/github.com/apache/thrift/lib/go/thrift/compact_protocol.go",
-      "sha256": "3a703697f986dd339b7a2cdfa31c117dfbf553431e1847c4c01175eb2d66fbe4",
+      "sha256": "d2784d15f4f9e57510b30f9bc3d5424f895dd7f0db050138985b3550a7c097ec",
+      "spdx": "Apache-2.0"
+    },
+    {
+      "basis": "engine/vendor/github.com/apache/thrift/LICENSE",
+      "path": "engine/vendor/github.com/apache/thrift/lib/go/thrift/compact_protocol_r1_test.go",
+      "sha256": "a41d68c6ddc3c7839bb586af8604b772c8bfdbff4ae9ae7531e8bcd842d290a8",
       "spdx": "Apache-2.0"
     },
     {

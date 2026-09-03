@@ -484,7 +484,7 @@ func value() string {
       f'baseline_repository != "{source_url}.git"',
       read("scripts/verify-provenance.py"),
     )
-    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/5")
+    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/6")
     self.assertEqual(
       json.loads(read("source/ratio1-engine-overrides.json"))["dependencySnapshot"]
       ["sourceBaseline"]["repository"],
@@ -620,7 +620,7 @@ func value() string {
     )
     self.assertEqual(
       {record["advisory"] for record in overrides["securityBackports"]},
-      {"CVE-2026-84304", "GO-2026-4518", "GO-2026-5004"},
+      {"CVE-2026-43871", "CVE-2026-84304", "GO-2026-4518", "GO-2026-5004"},
     )
     self.assertEqual(
       {record["id"] for record in overrides["dependencyCompatibilityBackports"]},
@@ -876,6 +876,7 @@ func value() string {
     self.assertIn("scripts/build-engine.sh", dockerfile)
     self.assertIn("scripts/verify-provenance.py", dockerfile)
     self.assertIn("go test -mod=vendor", dockerfile)
+    self.assertIn("github.com/apache/thrift/lib/go/thrift", dockerfile)
     self.assertIn("github.com/jackc/pgproto3/v2", dockerfile)
     self.assertIn("github.com/jackc/pgx/v4/internal/sanitize", dockerfile)
     self.assertIn("google.golang.org/grpc/internal/transport", dockerfile)
