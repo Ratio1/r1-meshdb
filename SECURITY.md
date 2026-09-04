@@ -112,6 +112,14 @@ component.
 - `CVE-2026-53613` is in util-linux's setuid `mount` target-path handling for
   restricted user mounts. The scratch runtime retains only non-setuid `setsid`;
   `mount`, `umount`, `libmount`, and `/etc/fstab` are absent.
+- `CVE-2026-76642` and `CVE-2026-78410` affect privileged `mount`/`libmount`
+  hooks introduced in util-linux v2.39. The retained package is v2.38.1 and the
+  final image contains neither those components nor `/etc/fstab`.
+- `CVE-2026-78408` affects `nsenter --join-cgroup`, introduced in util-linux
+  v2.40. The retained package is v2.38.1 and `nsenter` is absent.
+- `CVE-2026-78409` affects the detached-tree `X-mount.subdir` path introduced
+  in util-linux v2.42. The retained package is v2.38.1 and `mount`, `libmount`,
+  and `/etc/fstab` are absent.
 - `CVE-2025-69720` is in the `infocmp` command's `analyze_string` function.
   `infocmp`, ncurses commands, and `libncurses` are absent; only `libtinfo` is
   retained for Bash and the database binary.
