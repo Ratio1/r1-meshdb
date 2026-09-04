@@ -10,11 +10,12 @@ R1 MeshDB v1.0.2 includes a first-party, dependency-free browser console at
 authenticated v2 login and SQL APIs to show cluster identity, list user tables,
 and run SQL. `engine/pkg/ui/ui.go` links these assets from the console page.
 
-The release also adds a reviewed `not_affected` OpenVEX decision for
-`CVE-2026-53613`. The advisory targets util-linux's setuid `mount` path; the
-minimal scratch runtime retains only non-setuid `setsid` from that package and
-contains no `mount`, `umount`, `libmount`, or `/etc/fstab`. These changes do not
-alter database, wire-protocol, consensus, or store-format behavior.
+The release also includes reviewed `not_affected` OpenVEX decisions for
+util-linux findings. The minimal scratch runtime retains only non-setuid
+`setsid` from v2.38.1 and contains no `mount`, `umount`, `nsenter`, `libmount`,
+or `/etc/fstab`; the September findings target components introduced in v2.39,
+v2.40, or v2.42. These changes do not alter database, wire-protocol, consensus,
+or store-format behavior.
 
 ## Source Preparation
 

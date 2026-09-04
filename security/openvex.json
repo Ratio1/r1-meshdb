@@ -1,10 +1,10 @@
 {
   "@context": "https://openvex.dev/ns/v0.2.0",
-  "@id": "https://github.com/Ratio1/r1-meshdb/security/vex/6",
+  "@id": "https://github.com/Ratio1/r1-meshdb/security/vex/7",
   "author": "Ratio1",
   "role": "Project Maintainer",
-  "timestamp": "2026-09-03T00:00:00Z",
-  "version": 6,
+  "timestamp": "2026-09-04T00:00:00Z",
+  "version": 7,
   "statements": [
     {
       "vulnerability": {
@@ -109,6 +109,74 @@
       "status": "not_affected",
       "justification": "vulnerable_code_not_present",
       "impact_statement": "The advisory affects target-path handling in the setuid mount executable for restricted user mounts. The scratch runtime retains only non-setuid setsid from util-linux; mount, umount, libmount, /etc/fstab, and the vulnerable restricted-mount path are absent."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://nvd.nist.gov/vuln/detail/CVE-2026-76642",
+        "aliases": [
+          "CVE-2026-76642",
+          "GHSA-m25x-3hj9-m26f"
+        ]
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/util-linux@2.38.1-5%2Bdeb12u3?arch=amd64&distro=debian-12.15"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "The advisory affects privileged post-mount hooks introduced in util-linux v2.39. R1 MeshDB retains only non-setuid setsid from util-linux v2.38.1; mount, libmount, external mount helpers, and /etc/fstab are absent."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://nvd.nist.gov/vuln/detail/CVE-2026-78408",
+        "aliases": [
+          "CVE-2026-78408",
+          "GHSA-55fx-f4gg-cfhj"
+        ]
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/util-linux@2.38.1-5%2Bdeb12u3?arch=amd64&distro=debian-12.15"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "The advisory affects nsenter --join-cgroup, introduced in util-linux v2.40. R1 MeshDB retains only non-setuid setsid from util-linux v2.38.1; nsenter and its cgroup-joining code are absent."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://nvd.nist.gov/vuln/detail/CVE-2026-78409",
+        "aliases": [
+          "CVE-2026-78409",
+          "GHSA-8f2p-47x3-43mv"
+        ]
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/util-linux@2.38.1-5%2Bdeb12u3?arch=amd64&distro=debian-12.15"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "The advisory affects the detached-tree X-mount.subdir path introduced in util-linux v2.42. R1 MeshDB retains only non-setuid setsid from util-linux v2.38.1; mount, libmount, /etc/fstab, and the X-mount.subdir implementation are absent."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://nvd.nist.gov/vuln/detail/CVE-2026-78410",
+        "aliases": [
+          "CVE-2026-78410",
+          "GHSA-rh77-686x-2f2m"
+        ]
+      },
+      "products": [
+        {
+          "@id": "pkg:deb/debian/util-linux@2.38.1-5%2Bdeb12u3?arch=amd64&distro=debian-12.15"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "The advisory affects restricted bind-mount owner, group, and mode hooks introduced in util-linux v2.39. R1 MeshDB retains only non-setuid setsid from util-linux v2.38.1; mount, libmount, /etc/fstab, and the X-mount hook implementations are absent."
     },
     {
       "vulnerability": {

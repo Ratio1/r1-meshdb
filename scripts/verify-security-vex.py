@@ -36,6 +36,10 @@ EXPECTED = {
   "CVE-2026-84304": ((GRPC_ENGINE_PURL, GRPC_CLOUDFLARED_PURL), "fixed", None),
   "CVE-2026-53615": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
   "CVE-2026-53613": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
+  "CVE-2026-76642": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
+  "CVE-2026-78408": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
+  "CVE-2026-78409": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
+  "CVE-2026-78410": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
   "CVE-2025-69720": (LIBTINFO_PURL, "not_affected", "vulnerable_code_not_present"),
   "CVE-2026-56854": (X_CRYPTO_PURL, "not_affected", "vulnerable_code_not_in_execute_path"),
 }
@@ -43,6 +47,10 @@ REQUIRED_ALIASES = {
   "CVE-2026-43871": {"CVE-2026-43871", "GHSA-8wv5-x4w7-5gww"},
   "CVE-2026-84304": {"CVE-2026-84304", "GHSA-vp52-pcj8-j9qc"},
   "CVE-2026-56854": {"CVE-2026-56854", "GO-2026-6303"},
+  "CVE-2026-76642": {"CVE-2026-76642", "GHSA-m25x-3hj9-m26f"},
+  "CVE-2026-78408": {"CVE-2026-78408", "GHSA-55fx-f4gg-cfhj"},
+  "CVE-2026-78409": {"CVE-2026-78409", "GHSA-8f2p-47x3-43mv"},
+  "CVE-2026-78410": {"CVE-2026-78410", "GHSA-rh77-686x-2f2m"},
 }
 
 
@@ -213,16 +221,20 @@ def verify_minimal_runtime() -> None:
   }
   if not required <= package_names or forbidden & package_names:
     fail("minimal runtime package inventory does not match the VEX evidence")
+  if "util-linux=2.38.1-5+deb12u3" not in runtime_packages:
+    fail("util-linux version differs from the VEX product")
   assembler = (ROOT / "scripts/assemble-runtime-rootfs.sh").read_text(encoding="utf-8")
   if "/usr/bin/setsid" not in assembler:
     fail("the reviewed util-linux setsid executable is absent from the runtime assembler")
   for forbidden_path in (
     "/bin/mount", "/bin/umount", "/usr/bin/blkid", "/usr/bin/findmnt",
     "/usr/bin/infocmp", "/usr/bin/mount", "/usr/bin/mv", "/usr/bin/umount",
-    "/etc/fstab",
+    "/usr/bin/nsenter", "/etc/fstab",
   ):
     if forbidden_path in assembler:
       fail(f"forbidden executable entered the runtime assembler: {forbidden_path}")
+  if "libmount" in assembler:
+    fail("libmount entered the runtime assembler")
   entrypoint = (ROOT / "entrypoint.sh").read_text(encoding="utf-8")
   if "findmnt" in entrypoint or "/proc/self/mountinfo" not in entrypoint:
     fail("entrypoint mount checks do not match the util-linux VEX evidence")
@@ -283,9 +295,9 @@ def main() -> None:
   document = json.loads(VEX.read_text(encoding="utf-8"))
   if document.get("@context") != "https://openvex.dev/ns/v0.2.0":
     fail("unexpected OpenVEX context")
-  if document.get("@id") != "https://github.com/Ratio1/r1-meshdb/security/vex/6":
+  if document.get("@id") != "https://github.com/Ratio1/r1-meshdb/security/vex/7":
     fail("unexpected OpenVEX document identity")
-  if document.get("version") != 6 or document.get("timestamp") != "2026-09-03T00:00:00Z":
+  if document.get("version") != 7 or document.get("timestamp") != "2026-09-04T00:00:00Z":
     fail("unexpected OpenVEX document version or timestamp")
   statements = document.get("statements")
   if not isinstance(statements, list) or len(statements) != len(EXPECTED):

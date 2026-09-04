@@ -484,7 +484,7 @@ func value() string {
       f'baseline_repository != "{source_url}.git"',
       read("scripts/verify-provenance.py"),
     )
-    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/6")
+    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/7")
     self.assertEqual(
       json.loads(read("source/ratio1-engine-overrides.json"))["dependencySnapshot"]
       ["sourceBaseline"]["repository"],
@@ -1654,6 +1654,40 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
       "/etc/fstab",
     ):
       self.assertNotIn(forbidden_path, assembler)
+
+  def test_september_util_linux_vex_matches_version_and_minimal_runtime(self):
+    expected_aliases = {
+      "CVE-2026-76642": "GHSA-m25x-3hj9-m26f",
+      "CVE-2026-78408": "GHSA-55fx-f4gg-cfhj",
+      "CVE-2026-78409": "GHSA-8f2p-47x3-43mv",
+      "CVE-2026-78410": "GHSA-rh77-686x-2f2m",
+    }
+    vex = json.loads(read("security/openvex.json"))
+    verifier = read("scripts/verify-security-vex.py")
+    security_policy = read("SECURITY.md")
+    product = (
+      "pkg:deb/debian/util-linux@2.38.1-5%2Bdeb12u3?"
+      "arch=amd64&distro=debian-12.15"
+    )
+    for cve, ghsa in expected_aliases.items():
+      statements = [
+        statement for statement in vex["statements"]
+        if statement["vulnerability"]["@id"].endswith(cve)
+      ]
+      self.assertEqual(len(statements), 1)
+      self.assertEqual(statements[0]["status"], "not_affected")
+      self.assertEqual(statements[0]["justification"], "vulnerable_code_not_present")
+      self.assertEqual(statements[0]["products"], [{"@id": product}])
+      self.assertEqual(set(statements[0]["vulnerability"]["aliases"]), {cve, ghsa})
+      self.assertIn(cve, verifier)
+      self.assertIn(cve, security_policy)
+
+    assembler = read("scripts/assemble-runtime-rootfs.sh")
+    self.assertIn("util-linux=2.38.1-5+deb12u3", read("source/runtime-packages.txt"))
+    self.assertIn("/usr/bin/setsid", assembler)
+    for forbidden_path in ("/usr/bin/mount", "/usr/bin/nsenter", "/etc/fstab"):
+      self.assertNotIn(forbidden_path, assembler)
+    self.assertNotIn("libmount", assembler)
 
   def test_runtime_and_local_testbed_are_present(self):
     required = (
