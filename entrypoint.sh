@@ -115,6 +115,8 @@ CRDB_LOOPBACK_PREFIX="${CRDB_LOOPBACK_PREFIX:-127.77.0}"
 CRDB_CACHE="${CRDB_CACHE:-.25}"
 CRDB_MAX_SQL_MEMORY="${CRDB_MAX_SQL_MEMORY:-.25}"
 CRDB_CERTS_DIR="${CRDB_CERTS_DIR:-/cockroach/certs}"
+CRDB_NUM_REPLICAS="${CRDB_NUM_REPLICAS:-3}"
+CRDB_NUM_VOTERS="${CRDB_NUM_VOTERS:-3}"
 CRDB_ACCEPT_SQL_WITHOUT_TLS="${CRDB_ACCEPT_SQL_WITHOUT_TLS:-false}"
 CRDB_BOOTSTRAP_TIMEOUT_SECONDS="${CRDB_BOOTSTRAP_TIMEOUT_SECONDS:-300}"
 CRDB_SHUTDOWN_GRACE_SECONDS="${CRDB_SHUTDOWN_GRACE_SECONDS:-3}"
@@ -260,6 +262,13 @@ validate_identifier "CRDB_DATABASE" "${CRDB_DATABASE}"
 validate_identifier "CRDB_USER" "${CRDB_USER}"
 validate_positive_integer "CRDB_NODE_ID" "${CRDB_NODE_ID}"
 validate_positive_integer "CRDB_NODE_COUNT" "${CRDB_NODE_COUNT}"
+validate_positive_integer "CRDB_NUM_REPLICAS" "${CRDB_NUM_REPLICAS}"
+validate_positive_integer "CRDB_NUM_VOTERS" "${CRDB_NUM_VOTERS}"
+if ! awk -v voters="${CRDB_NUM_VOTERS}" -v replicas="${CRDB_NUM_REPLICAS}" \
+    'BEGIN { exit !(voters <= replicas) }'; then
+  log "CRDB_NUM_VOTERS must not exceed CRDB_NUM_REPLICAS"
+  exit 1
+fi
 validate_bounded_positive_integer "CRDB_BOOTSTRAP_TIMEOUT_SECONDS" "${CRDB_BOOTSTRAP_TIMEOUT_SECONDS}" 3600
 validate_positive_integer "CRDB_SHUTDOWN_GRACE_SECONDS" "${CRDB_SHUTDOWN_GRACE_SECONDS}"
 validate_boolean "CRDB_ACCEPT_SQL_WITHOUT_TLS" "${CRDB_ACCEPT_SQL_WITHOUT_TLS}"
@@ -1325,16 +1334,21 @@ if [[ "${CRDB_NODE_ID}" == "1" ]]; then
 
   bootstrap_sql="$(mktemp /tmp/deeploy-crdb-bootstrap.XXXXXX.sql)"
   chmod 600 "${bootstrap_sql}"
+  cat > "${bootstrap_sql}" <<SQL
+ALTER RANGE default CONFIGURE ZONE USING
+  num_replicas = ${CRDB_NUM_REPLICAS},
+  num_voters = ${CRDB_NUM_VOTERS};
+SQL
   if [[ "${CRDB_RECOVERY_ACTIVE}" == "true" ]]; then
     log "fresh-store recovery reached the surviving cluster; ensuring existing database operator privileges"
-    cat > "${bootstrap_sql}" <<SQL
+    cat >> "${bootstrap_sql}" <<SQL
 ALTER USER ${CRDB_USER} WITH CREATEDB CREATEROLE CREATELOGIN;
 GRANT ALL ON DATABASE ${CRDB_DATABASE} TO ${CRDB_USER} WITH GRANT OPTION;
 SQL
   else
     password_literal="$(sql_quote_literal "${CRDB_PASSWORD}")"
     log "ensuring R1 MeshDB database and database operator exist"
-    cat > "${bootstrap_sql}" <<SQL
+    cat >> "${bootstrap_sql}" <<SQL
 CREATE DATABASE IF NOT EXISTS ${CRDB_DATABASE};
 CREATE USER IF NOT EXISTS ${CRDB_USER} WITH PASSWORD ${password_literal};
 ALTER USER ${CRDB_USER} WITH PASSWORD ${password_literal} CREATEDB CREATEROLE CREATELOGIN;

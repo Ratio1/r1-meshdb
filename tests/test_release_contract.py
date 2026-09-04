@@ -1673,6 +1673,10 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
     self.assertIn("generate_series(1, 10000)", testbed)
     self.assertIn("expected replicated row count 10000", testbed)
     self.assertIn("array_length(voting_replicas, 1) < 3", testbed)
+    self.assertIn(
+      "[show ranges from table appdb.public.entrypoint_smoke]", testbed
+    )
+    self.assertIn("array_length(voting_replicas, 1) < ${test_node_count}", testbed)
     self.assertIn("array_length(learner_replicas, 1) > 0", testbed)
     self.assertNotIn("ranges.underreplicated", testbed)
     self.assertIn("password_cleanup_complete=false", testbed)
@@ -1712,6 +1716,27 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
     local_transport = read("tests/local-transport/Dockerfile")
     self.assertNotIn("apt-get", local_transport)
     self.assertIn("r1-test-tcp-proxy", local_transport)
+
+  def test_entrypoint_configures_requested_range_replication(self):
+    entrypoint = read("entrypoint.sh")
+    self.assertIn('CRDB_NUM_REPLICAS="${CRDB_NUM_REPLICAS:-3}"', entrypoint)
+    self.assertIn('CRDB_NUM_VOTERS="${CRDB_NUM_VOTERS:-3}"', entrypoint)
+    self.assertIn('validate_positive_integer "CRDB_NUM_REPLICAS"', entrypoint)
+    self.assertIn('validate_positive_integer "CRDB_NUM_VOTERS"', entrypoint)
+    self.assertIn("CRDB_NUM_VOTERS must not exceed CRDB_NUM_REPLICAS", entrypoint)
+    self.assertIn("ALTER RANGE default CONFIGURE ZONE USING", entrypoint)
+    self.assertIn("num_replicas = ${CRDB_NUM_REPLICAS}", entrypoint)
+    self.assertIn("num_voters = ${CRDB_NUM_VOTERS}", entrypoint)
+
+    testbed = read("scripts/entrypoint-multinode-smoke.sh")
+    self.assertIn('CRDB_TEST_NODE_COUNT:-3', testbed)
+    self.assertIn('-e "CRDB_NUM_REPLICAS=${test_node_count}"', testbed)
+    self.assertIn('-e "CRDB_NUM_VOTERS=${test_node_count}"', testbed)
+    self.assertIn("array_length(voting_replicas, 1) < ${test_node_count}", testbed)
+    self.assertIn(
+      'target_address="target-roach${BASH_REMATCH[1]}:26257"',
+      read("tests/runtime-supervision/cloudflared-test-stub.sh"),
+    )
 
   def test_process_environment_scans_tolerate_process_exit(self):
     guarded_read = 'if ! values="$(tr "\\000" "\\n" 2>/dev/null < "$environment")"; then'

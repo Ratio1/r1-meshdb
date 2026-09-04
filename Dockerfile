@@ -49,7 +49,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 \
 
 FROM golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 AS engine-builder
 
-ARG RATIO1_VERSION=v1.0.1
+ARG RATIO1_VERSION=v1.0.2
 ARG SOURCE_DATE_EPOCH=1727820937
 ARG BUILD_JOBS=4
 
@@ -170,7 +170,7 @@ FROM scratch
 
 ARG BUILD_DATE=""
 ARG RATIO1_REVISION="unknown"
-ARG RATIO1_VERSION="v1.0.1"
+ARG RATIO1_VERSION="v1.0.2"
 
 LABEL org.opencontainers.image.title="R1 MeshDB" \
       org.opencontainers.image.description="Distributed SQL database runtime for Ratio1 edge nodes" \

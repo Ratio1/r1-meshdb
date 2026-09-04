@@ -85,7 +85,7 @@
     "sourceUrl": "https://github.com/Ratio1/deeploy-cockroachdb-service.git",
     "commit": "89f1760c29b8d37bdac3ac4f274797e261db2811",
     "baseEntrypointSha256": "0e70768bf4f4125f2e171cf544ca1304ac0a83774e97c115b2efbaa0de3a4698",
-    "entrypointSha256": "8391559a57eedba4f6bfe3fbfac78b3023c4abc25c833c6254ff8503fb971509",
+    "entrypointSha256": "ead0cad1ccbd3c6db83c3da365321655de3853b9c2f3bb9e77795add35d619c6",
     "runtimePackages": "source/runtime-packages.txt"
   },
   "buildInputs": {
