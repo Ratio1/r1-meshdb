@@ -52,6 +52,7 @@ EXPECTED_MODIFIED_FILES = {
 }
 EXPECTED_REMOVED_FILES = {"engine/pkg/util/ctxutil/context_abi_pre1_20.go"}
 EXPECTED_ADDED_FILES = {
+  "engine/pkg/server/api_v2_r1_meshdb.go",
   "engine/pkg/storage/pebble_iterator_r1_test.go",
   "engine/pkg/ui/distoss/assets/bundle.js",
   "engine/pkg/ui/distoss/assets/favicon.svg",

@@ -946,6 +946,7 @@ pkg/server/admin_test_utils.go
 pkg/server/api_v2.go
 pkg/server/api_v2_auth.go
 pkg/server/api_v2_error.go
+pkg/server/api_v2_r1_meshdb.go
 pkg/server/api_v2_ranges.go
 pkg/server/api_v2_sql.go
 pkg/server/api_v2_sql_schema.go

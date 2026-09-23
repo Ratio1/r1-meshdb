@@ -204,6 +204,13 @@ func registerRoutes(
 		{"databases/{database_name:[\\w.]+}/grants/", a.databaseGrants, true, regularRole, noOption, false},
 		{"databases/{database_name:[\\w.]+}/tables/", a.databaseTables, true, regularRole, noOption, false},
 		{"databases/{database_name:[\\w.]+}/tables/{table_name:[\\w.]+}/", a.tableDetails, true, regularRole, noOption, false},
+		{"r1-meshdb/version/", a.meshdbVersion, true, regularRole, noOption, true},
+		{"r1-meshdb/capabilities/", a.meshdbCapabilities, true, regularRole, noOption, true},
+		{"r1-meshdb/databases/", a.meshdbDatabases, true, regularRole, noOption, true},
+		{"r1-meshdb/tables/", a.meshdbCreateTable, true, regularRole, noOption, true},
+		{"r1-meshdb/users/", a.meshdbUsers, true, adminRole, noOption, true},
+		{"r1-meshdb/access/", a.meshdbAccess, true, adminRole, noOption, true},
+		{"r1-meshdb/permissions/", a.meshdbPermissions, true, adminRole, noOption, true},
 		{"rules/", a.listRules, false, regularRole, noOption, true},
 
 		{"sql/", a.execSQL, true, regularRole, noOption, true},

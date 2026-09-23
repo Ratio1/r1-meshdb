@@ -8,7 +8,17 @@ R1 MeshDB v1.0.2 includes a first-party, dependency-free browser console at
 `engine/pkg/ui/distoss/assets/bundle.js`, with its icon at
 `engine/pkg/ui/distoss/assets/favicon.svg`. The console uses the retained
 authenticated v2 login and SQL APIs to show cluster identity, list user tables,
-and run SQL. `engine/pkg/ui/ui.go` links these assets from the console page.
+run SQL with bounded scrolling and client-side pagination, switch databases,
+and manage databases, users, and allowlisted database/table access, including
+multi-database grants from one database-scope operation. The
+Tables view lists objects first and provides an on-demand, allowlisted table-creation wizard for
+safe common column types, defaults, nullability, and primary keys. The
+admin-only Users & access view reports direct, public, and inherited role
+grants and supports confirmed user deletion. The management actions use
+task tabs and explicit database selection controls. They run through
+authenticated `engine/pkg/server/api_v2_r1_meshdb.go` endpoints because the generic SQL API
+intentionally rejects DDL and transaction-control statements. `engine/pkg/ui/ui.go`
+links these assets from the console page.
 
 The release also includes reviewed `not_affected` OpenVEX decisions for
 util-linux findings. The minimal scratch runtime retains only non-setuid

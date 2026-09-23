@@ -45,6 +45,56 @@ count. The entrypoint applies both values to the default range configuration,
 so application ranges place one voting replica on every selected node. Both
 settings default to `3` when omitted for compatibility with existing jobs.
 
+## Browser Console
+
+The first-party console is served from the dashboard page and uses the same
+origin through the Deeploy HTTP tunnel. After `POST /api/v2/login/`, the
+browser sends the returned `X-Cockroach-API-Session` value on subsequent
+requests. The SQL result view keeps the existing bounded response limit and
+adds a scrollable table with client-side page sizes of 25, 50, or 100 rows.
+Overview shows a short table inventory. Tables opens with the object list and
+offers table creation on demand. Manage separates database, user, and access
+tasks into tabs; database grants use explicit multi-selection controls.
+
+The console uses these authenticated, same-origin endpoints. The management
+endpoints cover operations that the generic SQL endpoint intentionally rejects:
+
+- `GET /api/v2/r1-meshdb/version/` returns
+  `{ "version": "1.0.2" }`, reading the installed R1 MeshDB image version
+  from `/usr/share/r1-meshdb/VERSION`.
+- `GET /api/v2/r1-meshdb/capabilities/` reports whether the session can view
+  access administration or create databases.
+- `GET /api/v2/r1-meshdb/databases/` lists databases where the session has
+  `CONNECT`; `POST /api/v2/r1-meshdb/databases/` creates `{ "name": "appdb" }`.
+- `POST /api/v2/r1-meshdb/tables/` with a database, schema, table name, and
+  allowlisted column definitions. The endpoint enforces the caller's CREATE
+  privilege on the selected database.
+- `GET /api/v2/r1-meshdb/users/` lists users. `POST` creates a user with
+  `{ "username": "app", "password": "..." }`. `DELETE` accepts
+  `{ "username": "app" }` and returns `{ "username": "app" }` after dropping
+  the user. The admin-only endpoint rejects the current or protected account;
+  the database also rejects deletion while grants, ownership, or dependent jobs
+  remain.
+- `GET` or `POST /api/v2/r1-meshdb/access/` for a user, database, and optional
+  table. POST requests may send a `databases` array to apply one database-scope
+  grant or revoke to multiple databases in one operation. Access changes accept
+  only `viewer` or `editor` presets and `grant` or `revoke` actions.
+- `GET /api/v2/r1-meshdb/permissions/?username=app` returns paginated
+  database/table grants and labels each source as direct, public, or a role.
+
+The Users & access view is restricted to authenticated admin users. It offers
+typed-name confirmation before deleting an account. The API
+enforces the same boundary, so hiding the navigation item is not the security
+control. Ordinary SQL users can still use the console and receive normal SQL
+privilege errors when they select or modify objects they cannot access.
+
+Creating a user and applying its initial access are separate operations. If
+the user is created but the access grant fails, the console reports that
+partial result and the existing access editor can retry it. Table grants apply
+only to the selected table; database `viewer` grants `CONNECT`, database
+`editor` grants `CONNECT, CREATE`, table `viewer` grants `SELECT`, and table
+`editor` grants `SELECT, INSERT, UPDATE, DELETE`.
+
 ## Source Boundary
 
 The engine snapshot is derived from upstream tag `v23.1.28`, commit

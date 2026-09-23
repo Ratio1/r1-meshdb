@@ -51,6 +51,70 @@ class ReleaseContractTests(unittest.TestCase):
     self.assertIn("/api/v2/sql/", bundle)
     self.assertNotRegex(bundle, r"https?://")
 
+  def test_console_management_contract_is_first_party_and_allowlisted(self):
+    bundle = read("engine/pkg/ui/distoss/assets/bundle.js")
+    api = read("engine/pkg/server/api_v2_r1_meshdb.go")
+    routes = read("engine/pkg/server/api_v2.go")
+    for marker in (
+      "mesh-database-select",
+      "const databases = [...new Set(state.databases.filter(Boolean))]",
+      "No accessible databases",
+      "#mesh-logout { flex: 0 0 auto; white-space: nowrap; }",
+      "data-mesh-pagination",
+      "data-view=\"users\"",
+      "Image",
+      "/api/v2/r1-meshdb/capabilities/",
+      "/api/v2/r1-meshdb/databases/",
+      "/api/v2/r1-meshdb/version/",
+      "/api/v2/r1-meshdb/tables/",
+      "/api/v2/r1-meshdb/users/",
+      "/api/v2/r1-meshdb/access/",
+      "/api/v2/r1-meshdb/permissions/",
+      "mesh-create-user-grant",
+      "mesh-permission-user",
+      "mesh-delete-username",
+      "method: 'DELETE'",
+      "const databases = selectedValues('mesh-create-user-database')",
+      "mesh-create-table-preview",
+      "databaseRevision",
+      "isCurrentDatabase",
+      "permissionRequestRevision",
+      "accessSelectionKey",
+    ):
+      self.assertIn(marker, bundle)
+    for marker in (
+      'preset must be viewer or editor',
+      'action must be grant or revoke',
+      'CREATE USER %s WITH PASSWORD $1',
+      'DROP USER %s',
+      'cannot delete the current user',
+      'cannot delete a protected user',
+      'CREATE TABLE %s (%s)',
+      'unsupported column type',
+      'SHOW GRANTS FOR %s',
+      'SHOW DATABASES',
+      'has_database_privilege(database_name, \'CONNECT\')',
+      'InternalExecutorOverride{User: actor, Database: database}',
+      'internalDB.Txn(ctx, func(ctx context.Context, txn isql.Txn) error',
+      'can_view_access',
+      'json:"databases,omitempty"',
+      'json:"version"',
+      'meshDBVersionPath',
+      'os.ReadFile(meshDBVersionPath)',
+    ):
+      self.assertIn(marker, api)
+    for marker in (
+      '"r1-meshdb/capabilities/"',
+      '"r1-meshdb/databases/"',
+      '"r1-meshdb/version/"',
+      '"r1-meshdb/tables/"',
+      '"r1-meshdb/users/"',
+      '"r1-meshdb/access/"',
+      '"r1-meshdb/permissions/"',
+    ):
+      self.assertIn(marker, routes)
+    self.assertNotIn("GRANT %s ON", api)
+
   def test_release_version_resolution_is_strict_and_monotonic(self):
     resolver = load_script("scripts/resolve-release-version.py")
     resolved = resolver.resolve_release_version(
