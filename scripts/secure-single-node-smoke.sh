@@ -236,19 +236,21 @@ SQL
   fi
   rm -f "${negative_sql}"
 
+  local secret_index=0
   for secret_canary in app_secret_123 operator_child_secret meshdb_smoke_secret meshdb_reader_secret must_not_apply fake-token; do
+    secret_index=$((secret_index + 1))
     if docker_cmd logs "${name}" 2>&1 | grep -Fq "${secret_canary}"; then
-      echo "secret canary leaked into container logs" >&2
+      echo "secret canary ${secret_index} leaked into container logs" >&2
       exit 1
     fi
     if docker_cmd exec -e "SECRET_CANARY=${secret_canary}" "${name}" sh -c \
       'grep -R -Fq -- "$SECRET_CANARY" /cockroach/cockroach-data/logs 2>/dev/null'; then
-      echo "secret canary leaked into R1 MeshDB logs" >&2
+      echo "secret canary ${secret_index} leaked into R1 MeshDB logs" >&2
       exit 1
     fi
     if docker_cmd exec -e "SECRET_CANARY=${secret_canary}" "${name}" sh -c \
       'cmdlines="$(for f in /proc/[0-9]*/cmdline; do tr "\0" " " < "$f" 2>/dev/null || true; done)"; printf "%s" "$cmdlines" | grep -Fq -- "$SECRET_CANARY"'; then
-      echo "secret canary ${secret_canary} leaked into process arguments" >&2
+      echo "secret canary ${secret_index} leaked into process arguments" >&2
       exit 1
     fi
   done
