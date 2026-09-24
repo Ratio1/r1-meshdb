@@ -132,6 +132,8 @@ class ReleaseContractTests(unittest.TestCase):
     self.assertIn("internalDB.Txn", create)
     self.assertIn("REVOKE CONNECT ON DATABASE", create)
     self.assertIn("REVOKE CREATE ON SCHEMA", create)
+    self.assertIn("GRANT CREATE ON SCHEMA", create)
+    self.assertIn("quotedActor", create)
     self.assertIn("user: username.RootUserName()", create)
     self.assertIn('"r1-meshdb/database-tables/", a.meshdbListDatabaseTables, true, regularRole', routes)
     self.assertIn("/api/v2/r1-meshdb/database-tables/?database=${encodeURIComponent(database)}", bundle)
@@ -1071,6 +1073,10 @@ func value() string {
       "/api/v2/login/",
       "X-Cockroach-API-Session",
       "/api/v2/sql/",
+      "/api/v2/r1-meshdb/databases/",
+      "/api/v2/r1-meshdb/database-tables/",
+      "/api/v2/r1-meshdb/access/",
+      "/api/v2/r1-meshdb/permissions/",
     ):
       self.assertIn(console_contract, secure_smoke)
     self.assertEqual(read(".github/workflows/ci.yml").count("path: source-snapshot"), 2)

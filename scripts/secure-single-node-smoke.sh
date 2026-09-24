@@ -236,7 +236,7 @@ SQL
   fi
   rm -f "${negative_sql}"
 
-  for secret_canary in app_secret_123 operator_child_secret must_not_apply fake-token; do
+  for secret_canary in app_secret_123 operator_child_secret meshdb_smoke_secret meshdb_reader_secret must_not_apply fake-token; do
     if docker_cmd logs "${name}" 2>&1 | grep -Fq "${secret_canary}"; then
       echo "secret canary leaked into container logs" >&2
       exit 1
@@ -297,6 +297,8 @@ assert_console_contract() {
   local -a curl_args
   local port base_url root_file bundle_file login_file sql_file
   local root_status bundle_status anonymous_status login_status session sql_status
+  local create_status tables_status admin_login_status admin_session user_status grant_status
+  local permissions_status reader_login_status reader_session databases_status
   port="$(docker_cmd port "${name}" 8080/tcp | sed -n 's/.*://p')"
   if [[ ! "${port}" =~ ^[1-9][0-9]*$ ]]; then
     echo "console port is not published on loopback" >&2
@@ -379,6 +381,120 @@ raise SystemExit(0 if row == {"username": "app_user", "database_name": "appdb"} 
 PY
   then
     echo "console authenticated SQL request failed" >&2
+    exit 1
+  fi
+
+  create_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${session}" | \
+    curl --config - "${curl_args[@]}" --output "${tmp}/console-create-database.json" \
+      --write-out '%{http_code}' --header 'Content-Type: application/json' \
+      --data '{"name":"console-smoke-db"}' "${base_url}/api/v2/r1-meshdb/databases/")"
+  if [[ "${create_status}" != "201" ]]; then
+    echo "console database creation failed: $(cat "${tmp}/console-create-database.json")" >&2
+    exit 1
+  fi
+  local public_connect public_schema_create
+  public_connect="$(root_sql --format=csv -e \
+    'SELECT count(*) FROM [SHOW GRANTS ON DATABASE "console-smoke-db"] WHERE grantee = '\''public'\'' AND privilege_type = '\''CONNECT'\'';' | tail -n 1 | tr -d '\r')"
+  public_schema_create="$(root_sql --format=csv -e \
+    'SELECT count(*) FROM [SHOW GRANTS ON SCHEMA "console-smoke-db".public] WHERE grantee = '\''public'\'' AND privilege_type = '\''CREATE'\'';' | tail -n 1 | tr -d '\r')"
+  if [[ "${public_connect}" != "0" || "${public_schema_create}" != "0" ]]; then
+    echo "console-created database retains public CONNECT or schema CREATE" >&2
+    exit 1
+  fi
+  app_sql -e 'CREATE TABLE "console-smoke-db".public.console_smoke_table (id INT PRIMARY KEY);' >/dev/null
+
+  tables_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${session}" | \
+    curl --config - "${curl_args[@]}" --output "${tmp}/console-tables.json" \
+      --write-out '%{http_code}' "${base_url}/api/v2/r1-meshdb/database-tables/?database=console-smoke-db")"
+  if [[ "${tables_status}" != "200" ]] || ! python3 - "${tmp}/console-tables.json" <<'PY'
+import json
+import pathlib
+import sys
+
+tables = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")).get("table_names", [])
+raise SystemExit(0 if "public.console_smoke_table" in tables else 1)
+PY
+  then
+    echo "console table listing failed for a hyphenated database" >&2
+    exit 1
+  fi
+
+  root_sql -e "CREATE USER meshdb_smoke_admin WITH PASSWORD 'meshdb_smoke_secret'; GRANT admin TO meshdb_smoke_admin;" >/dev/null
+  admin_login_status="$(curl "${curl_args[@]}" --output "${tmp}/console-admin-login.json" \
+    --write-out '%{http_code}' --header 'Content-Type: application/x-www-form-urlencoded' \
+    --data 'username=meshdb_smoke_admin&password=meshdb_smoke_secret' "${base_url}/api/v2/login/")"
+  if [[ "${admin_login_status}" != "200" ]]; then
+    echo "console admin login failed" >&2
+    exit 1
+  fi
+  admin_session="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["session"])' "${tmp}/console-admin-login.json")"
+  if [[ -z "${admin_session}" ]]; then
+    echo "console admin session is missing" >&2
+    exit 1
+  fi
+  user_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${admin_session}" | \
+    curl --config - "${curl_args[@]}" --output "${tmp}/console-user.json" \
+      --write-out '%{http_code}' --header 'Content-Type: application/json' \
+      --data '{"username":"meshdb_smoke_reader","password":"meshdb_reader_secret"}' \
+      "${base_url}/api/v2/r1-meshdb/users/")"
+  if [[ "${user_status}" != "201" ]]; then
+    echo "console user creation failed: $(cat "${tmp}/console-user.json")" >&2
+    exit 1
+  fi
+  grant_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${admin_session}" | \
+    curl --config - "${curl_args[@]}" --output "${tmp}/console-grant.json" \
+      --write-out '%{http_code}' --header 'Content-Type: application/json' \
+      --data '{"username":"meshdb_smoke_reader","database":"console-smoke-db","scope":"table","table":"public.console_smoke_table","preset":"viewer","action":"grant"}' \
+      "${base_url}/api/v2/r1-meshdb/access/")"
+  if [[ "${grant_status}" != "200" ]]; then
+    echo "console table access grant failed: $(cat "${tmp}/console-grant.json")" >&2
+    exit 1
+  fi
+  permissions_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${admin_session}" | \
+    curl --config - "${curl_args[@]}" --output "${tmp}/console-permissions.json" \
+      --write-out '%{http_code}' "${base_url}/api/v2/r1-meshdb/permissions/?username=meshdb_smoke_reader")"
+  if [[ "${permissions_status}" != "200" ]] || ! python3 - "${tmp}/console-permissions.json" <<'PY'
+import json
+import pathlib
+import sys
+
+permissions = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")).get("permissions", [])
+rows = [row for row in permissions if row.get("database") == "console-smoke-db"]
+has_connect = any(row.get("scope") == "database" and row.get("source") == "direct" and "CONNECT" in row.get("privileges", []) for row in rows)
+has_select = any(row.get("scope") == "table" and row.get("source") == "direct" and "SELECT" in row.get("privileges", []) for row in rows)
+has_public = any(row.get("scope") == "schema" and row.get("source") == "public" and "USAGE" in row.get("privileges", []) for row in rows)
+raise SystemExit(0 if has_connect and has_select and has_public else 1)
+PY
+  then
+    echo "console permissions omitted a direct or public grant" >&2
+    exit 1
+  fi
+
+  reader_login_status="$(curl "${curl_args[@]}" --output "${tmp}/console-reader-login.json" \
+    --write-out '%{http_code}' --header 'Content-Type: application/x-www-form-urlencoded' \
+    --data 'username=meshdb_smoke_reader&password=meshdb_reader_secret' "${base_url}/api/v2/login/")"
+  if [[ "${reader_login_status}" != "200" ]]; then
+    echo "console reader login failed" >&2
+    exit 1
+  fi
+  reader_session="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["session"])' "${tmp}/console-reader-login.json")"
+  if [[ -z "${reader_session}" ]]; then
+    echo "console reader session is missing" >&2
+    exit 1
+  fi
+  databases_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${reader_session}" | \
+    curl --config - "${curl_args[@]}" --output "${tmp}/console-reader-databases.json" \
+      --write-out '%{http_code}' "${base_url}/api/v2/r1-meshdb/databases/")"
+  if [[ "${databases_status}" != "200" ]] || ! python3 - "${tmp}/console-reader-databases.json" <<'PY'
+import json
+import pathlib
+import sys
+
+databases = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")).get("databases", [])
+raise SystemExit(0 if "console-smoke-db" in databases else 1)
+PY
+  then
+    echo "table-only grant did not make the database selectable" >&2
     exit 1
   fi
 }

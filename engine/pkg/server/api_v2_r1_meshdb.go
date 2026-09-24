@@ -565,6 +565,8 @@ func (a *apiV2Server) meshdbCreateDatabase(w http.ResponseWriter, r *http.Reques
 	ctx := a.sqlServer.AnnotateCtx(r.Context())
 	actor := userFromHTTPAuthInfoContext(ctx)
 	quotedDatabase := tree.NameStringP(&database)
+	actorName := actor.Normalized()
+	quotedActor := tree.NameStringP(&actorName)
 	if err := a.sqlServer.internalDB.Txn(ctx, func(ctx context.Context, txn isql.Txn) error {
 		statements := []struct {
 			query string
@@ -574,6 +576,7 @@ func (a *apiV2Server) meshdbCreateDatabase(w http.ResponseWriter, r *http.Reques
 			{query: "REVOKE CONNECT ON DATABASE " + quotedDatabase + " FROM public", user: actor},
 			// The new public schema is admin-owned, even when a CREATEDB user owns the database.
 			{query: "REVOKE CREATE ON SCHEMA " + quotedDatabase + ".public FROM public", user: username.RootUserName()},
+			{query: "GRANT CREATE ON SCHEMA " + quotedDatabase + ".public TO " + quotedActor, user: username.RootUserName()},
 		}
 		for _, statement := range statements {
 			if _, err := txn.ExecEx(

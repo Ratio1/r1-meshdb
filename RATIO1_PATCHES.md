@@ -22,7 +22,8 @@ links these assets from the console page. The retained upstream
 `engine/pkg/server/api_v2.go` registers the authenticated management routes
 with regular-user or admin role requirements.
 Wizard-created databases revoke default public `CONNECT` and public-schema
-`CREATE` in the creation transaction. Editor database grants restore schema
+`CREATE` in the creation transaction, then restore schema `CREATE` to the
+database owner. Editor database grants restore schema
 creation for that user, while table grants include database `CONNECT`.
 Permissions include public grants, and the table picker uses a query parameter
 to support quoted database names outside the upstream path-route pattern.

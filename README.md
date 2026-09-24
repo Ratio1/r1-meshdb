@@ -67,6 +67,7 @@ endpoints cover operations that the generic SQL endpoint intentionally rejects:
 - `GET /api/v2/r1-meshdb/databases/` lists databases where the session has
   `CONNECT`; `POST /api/v2/r1-meshdb/databases/` creates `{ "name": "appdb" }`
   with public database `CONNECT` and public-schema `CREATE` revoked atomically.
+  The database creator retains schema `CREATE`.
 - `GET /api/v2/r1-meshdb/database-tables/?database=appdb` lists tables using a
   query parameter so valid database names do not depend on URL path patterns.
 - `POST /api/v2/r1-meshdb/tables/` with a database, schema, table name, and
