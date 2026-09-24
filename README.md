@@ -1,4 +1,4 @@
-# R1 MeshDB v1.0.2
+# R1 MeshDB v1.0.3
 
 R1 MeshDB is an independently maintained Ratio1 distribution of a
 source-derived OSS runtime closure from CockroachDB v23.1.28. It packages the
@@ -11,7 +11,7 @@ copyright notices are retained under `engine/`.
 
 ## Version
 
-The current R1 MeshDB product version is `1.0.2`. [`VERSION`](VERSION) is the
+The current R1 MeshDB product version is `1.0.3`. [`VERSION`](VERSION) is the
 single source of truth: the build validates it, installs it in the image at
 `/usr/share/r1-meshdb/VERSION`, and records it in generated SPDX and CycloneDX
 SBOM application metadata. A merged `VERSION` change automatically starts the
@@ -60,7 +60,7 @@ The console uses these authenticated, same-origin endpoints. The management
 endpoints cover operations that the generic SQL endpoint intentionally rejects:
 
 - `GET /api/v2/r1-meshdb/version/` returns
-  `{ "version": "1.0.2" }`, reading the installed R1 MeshDB image version
+  `{ "version": "1.0.3" }`, reading the installed R1 MeshDB image version
   from `/usr/share/r1-meshdb/VERSION`.
 - `GET /api/v2/r1-meshdb/capabilities/` reports whether the session can view
   access administration or create databases.
@@ -152,7 +152,7 @@ Repository and package promotion controls are documented in
 ```bash
 scripts/verify-image.sh \
   ghcr.io/ratio1/r1-meshdb@sha256:<digest> \
-  v1.0.2
+  v1.0.3
 ```
 
 ## Support
@@ -173,9 +173,8 @@ and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Citation
 
-The R1 MeshDB entry below is the recommended citation for the current source
-snapshot. Publish it with an immutable `v1.0.2` tag before treating it as a
-reproducible release citation.
+The R1 MeshDB entry below cites this source snapshot. Its immutable `v1.0.3`
+tag will make the citation reproducible once the release is published.
 
 ```bibtex
 @software{cockroachdb_23_1_28,
@@ -187,11 +186,10 @@ reproducible release citation.
   note    = {Tag v23.1.28; commit 76e598c9b1c100fd9280b979140b5e377c330a20}
 }
 
-@software{ratio1_meshdb_1_0_2,
+@software{ratio1_meshdb_1_0_3,
   author  = {{Ratio1}},
   title   = {{R1 MeshDB}},
-  version = {1.0.2},
-  date    = {2026-09-04},
+  version = {1.0.3},
   url     = {https://github.com/Ratio1/r1-meshdb},
   note    = {Source-derived Ratio1 distribution based on CockroachDB v23.1.28}
 }

@@ -4,7 +4,7 @@ This file records every deliberate difference between upstream CockroachDB
 v23.1.28 commit `76e598c9b1c100fd9280b979140b5e377c330a20` and this distribution.
 Every released file is covered by `source/manifest.sha256`.
 
-R1 MeshDB v1.0.2 includes a first-party, dependency-free browser console at
+R1 MeshDB v1.0.3 includes a first-party, dependency-free browser console at
 `engine/pkg/ui/distoss/assets/bundle.js`, with its icon at
 `engine/pkg/ui/distoss/assets/favicon.svg`. The console uses the retained
 authenticated v2 login and SQL APIs to show cluster identity, list user tables,
@@ -132,7 +132,7 @@ upstream commit as `Build Commit ID` and requires all of:
 
 ```text
 Distribution:     OSS
-Build Tag:        v1.0.2
+Build Tag:        v1.0.3
 Build Type:       release
 ```
 
