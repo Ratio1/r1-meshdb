@@ -244,7 +244,7 @@
   "ratio1AddedFiles": [
     {
       "path": "engine/pkg/server/api_v2_r1_meshdb.go",
-      "sha256": "c13d111ff95fd153f62a9e8cbfc27b06312f2ce954cad45f923a92586764ab49",
+      "sha256": "7ae267aca3db197cb5dfdf7078f604a419d6416d8c0efb05a92811c55c50e24a",
       "reason": "Authenticated, allowlisted management and admin-only user-permission endpoints for filtered database discovery, private database creation, safe tables, creating and deleting users, inspecting direct, role, and public grants across database contexts, and atomically granting or revoking focused database/table access without exposing arbitrary DDL or privilege SQL through the browser."
     },
     {

@@ -487,7 +487,7 @@ func (a *apiV2Server) meshdbListDatabases(w http.ResponseWriter, r *http.Request
 	it, err := a.sqlServer.internalExecutor.QueryIteratorEx(
 		ctx, "r1-meshdb-list-databases", nil,
 		sessiondata.InternalExecutorOverride{User: actor},
-		"SELECT database_name FROM [SHOW DATABASES] WHERE pg_catalog.has_database_privilege(database_name, 'CONNECT') ORDER BY database_name",
+		"SELECT database_name FROM [SHOW DATABASES] WHERE has_database_privilege(database_name, 'CONNECT') ORDER BY database_name",
 	)
 	if err != nil {
 		meshDBExecutionError(ctx, w, err)

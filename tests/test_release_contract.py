@@ -148,6 +148,9 @@ class ReleaseContractTests(unittest.TestCase):
     self.assertIn("GRANT CONNECT ON DATABASE %s TO %s", access)
     self.assertIn("CREATE ON SCHEMA %s.public %s %s", access)
 
+    self.assertIn("WHERE has_database_privilege(database_name, 'CONNECT')", api)
+    self.assertNotIn("pg_catalog.has_database_privilege(database_name, 'CONNECT')", api)
+
   def test_release_version_resolution_is_strict_and_monotonic(self):
     resolver = load_script("scripts/resolve-release-version.py")
     resolved = resolver.resolve_release_version(

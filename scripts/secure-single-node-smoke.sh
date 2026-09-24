@@ -298,7 +298,7 @@ assert_console_contract() {
   local port base_url root_file bundle_file login_file sql_file
   local root_status bundle_status anonymous_status login_status session sql_status
   local create_status tables_status admin_login_status admin_session user_status grant_status
-  local permissions_status reader_login_status reader_session databases_status databases_visible
+  local permissions_status reader_login_status reader_session databases_status
   port="$(docker_cmd port "${name}" 8080/tcp | sed -n 's/.*://p')"
   if [[ ! "${port}" =~ ^[1-9][0-9]*$ ]]; then
     echo "console port is not published on loopback" >&2
@@ -489,12 +489,10 @@ PY
     echo "console reader session is missing" >&2
     exit 1
   fi
-  databases_visible=false
-  for attempt in {1..10}; do
-    databases_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${reader_session}" | \
-      curl --config - "${curl_args[@]}" --output "${tmp}/console-reader-databases.json" \
-        --write-out '%{http_code}' "${base_url}/api/v2/r1-meshdb/databases/")"
-    if [[ "${databases_status}" == "200" ]] && python3 - "${tmp}/console-reader-databases.json" <<'PY'
+  databases_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${reader_session}" | \
+    curl --config - "${curl_args[@]}" --output "${tmp}/console-reader-databases.json" \
+      --write-out '%{http_code}' "${base_url}/api/v2/r1-meshdb/databases/")"
+  if [[ "${databases_status}" != "200" ]] || ! python3 - "${tmp}/console-reader-databases.json" <<'PY'
 import json
 import pathlib
 import sys
@@ -502,13 +500,7 @@ import sys
 databases = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")).get("databases", [])
 raise SystemExit(0 if "console-smoke-db" in databases else 1)
 PY
-    then
-      databases_visible=true
-      break
-    fi
-    sleep 1
-  done
-  if [[ "${databases_visible}" != "true" ]]; then
+  then
     echo "table-only grant did not make the database selectable (HTTP ${databases_status}): $(cat "${tmp}/console-reader-databases.json")" >&2
     exit 1
   fi
