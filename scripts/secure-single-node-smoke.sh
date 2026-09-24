@@ -419,10 +419,13 @@ PY
     exit 1
   fi
 
-  root_sql -e "CREATE USER meshdb_smoke_admin WITH PASSWORD 'meshdb_smoke_secret'; GRANT admin TO meshdb_smoke_admin;" >/dev/null
-  admin_login_status="$(curl "${curl_args[@]}" --output "${tmp}/console-admin-login.json" \
+  printf '%s\n' "CREATE USER meshdb_smoke_admin WITH PASSWORD 'meshdb_smoke_secret'; GRANT admin TO meshdb_smoke_admin;" | \
+    docker_cmd exec -i "${name}" /cockroach/cockroach sql \
+      --certs-dir=/cockroach/certs --host=roach1:26257 >/dev/null
+  admin_login_status="$(printf '%s' 'username=meshdb_smoke_admin&password=meshdb_smoke_secret' | \
+    curl "${curl_args[@]}" --output "${tmp}/console-admin-login.json" \
     --write-out '%{http_code}' --header 'Content-Type: application/x-www-form-urlencoded' \
-    --data 'username=meshdb_smoke_admin&password=meshdb_smoke_secret' "${base_url}/api/v2/login/")"
+    --data-binary @- "${base_url}/api/v2/login/")"
   if [[ "${admin_login_status}" != "200" ]]; then
     echo "console admin login failed" >&2
     exit 1
@@ -432,13 +435,16 @@ PY
     echo "console admin session is missing" >&2
     exit 1
   fi
+  printf '%s' '{"username":"meshdb_smoke_reader","password":"meshdb_reader_secret"}' > "${tmp}/console-user-request.json"
+  chmod 600 "${tmp}/console-user-request.json"
   user_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${admin_session}" | \
     curl --config - "${curl_args[@]}" --output "${tmp}/console-user.json" \
       --write-out '%{http_code}' --header 'Content-Type: application/json' \
-      --data '{"username":"meshdb_smoke_reader","password":"meshdb_reader_secret"}' \
+      --data-binary "@${tmp}/console-user-request.json" \
       "${base_url}/api/v2/r1-meshdb/users/")"
+  rm -f "${tmp}/console-user-request.json"
   if [[ "${user_status}" != "201" ]]; then
-    echo "console user creation failed: $(cat "${tmp}/console-user.json")" >&2
+    echo "console user creation failed" >&2
     exit 1
   fi
   grant_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${admin_session}" | \
@@ -470,9 +476,10 @@ PY
     exit 1
   fi
 
-  reader_login_status="$(curl "${curl_args[@]}" --output "${tmp}/console-reader-login.json" \
+  reader_login_status="$(printf '%s' 'username=meshdb_smoke_reader&password=meshdb_reader_secret' | \
+    curl "${curl_args[@]}" --output "${tmp}/console-reader-login.json" \
     --write-out '%{http_code}' --header 'Content-Type: application/x-www-form-urlencoded' \
-    --data 'username=meshdb_smoke_reader&password=meshdb_reader_secret' "${base_url}/api/v2/login/")"
+    --data-binary @- "${base_url}/api/v2/login/")"
   if [[ "${reader_login_status}" != "200" ]]; then
     echo "console reader login failed" >&2
     exit 1
