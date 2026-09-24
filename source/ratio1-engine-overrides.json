@@ -124,7 +124,7 @@
     {
       "path": "engine/pkg/server/api_v2.go",
       "upstreamSha256": "abdd01ce3e5d7b705549865273fdc8e54d6f0c484153001aad2c4181677161b6",
-      "distributedSha256": "d13c398edd050d849933ffaed23b6e5bee7aa664a2210631a529a299486b6aa5",
+      "distributedSha256": "83ea6aa11f6fbbc6fe853a5968297f9047f8428e0ed5ee16b15ed7836295c9ff",
       "changeClass": "browser-console-management",
       "reason": "Register authenticated R1 MeshDB console management routes with explicit regular-user and admin role requirements."
     },
@@ -244,8 +244,8 @@
   "ratio1AddedFiles": [
     {
       "path": "engine/pkg/server/api_v2_r1_meshdb.go",
-      "sha256": "9cbfad1c9f217852e3753171f4644999e3ca60e6fd426d691b89787d78c6d0a7",
-      "reason": "Authenticated, allowlisted management and admin-only user-permission endpoints for filtered database discovery, creating databases, safe tables, creating and deleting users, inspecting effective grants across database contexts, and atomically granting or revoking focused database/table access without exposing arbitrary DDL or privilege SQL through the browser."
+      "sha256": "dbfd5b1c3a265a918937d14ae868a993fdccc31205a81169ab520d9636f21aa9",
+      "reason": "Authenticated, allowlisted management and admin-only user-permission endpoints for filtered database discovery, private database creation, safe tables, creating and deleting users, inspecting direct, role, and public grants across database contexts, and atomically granting or revoking focused database/table access without exposing arbitrary DDL or privilege SQL through the browser."
     },
     {
       "path": "engine/pkg/storage/pebble_iterator_r1_test.go",
@@ -254,8 +254,8 @@
     },
     {
       "path": "engine/pkg/ui/distoss/assets/bundle.js",
-      "sha256": "f5c779f19212a6cbc62ec32625d3662f9351a0c4c0966caf2964cc348391885a",
-      "reason": "Dependency-free first-party browser console with a table inventory, on-demand table creation, scrollable paginated SQL results, CONNECT-filtered database switching, tabbed database/user/access management with explicit multi-database selection and confirmed deletion, an admin-only effective-permissions view, and responsive controls."
+      "sha256": "0dda5a7f22440fb9ff98286d6f407423212424ec11226962a72b224d17dc5607",
+      "reason": "Dependency-free first-party browser console with a table inventory, on-demand table creation, scrollable paginated SQL results, CONNECT-filtered database switching, tabbed database/user/access management with explicit multi-database selection and confirmed deletion, an admin-only direct/role/public grants view, and responsive controls."
     },
     {
       "path": "engine/pkg/ui/distoss/assets/favicon.svg",

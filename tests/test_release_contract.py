@@ -65,6 +65,7 @@ class ReleaseContractTests(unittest.TestCase):
       "Image",
       "/api/v2/r1-meshdb/capabilities/",
       "/api/v2/r1-meshdb/databases/",
+      "/api/v2/r1-meshdb/database-tables/",
       "/api/v2/r1-meshdb/version/",
       "/api/v2/r1-meshdb/tables/",
       "/api/v2/r1-meshdb/users/",
@@ -91,7 +92,12 @@ class ReleaseContractTests(unittest.TestCase):
       'cannot delete a protected user',
       'CREATE TABLE %s (%s)',
       'unsupported column type',
-      'SHOW GRANTS FOR %s',
+      'SHOW GRANTS FOR %s, public',
+      'REVOKE CONNECT ON DATABASE ',
+      'REVOKE CREATE ON SCHEMA ',
+      'GRANT CONNECT ON DATABASE %s TO %s',
+      'CREATE ON SCHEMA %s.public %s %s',
+      "'crdb_internal', 'information_schema', 'pg_catalog', 'pg_extension'",
       'SHOW DATABASES',
       'has_database_privilege(database_name, \'CONNECT\')',
       'InternalExecutorOverride{User: actor, Database: database}',
@@ -106,6 +112,7 @@ class ReleaseContractTests(unittest.TestCase):
     for marker in (
       '"r1-meshdb/capabilities/"',
       '"r1-meshdb/databases/"',
+      '"r1-meshdb/database-tables/"',
       '"r1-meshdb/version/"',
       '"r1-meshdb/tables/"',
       '"r1-meshdb/users/"',
@@ -114,6 +121,30 @@ class ReleaseContractTests(unittest.TestCase):
     ):
       self.assertIn(marker, routes)
     self.assertNotIn("GRANT %s ON", api)
+
+  def test_console_database_privacy_and_name_safe_table_listing(self):
+    api = read("engine/pkg/server/api_v2_r1_meshdb.go")
+    routes = read("engine/pkg/server/api_v2.go")
+    bundle = read("engine/pkg/ui/distoss/assets/bundle.js")
+    create = api.split("func (a *apiV2Server) meshdbCreateDatabase", 1)[1].split(
+      "func (a *apiV2Server) meshdbCreateTable", 1
+    )[0]
+    self.assertIn("internalDB.Txn", create)
+    self.assertIn("REVOKE CONNECT ON DATABASE", create)
+    self.assertIn("REVOKE CREATE ON SCHEMA", create)
+    self.assertIn("user: username.RootUserName()", create)
+    self.assertIn('"r1-meshdb/database-tables/", a.meshdbListDatabaseTables, true, regularRole', routes)
+    self.assertIn("/api/v2/r1-meshdb/database-tables/?database=${encodeURIComponent(database)}", bundle)
+    self.assertNotIn("/api/v2/databases/${encodeURIComponent(database)}/tables/", bundle)
+
+    permissions = api.split("func (a *apiV2Server) meshdbReadPermissions", 1)[1].split(
+      "func valueOrEmpty", 1
+    )[0]
+    self.assertIn("SHOW GRANTS FOR %s, public", permissions)
+    self.assertIn("schema_name NOT IN", permissions)
+    access = api.split("func (a *apiV2Server) meshdbChangeAccess", 1)[1]
+    self.assertIn("GRANT CONNECT ON DATABASE %s TO %s", access)
+    self.assertIn("CREATE ON SCHEMA %s.public %s %s", access)
 
   def test_release_version_resolution_is_strict_and_monotonic(self):
     resolver = load_script("scripts/resolve-release-version.py")

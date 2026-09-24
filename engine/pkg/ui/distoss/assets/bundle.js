@@ -1142,7 +1142,7 @@
   async function ensureManageTables(database) {
     if (!database) return [];
     if (!Object.prototype.hasOwnProperty.call(state.manage.tablesByDatabase, database)) {
-      state.manage.tablesByDatabase[database] = await fetchPaged(`/api/v2/databases/${encodeURIComponent(database)}/tables/`, 'table_names');
+      state.manage.tablesByDatabase[database] = await fetchPaged(`/api/v2/r1-meshdb/database-tables/?database=${encodeURIComponent(database)}`, 'table_names');
     }
     return state.manage.tablesByDatabase[database];
   }
@@ -1247,7 +1247,7 @@
         </div>
       </section>
       <section class="mesh-panel">
-        <div class="mesh-panel-head"><h2>Effective database and table grants</h2><span class="mesh-query-meta">${htmlEscape(selectedUser || 'No user selected')}</span></div>
+        <div class="mesh-panel-head"><h2>Database, schema and table grants</h2><span class="mesh-query-meta">${htmlEscape(selectedUser || 'No user selected')}</span></div>
         <div class="mesh-panel-body" id="mesh-permission-body"></div>
       </section>
     `;
@@ -1357,7 +1357,7 @@
     const body = document.getElementById('mesh-permission-body');
     if (!body) return;
     if (state.manage.permissionsLoading) {
-      body.innerHTML = '<span class="mesh-loading">Loading effective grants...</span>';
+      body.innerHTML = '<span class="mesh-loading">Loading grants...</span>';
       return;
     }
     if (state.manage.permissionError) {
@@ -1382,7 +1382,7 @@
         grantable: permission.grantable ? 'Yes' : 'No',
       })),
     };
-    body.innerHTML = `<div id="mesh-permission-table">${renderDataTable(permissionResult, 'No effective database or table grants found.', { page: state.manage.permissionPage, pageSize: state.manage.permissionPageSize, showPageSize: true })}</div>`;
+    body.innerHTML = `<div id="mesh-permission-table">${renderDataTable(permissionResult, 'No database, schema or table grants found.', { page: state.manage.permissionPage, pageSize: state.manage.permissionPageSize, showPageSize: true })}</div>`;
     bindTablePagination(document.getElementById('mesh-permission-table'), (nextPage) => {
       state.manage.permissionPage = nextPage;
       renderPermissionDetails();
@@ -1428,6 +1428,7 @@
         <div class="mesh-panel-body">
           <div class="mesh-status" id="mesh-create-database-status" hidden></div>
           <form id="mesh-create-database-form">
+            <p class="mesh-access-note">New databases start with public connection and schema creation disabled.</p>
             <div class="mesh-form-grid">
               <div class="mesh-field"><label for="mesh-new-database">Database name</label><input class="mesh-input mesh-code" id="mesh-new-database" name="name" autocomplete="off" required></div>
             </div>
@@ -1449,7 +1450,7 @@
             </div>
             <fieldset class="mesh-fieldset">
               <legend>Initial access</legend>
-              <p class="mesh-access-note">Creating a user only creates the login. Enable this step to grant access to one or more databases, or one table.</p>
+              <p class="mesh-access-note">Creating a user only creates the login. Enable this step to grant access to one or more databases, or one table. Table access includes database connection.</p>
               <label class="mesh-checkbox"><input type="checkbox" id="mesh-create-user-grant"> <span>Grant the selected access after the user is created</span></label>
               <div class="mesh-form-grid" id="mesh-initial-access-fields">
                 <div class="mesh-field"><span class="mesh-field-label">Databases</span>${databasePicker('mesh-create-user-database', databases, selectedDatabase)}</div>
@@ -1467,7 +1468,7 @@
       <section class="mesh-panel" id="mesh-manage-access" role="tabpanel" aria-labelledby="mesh-tab-access" ${state.manage.activeSection === 'access' ? '' : 'hidden'}>
         <div class="mesh-panel-head"><h2>Manage existing access</h2><span class="mesh-query-meta">${users.length} users</span></div>
         <div class="mesh-panel-body">
-          <p class="mesh-access-note">Changes use explicit viewer or editor presets. Database-scope changes apply to every selected database; table grants apply to one selected table.</p>
+          <p class="mesh-access-note">Database-scope changes apply to every selected database. Table grants include database connection; revoking table access leaves connection in place.</p>
           <form id="mesh-access-form">
             <div class="mesh-form-grid">
               <div class="mesh-field"><label for="mesh-access-user">User</label><select class="mesh-input mesh-code" id="mesh-access-user">${selectOptions(users, state.manage.selectedUser, 'No users available')}</select></div>

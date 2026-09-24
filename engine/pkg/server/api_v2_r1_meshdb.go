@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/cockroachdb/cockroach/pkg/security/username"
+	"github.com/cockroachdb/cockroach/pkg/server/serverpb"
 	"github.com/cockroachdb/cockroach/pkg/sql/isql"
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgerror"
@@ -26,7 +27,7 @@ import (
 
 const (
 	meshDBMaxManagementRequestBytes = 1 << 20
-	meshDBVersionPath              = "/usr/share/r1-meshdb/VERSION"
+	meshDBVersionPath               = "/usr/share/r1-meshdb/VERSION"
 )
 
 // The console uses this small, explicit API for operations that the generic
@@ -65,17 +66,17 @@ type meshDBCreateTableColumn struct {
 }
 
 type meshDBCreateTableRequest struct {
-	Database string                   `json:"database"`
-	Schema   string                   `json:"schema,omitempty"`
-	Name     string                   `json:"name"`
+	Database string                    `json:"database"`
+	Schema   string                    `json:"schema,omitempty"`
+	Name     string                    `json:"name"`
 	Columns  []meshDBCreateTableColumn `json:"columns"`
 }
 
 type meshDBAccessResponse struct {
-	Username  string   `json:"username"`
-	Database  string   `json:"database"`
-	Table     string   `json:"table,omitempty"`
-	Scope     string   `json:"scope"`
+	Username   string   `json:"username"`
+	Database   string   `json:"database"`
+	Table      string   `json:"table,omitempty"`
+	Scope      string   `json:"scope"`
 	Privileges []string `json:"privileges"`
 }
 
@@ -522,6 +523,30 @@ func (a *apiV2Server) meshdbListDatabases(w http.ResponseWriter, r *http.Request
 	})
 }
 
+func (a *apiV2Server) meshdbListDatabaseTables(w http.ResponseWriter, r *http.Request) {
+	if !meshDBMethod(w, r, http.MethodGet) {
+		return
+	}
+	database, err := meshDBDatabaseName(r.URL.Query().Get("database"))
+	if err != nil {
+		meshDBRequestError(w, err)
+		return
+	}
+	ctx := a.sqlServer.AnnotateCtx(r.Context())
+	actor := userFromHTTPAuthInfoContext(ctx)
+	limit, offset := getSimplePaginationValues(r)
+	tables, err := a.admin.getDatabaseTables(ctx, &serverpb.DatabaseDetailsRequest{Database: database}, actor, limit, offset)
+	if err != nil {
+		meshDBExecutionError(ctx, w, err)
+		return
+	}
+	response := databaseTablesResponse{TableNames: tables}
+	if limit > 0 && len(tables) >= limit {
+		response.Next = offset + len(tables)
+	}
+	writeJSONResponse(ctx, w, http.StatusOK, response)
+}
+
 func (a *apiV2Server) meshdbCreateDatabase(w http.ResponseWriter, r *http.Request) {
 	if !meshDBMethod(w, r, http.MethodPost) {
 		return
@@ -539,11 +564,27 @@ func (a *apiV2Server) meshdbCreateDatabase(w http.ResponseWriter, r *http.Reques
 
 	ctx := a.sqlServer.AnnotateCtx(r.Context())
 	actor := userFromHTTPAuthInfoContext(ctx)
-	query := fmt.Sprintf("CREATE DATABASE %s", tree.NameStringP(&database))
-	if _, err := a.sqlServer.internalExecutor.ExecEx(
-		ctx, "r1-meshdb-create-database", nil,
-		sessiondata.InternalExecutorOverride{User: actor}, query,
-	); err != nil {
+	quotedDatabase := tree.NameStringP(&database)
+	if err := a.sqlServer.internalDB.Txn(ctx, func(ctx context.Context, txn isql.Txn) error {
+		statements := []struct {
+			query string
+			user  username.SQLUsername
+		}{
+			{query: "CREATE DATABASE " + quotedDatabase, user: actor},
+			{query: "REVOKE CONNECT ON DATABASE " + quotedDatabase + " FROM public", user: actor},
+			// The new public schema is admin-owned, even when a CREATEDB user owns the database.
+			{query: "REVOKE CREATE ON SCHEMA " + quotedDatabase + ".public FROM public", user: username.RootUserName()},
+		}
+		for _, statement := range statements {
+			if _, err := txn.ExecEx(
+				ctx, "r1-meshdb-create-private-database", txn.KV(),
+				sessiondata.InternalExecutorOverride{User: statement.user}, statement.query,
+			); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
 		meshDBExecutionError(ctx, w, err)
 		return
 	}
@@ -801,7 +842,10 @@ func (a *apiV2Server) meshdbReadPermissions(
 	ctx context.Context, actor username.SQLUsername, target username.SQLUsername,
 ) ([]meshDBPermission, error) {
 	targetName := target.Normalized()
-	query := fmt.Sprintf("SHOW GRANTS FOR %s", tree.NameStringP(&targetName))
+	query := fmt.Sprintf(`SELECT * FROM [SHOW GRANTS FOR %s, public]
+		WHERE object_type IN ('database', 'schema', 'table')
+		AND (schema_name IS NULL OR schema_name NOT IN
+		('crdb_internal', 'information_schema', 'pg_catalog', 'pg_extension'))`, tree.NameStringP(&targetName))
 	databaseIterator, err := a.sqlServer.internalExecutor.QueryIteratorEx(
 		ctx, "r1-meshdb-list-grant-databases", nil,
 		sessiondata.InternalExecutorOverride{User: actor}, "SHOW DATABASES",
@@ -1018,7 +1062,7 @@ func (a *apiV2Server) meshdbChangeAccess(w http.ResponseWriter, r *http.Request)
 	queries := make([]struct {
 		database string
 		query    string
-	}, 0, len(databases))
+	}, 0, len(databases)*2)
 	for _, database := range databases {
 		access := req
 		access.Database = database
@@ -1027,10 +1071,28 @@ func (a *apiV2Server) meshdbChangeAccess(w http.ResponseWriter, r *http.Request)
 			meshDBRequestError(w, err)
 			return
 		}
+		if strings.EqualFold(strings.TrimSpace(req.Scope), "table") && strings.EqualFold(strings.TrimSpace(req.Action), "grant") {
+			userName := target.Normalized()
+			queries = append(queries, struct {
+				database string
+				query    string
+			}{database: database, query: fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s", tree.NameStringP(&database), tree.NameStringP(&userName))})
+		}
 		queries = append(queries, struct {
 			database string
 			query    string
 		}{database: database, query: query})
+		if strings.EqualFold(strings.TrimSpace(req.Scope), "database") && strings.EqualFold(strings.TrimSpace(req.Preset), "editor") {
+			verb, roleKeyword := "GRANT", "TO"
+			if strings.EqualFold(strings.TrimSpace(req.Action), "revoke") {
+				verb, roleKeyword = "REVOKE", "FROM"
+			}
+			userName := target.Normalized()
+			queries = append(queries, struct {
+				database string
+				query    string
+			}{database: database, query: fmt.Sprintf("%s CREATE ON SCHEMA %s.public %s %s", verb, tree.NameStringP(&database), roleKeyword, tree.NameStringP(&userName))})
+		}
 	}
 
 	ctx := a.sqlServer.AnnotateCtx(r.Context())

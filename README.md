@@ -65,7 +65,10 @@ endpoints cover operations that the generic SQL endpoint intentionally rejects:
 - `GET /api/v2/r1-meshdb/capabilities/` reports whether the session can view
   access administration or create databases.
 - `GET /api/v2/r1-meshdb/databases/` lists databases where the session has
-  `CONNECT`; `POST /api/v2/r1-meshdb/databases/` creates `{ "name": "appdb" }`.
+  `CONNECT`; `POST /api/v2/r1-meshdb/databases/` creates `{ "name": "appdb" }`
+  with public database `CONNECT` and public-schema `CREATE` revoked atomically.
+- `GET /api/v2/r1-meshdb/database-tables/?database=appdb` lists tables using a
+  query parameter so valid database names do not depend on URL path patterns.
 - `POST /api/v2/r1-meshdb/tables/` with a database, schema, table name, and
   allowlisted column definitions. The endpoint enforces the caller's CREATE
   privilege on the selected database.
@@ -80,7 +83,8 @@ endpoints cover operations that the generic SQL endpoint intentionally rejects:
   grant or revoke to multiple databases in one operation. Access changes accept
   only `viewer` or `editor` presets and `grant` or `revoke` actions.
 - `GET /api/v2/r1-meshdb/permissions/?username=app` returns paginated
-  database/table grants and labels each source as direct, public, or a role.
+  database, schema, and table grants and labels each source as direct, public,
+  or a role. System-schema objects are excluded.
 
 The Users & access view is restricted to authenticated admin users. It offers
 typed-name confirmation before deleting an account. The API
@@ -92,8 +96,12 @@ Creating a user and applying its initial access are separate operations. If
 the user is created but the access grant fails, the console reports that
 partial result and the existing access editor can retry it. Table grants apply
 only to the selected table; database `viewer` grants `CONNECT`, database
-`editor` grants `CONNECT, CREATE`, table `viewer` grants `SELECT`, and table
-`editor` grants `SELECT, INSERT, UPDATE, DELETE`.
+`editor` grants `CONNECT, CREATE` plus `CREATE` on the public schema, table
+`viewer` grants `SELECT`, and table `editor` grants `SELECT, INSERT, UPDATE,
+DELETE`. Table grants also grant database `CONNECT`. Revoking table access does
+not revoke `CONNECT`, which may still support other grants.
+Existing databases retain their current public grants; creating a database
+through this console does not change privileges on older databases.
 
 ## Source Boundary
 

@@ -209,6 +209,7 @@ func registerRoutes(
 		{"r1-meshdb/version/", a.meshdbVersion, true, regularRole, noOption, true},
 		{"r1-meshdb/capabilities/", a.meshdbCapabilities, true, regularRole, noOption, true},
 		{"r1-meshdb/databases/", a.meshdbDatabases, true, regularRole, noOption, true},
+		{"r1-meshdb/database-tables/", a.meshdbListDatabaseTables, true, regularRole, noOption, true},
 		{"r1-meshdb/tables/", a.meshdbCreateTable, true, regularRole, noOption, true},
 		{"r1-meshdb/users/", a.meshdbUsers, true, adminRole, noOption, true},
 		{"r1-meshdb/access/", a.meshdbAccess, true, adminRole, noOption, true},
