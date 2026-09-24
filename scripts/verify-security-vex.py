@@ -13,6 +13,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 VEX = ROOT / "security" / "openvex.json"
 RUNTIME_FILES = ROOT / "source" / "runtime-files.txt"
+CLOUDFLARED_PACKAGES = ROOT / "source" / "cloudflared-compiled-packages.txt"
 PROMETHEUS_PURL = (
   "pkg:golang/github.com/prometheus/prometheus@"
   "v1.8.2-0.20210914090109-37468d88dce8"
@@ -34,6 +35,9 @@ EXPECTED = {
   "CVE-2026-32286": (PGPROTO_PURL, "fixed", None),
   "CVE-2026-43871": (THRIFT_PURL, "fixed", None),
   "CVE-2026-84304": ((GRPC_ENGINE_PURL, GRPC_CLOUDFLARED_PURL), "fixed", None),
+  "CVE-2026-84445": (
+    (GRPC_ENGINE_PURL, GRPC_CLOUDFLARED_PURL), "not_affected", "vulnerable_code_not_present"
+  ),
   "CVE-2026-53615": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
   "CVE-2026-53613": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
   "CVE-2026-76642": (UTIL_LINUX_PURL, "not_affected", "vulnerable_code_not_present"),
@@ -46,6 +50,7 @@ EXPECTED = {
 REQUIRED_ALIASES = {
   "CVE-2026-43871": {"CVE-2026-43871", "GHSA-8wv5-x4w7-5gww"},
   "CVE-2026-84304": {"CVE-2026-84304", "GHSA-vp52-pcj8-j9qc"},
+  "CVE-2026-84445": {"CVE-2026-84445", "GHSA-2v4p-qf9q-27wj"},
   "CVE-2026-56854": {"CVE-2026-56854", "GO-2026-6303"},
   "CVE-2026-76642": {"CVE-2026-76642", "GHSA-m25x-3hj9-m26f"},
   "CVE-2026-78408": {"CVE-2026-78408", "GHSA-55fx-f4gg-cfhj"},
@@ -211,10 +216,23 @@ def verify_grpc_backport() -> None:
     fail("Cloudflared source verifier does not enforce the gRPC backport")
 
 
+def verify_grpc_xds_absence() -> None:
+  engine_files = RUNTIME_FILES.read_text(encoding="utf-8").splitlines()
+  if any(path.startswith("vendor/google.golang.org/grpc/xds/") for path in engine_files):
+    fail("the engine runtime closure includes the vulnerable gRPC xDS server")
+
+  cloud_packages = CLOUDFLARED_PACKAGES.read_text(encoding="utf-8").splitlines()
+  if any(
+    package == "google.golang.org/grpc/xds" or package.startswith("google.golang.org/grpc/xds/")
+    for package in cloud_packages
+  ):
+    fail("the Cloudflared binary includes the vulnerable gRPC xDS server")
+
+
 def verify_minimal_runtime() -> None:
   runtime_packages = (ROOT / "source/runtime-packages.txt").read_text(encoding="utf-8").splitlines()
   package_names = {line.split("=", 1)[0] for line in runtime_packages}
-  required = {"util-linux", "libtinfo6"}
+  required = {"util-linux", "libtinfo6", "libpcre2-8-0"}
   forbidden = {
     "bsdutils", "gzip", "libacl1", "libattr1", "libblkid1", "libmount1", "mount", "ncurses-base",
     "ncurses-bin", "perl-base", "util-linux-extra", "zlib1g",
@@ -223,6 +241,11 @@ def verify_minimal_runtime() -> None:
     fail("minimal runtime package inventory does not match the VEX evidence")
   if "util-linux=2.38.1-5+deb12u3" not in runtime_packages:
     fail("util-linux version differs from the VEX product")
+  if "libpcre2-8-0=10.42-1+deb12u1" not in runtime_packages:
+    fail("the runtime PCRE2 security update is missing")
+  source_mapping = (ROOT / "source/runtime-package-sources.tsv").read_text(encoding="utf-8")
+  if "libpcre2-8-0\t10.42-1+deb12u1\tpcre2\t10.42-1+deb12u1\n" not in source_mapping:
+    fail("the fixed PCRE2 corresponding-source mapping differs")
   assembler = (ROOT / "scripts/assemble-runtime-rootfs.sh").read_text(encoding="utf-8")
   if "/usr/bin/setsid" not in assembler:
     fail("the reviewed util-linux setsid executable is absent from the runtime assembler")
@@ -239,6 +262,12 @@ def verify_minimal_runtime() -> None:
   if "findmnt" in entrypoint or "/proc/self/mountinfo" not in entrypoint:
     fail("entrypoint mount checks do not match the util-linux VEX evidence")
   dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+  provenance = json.loads((ROOT / "source/provenance.json").read_text(encoding="utf-8"))
+  snapshot = provenance["buildInputs"].get("runtimeDebianSnapshot")
+  if snapshot != "20260924T000000Z" or dockerfile.count(f"/20260924T000000Z") != 4:
+    fail("the fixed PCRE2 runtime snapshot differs")
+  if "libpcre2-8-0=10.42-1+deb12u1" not in dockerfile:
+    fail("the fixed PCRE2 package is not installed in the runtime builder")
   if not re.search(r"(?m)^FROM scratch$", dockerfile):
     fail("final runtime is not the reviewed scratch closure")
   if "r1-atomic-replace" not in dockerfile or "r1-atomic-replace" not in entrypoint:
@@ -295,9 +324,9 @@ def main() -> None:
   document = json.loads(VEX.read_text(encoding="utf-8"))
   if document.get("@context") != "https://openvex.dev/ns/v0.2.0":
     fail("unexpected OpenVEX context")
-  if document.get("@id") != "https://github.com/Ratio1/r1-meshdb/security/vex/7":
+  if document.get("@id") != "https://github.com/Ratio1/r1-meshdb/security/vex/8":
     fail("unexpected OpenVEX document identity")
-  if document.get("version") != 7 or document.get("timestamp") != "2026-09-04T00:00:00Z":
+  if document.get("version") != 8 or document.get("timestamp") != "2026-09-24T00:00:00Z":
     fail("unexpected OpenVEX document version or timestamp")
   statements = document.get("statements")
   if not isinstance(statements, list) or len(statements) != len(EXPECTED):
@@ -310,6 +339,7 @@ def main() -> None:
   verify_pgproto_backport()
   verify_thrift_backport()
   verify_grpc_backport()
+  verify_grpc_xds_absence()
   verify_minimal_runtime()
   verify_ssh_server_authentication_absence()
   security_policy = (ROOT / "SECURITY.md").read_text(encoding="utf-8")

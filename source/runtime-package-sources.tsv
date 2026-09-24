@@ -10,7 +10,7 @@ hostname	3.23+nmu1	hostname	3.23+nmu1
 libc-bin	2.36-9+deb12u14	glibc	2.36-9+deb12u14
 libc6	2.36-9+deb12u14	glibc	2.36-9+deb12u14
 libgcc-s1	12.2.0-14+deb12u1	gcc-12	12.2.0-14+deb12u1
-libpcre2-8-0	10.42-1	pcre2	10.42-1
+libpcre2-8-0	10.42-1+deb12u1	pcre2	10.42-1+deb12u1
 libselinux1	3.4-1+b6	libselinux	3.4-1
 libstdc++6	12.2.0-14+deb12u1	gcc-12	12.2.0-14+deb12u1
 libtinfo6	6.4-4	ncurses	6.4-4

@@ -548,7 +548,7 @@ func value() string {
       f'baseline_repository != "{source_url}.git"',
       read("scripts/verify-provenance.py"),
     )
-    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/7")
+    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/8")
     self.assertEqual(
       json.loads(read("source/ratio1-engine-overrides.json"))["dependencySnapshot"]
       ["sourceBaseline"]["repository"],
@@ -935,6 +935,17 @@ func value() string {
     self.assertNotIn("perl -0pi", dockerfile)
     self.assertIn("GOPROXY=off", dockerfile)
     self.assertIn("snapshot.debian.org/archive/debian/20260812T000000Z", dockerfile)
+    self.assertIn("snapshot.debian.org/archive/debian-security/20260924T000000Z", dockerfile)
+    self.assertIn("libpcre2-8-0=10.42-1+deb12u1", dockerfile)
+    self.assertIn("libpcre2-8-0=10.42-1+deb12u1", read("source/runtime-packages.txt"))
+    self.assertIn(
+      "libpcre2-8-0\t10.42-1+deb12u1\tpcre2\t10.42-1+deb12u1",
+      read("source/runtime-package-sources.tsv"),
+    )
+    self.assertEqual(
+      json.loads(read("source/provenance.json"))["buildInputs"]["runtimeDebianSnapshot"],
+      "20260924T000000Z",
+    )
     self.assertIn("autoconf=2.71-3", dockerfile)
     self.assertIn("bash=5.2.15-2+b13", dockerfile)
     self.assertIn("scripts/build-engine.sh", dockerfile)
@@ -1637,6 +1648,47 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
       stdout=subprocess.PIPE,
       text=True,
     )
+
+  def test_grpc_xds_vex_rejects_a_compiled_xds_server(self):
+    cve = "CVE-2026-84445"
+    statements = [
+      statement for statement in json.loads(read("security/openvex.json"))["statements"]
+      if statement["vulnerability"]["@id"].endswith(cve)
+    ]
+    self.assertEqual(len(statements), 1)
+    self.assertEqual(statements[0]["status"], "not_affected")
+    self.assertEqual(statements[0]["justification"], "vulnerable_code_not_present")
+    self.assertEqual(
+      statements[0]["products"],
+      [
+        {"@id": "pkg:golang/google.golang.org/grpc@v1.82.1"},
+        {"@id": "pkg:golang/google.golang.org/grpc@v1.83.0"},
+      ],
+    )
+
+    verifier = load_script("scripts/verify-security-vex.py")
+    verifier.verify_grpc_xds_absence()
+    with tempfile.TemporaryDirectory() as directory:
+      engine_files = Path(directory) / "runtime-files.txt"
+      cloud_packages = Path(directory) / "cloudflared-compiled-packages.txt"
+      original_engine = verifier.RUNTIME_FILES
+      original_cloud = verifier.CLOUDFLARED_PACKAGES
+      try:
+        verifier.RUNTIME_FILES = engine_files
+        verifier.CLOUDFLARED_PACKAGES = cloud_packages
+        engine_files.write_text("vendor/google.golang.org/grpc/internal/xds/xds.go\n")
+        cloud_packages.write_text("google.golang.org/grpc/internal/xds\n")
+        verifier.verify_grpc_xds_absence()
+        engine_files.write_text("vendor/google.golang.org/grpc/xds/server.go\n")
+        with self.assertRaises(SystemExit):
+          verifier.verify_grpc_xds_absence()
+        engine_files.write_text("vendor/google.golang.org/grpc/internal/xds/xds.go\n")
+        cloud_packages.write_text("google.golang.org/grpc/xds\n")
+        with self.assertRaises(SystemExit):
+          verifier.verify_grpc_xds_absence()
+      finally:
+        verifier.RUNTIME_FILES = original_engine
+        verifier.CLOUDFLARED_PACKAGES = original_cloud
 
   def test_x_crypto_ssh_vex_excludes_the_server_authentication_path(self):
     cve = "CVE-2026-56854"

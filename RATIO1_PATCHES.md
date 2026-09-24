@@ -254,6 +254,9 @@ operation is no longer supported.
   tunnel RPC tests run during the image build.
 - Resolves Debian packages from a dated snapshot and pins direct package
   versions.
+- Pins the runtime root filesystem to the 2026-09-24 snapshot and installs
+  Debian's fixed `libpcre2-8-0=10.42-1+deb12u1` package; the matching `pcre2`
+  source package remains part of the corresponding-source archive.
 - Accompanies retained Debian object code with exact binary-to-source mappings,
   `.dsc` files, and source archives from that snapshot, both inside the image
   and as a checksum-backed release asset.

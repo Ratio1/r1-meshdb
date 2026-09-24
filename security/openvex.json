@@ -1,10 +1,10 @@
 {
   "@context": "https://openvex.dev/ns/v0.2.0",
-  "@id": "https://github.com/Ratio1/r1-meshdb/security/vex/7",
+  "@id": "https://github.com/Ratio1/r1-meshdb/security/vex/8",
   "author": "Ratio1",
   "role": "Project Maintainer",
-  "timestamp": "2026-09-04T00:00:00Z",
-  "version": 7,
+  "timestamp": "2026-09-24T00:00:00Z",
+  "version": 8,
   "statements": [
     {
       "vulnerability": {
@@ -75,6 +75,26 @@
       ],
       "status": "fixed",
       "status_notes": "Ratio1 backports the official gRPC-Go receive-buffer compaction fix from commit 8cfeca0e1ee5ea0980dcc320e20240fa1079ec77 to the engine's vendored v1.82.1 source and the Cloudflared build's vendored v1.83.0 source. Exact preimage, patch, distributed-source, and regression hashes are enforced by the provenance and security verifiers."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://nvd.nist.gov/vuln/detail/CVE-2026-84445",
+        "aliases": [
+          "CVE-2026-84445",
+          "GHSA-2v4p-qf9q-27wj"
+        ]
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/google.golang.org/grpc@v1.82.1"
+        },
+        {
+          "@id": "pkg:golang/google.golang.org/grpc@v1.83.0"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "The crash requires the xDS routing interceptor installed by grpc/xds.NewGRPCServer. The verified engine runtime source closure excludes vendor/google.golang.org/grpc/xds/, and the exact Cloudflared compiled-package closure excludes google.golang.org/grpc/xds. The affected xDS server implementation is not compiled into either binary."
     },
     {
       "vulnerability": {

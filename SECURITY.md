@@ -89,6 +89,15 @@ binary hashes are enforced by `source/provenance.json` and
 `scripts/verify-cloudflared-source.py`. The exact VEX decision is `fixed` for
 both scanner-visible module versions.
 
+`CVE-2026-84445` / `GHSA-2v4p-qf9q-27wj` requires an xDS server created with
+`grpc/xds.NewGRPCServer`; malformed requests can crash its routing interceptor.
+The verified OSS engine runtime source closure contains no public
+`vendor/google.golang.org/grpc/xds/` package, and Cloudflared's verified
+compiled-package closure contains no `google.golang.org/grpc/xds` package.
+The exact-version VEX decision is `not_affected` because the vulnerable server
+implementation is absent from both binaries. The VEX gate rejects either
+package entering those closures.
+
 `CVE-2026-56854` / `GO-2026-6303` affects SSH server authentication reached
 through `golang.org/x/crypto/ssh.NewServerConn` before x/crypto v0.55.0. The
 database engine's verified vendored runtime closure contains no x/crypto SSH
@@ -105,6 +114,11 @@ than a complete Debian userspace. This removes Perl, gzip, zlib, block-device
 parsers, mount tools, package managers, login tools, and ncurses commands while
 retaining Debian package metadata and copyright files for every copied OS
 component.
+
+The retained `libpcre2-8-0` runtime library is updated to Debian's fixed
+`10.42-1+deb12u1` build for `CVE-2026-86145`, `CVE-2026-89157`, and
+`CVE-2026-89161`. The runtime builder pins the 2026-09-24 Debian snapshot and
+bundles the corresponding `pcre2` source package with the image.
 
 - `CVE-2026-53615` is in util-linux's DOS/EBR parser. Only `setsid` is retained;
   `libblkid`, `blkid`, `findmnt`, and mount utilities are absent, and the
