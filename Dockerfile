@@ -49,7 +49,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 \
 
 FROM golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 AS engine-builder
 
-ARG RATIO1_VERSION=v1.0.2
+ARG RATIO1_VERSION=v1.0.3
 ARG SOURCE_DATE_EPOCH=1727820937
 ARG BUILD_JOBS=4
 
@@ -137,16 +137,17 @@ FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN printf '%s\n' \
-      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260812T000000Z bookworm main' \
-      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260812T000000Z bookworm-security main' \
-      'deb-src [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260812T000000Z bookworm main' \
-      'deb-src [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260812T000000Z bookworm-security main' \
+      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260924T000000Z bookworm main' \
+      'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260924T000000Z bookworm-security main' \
+      'deb-src [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260924T000000Z bookworm main' \
+      'deb-src [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260924T000000Z bookworm-security main' \
       > /etc/apt/sources.list \
   && rm -f /etc/apt/sources.list.d/debian.sources \
   && apt-get -o Acquire::Check-Valid-Until=false update \
   && apt-get install -y --no-install-recommends \
     bash=5.2.15-2+b13 \
     ca-certificates=20230311+deb12u1 \
+    libpcre2-8-0=10.42-1+deb12u1 \
     libtinfo6=6.4-4
 
 COPY --chmod=755 scripts/assemble-runtime-rootfs.sh /usr/local/bin/assemble-runtime-rootfs
@@ -170,7 +171,7 @@ FROM scratch
 
 ARG BUILD_DATE=""
 ARG RATIO1_REVISION="unknown"
-ARG RATIO1_VERSION="v1.0.2"
+ARG RATIO1_VERSION="v1.0.3"
 
 LABEL org.opencontainers.image.title="R1 MeshDB" \
       org.opencontainers.image.description="Distributed SQL database runtime for Ratio1 edge nodes" \

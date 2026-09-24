@@ -37,6 +37,7 @@ EXPECTED_MODIFIED_FILES = {
   "engine/pkg/kv/kvserver/replica_consistency.go",
   "engine/pkg/kv/kvserver/replica_corruption.go",
   "engine/pkg/kv/kvclient/kvcoord/txn_coord_sender.go",
+  "engine/pkg/server/api_v2.go",
   "engine/pkg/server/api_v2_error.go",
   "engine/pkg/server/diagnostics/diagnostics.go",
   "engine/pkg/server/server.go",
@@ -52,6 +53,7 @@ EXPECTED_MODIFIED_FILES = {
 }
 EXPECTED_REMOVED_FILES = {"engine/pkg/util/ctxutil/context_abi_pre1_20.go"}
 EXPECTED_ADDED_FILES = {
+  "engine/pkg/server/api_v2_r1_meshdb.go",
   "engine/pkg/storage/pebble_iterator_r1_test.go",
   "engine/pkg/ui/distoss/assets/bundle.js",
   "engine/pkg/ui/distoss/assets/favicon.svg",
@@ -465,6 +467,7 @@ def check_engine_overrides(upstream_commit: str, patch_record: str, upstream_roo
     change_class = record.get("changeClass")
     if change_class not in {
       "comments-only",
+      "browser-console-management",
       "go-toolchain-compatibility",
       "product-identity-and-privacy",
       "runtime-recovery-signal",

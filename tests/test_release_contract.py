@@ -51,6 +51,109 @@ class ReleaseContractTests(unittest.TestCase):
     self.assertIn("/api/v2/sql/", bundle)
     self.assertNotRegex(bundle, r"https?://")
 
+  def test_console_management_contract_is_first_party_and_allowlisted(self):
+    bundle = read("engine/pkg/ui/distoss/assets/bundle.js")
+    api = read("engine/pkg/server/api_v2_r1_meshdb.go")
+    routes = read("engine/pkg/server/api_v2.go")
+    for marker in (
+      "mesh-database-select",
+      "const databases = [...new Set(state.databases.filter(Boolean))]",
+      "No accessible databases",
+      "#mesh-logout { flex: 0 0 auto; white-space: nowrap; }",
+      "data-mesh-pagination",
+      "data-view=\"users\"",
+      "Image",
+      "/api/v2/r1-meshdb/capabilities/",
+      "/api/v2/r1-meshdb/databases/",
+      "/api/v2/r1-meshdb/database-tables/",
+      "/api/v2/r1-meshdb/version/",
+      "/api/v2/r1-meshdb/tables/",
+      "/api/v2/r1-meshdb/users/",
+      "/api/v2/r1-meshdb/access/",
+      "/api/v2/r1-meshdb/permissions/",
+      "mesh-create-user-grant",
+      "mesh-permission-user",
+      "mesh-delete-username",
+      "method: 'DELETE'",
+      "const databases = selectedValues('mesh-create-user-database')",
+      "mesh-create-table-preview",
+      "databaseRevision",
+      "isCurrentDatabase",
+      "permissionRequestRevision",
+      "accessSelectionKey",
+    ):
+      self.assertIn(marker, bundle)
+    for marker in (
+      'preset must be viewer or editor',
+      'action must be grant or revoke',
+      'CREATE USER %s WITH PASSWORD %s',
+      'lexbase.EscapeSQLString(req.Password)',
+      'DROP USER %s',
+      'cannot delete the current user',
+      'cannot delete a protected user',
+      'CREATE TABLE %s (%s)',
+      'unsupported column type',
+      'SHOW GRANTS FOR %s, public',
+      'REVOKE CONNECT ON DATABASE ',
+      'REVOKE CREATE ON SCHEMA ',
+      'GRANT CONNECT ON DATABASE %s TO %s',
+      'CREATE ON SCHEMA %s.public %s %s',
+      "'crdb_internal', 'information_schema', 'pg_catalog', 'pg_extension'",
+      'SHOW DATABASES',
+      'has_database_privilege(database_name, \'CONNECT\')',
+      'InternalExecutorOverride{User: actor, Database: database}',
+      'internalDB.Txn(ctx, func(ctx context.Context, txn isql.Txn) error',
+      'can_view_access',
+      'json:"databases,omitempty"',
+      'json:"version"',
+      'meshDBVersionPath',
+      'os.ReadFile(meshDBVersionPath)',
+    ):
+      self.assertIn(marker, api)
+    for marker in (
+      '"r1-meshdb/capabilities/"',
+      '"r1-meshdb/databases/"',
+      '"r1-meshdb/database-tables/"',
+      '"r1-meshdb/version/"',
+      '"r1-meshdb/tables/"',
+      '"r1-meshdb/users/"',
+      '"r1-meshdb/access/"',
+      '"r1-meshdb/permissions/"',
+    ):
+      self.assertIn(marker, routes)
+    self.assertNotIn("GRANT %s ON", api)
+
+  def test_console_database_privacy_and_name_safe_table_listing(self):
+    api = read("engine/pkg/server/api_v2_r1_meshdb.go")
+    routes = read("engine/pkg/server/api_v2.go")
+    bundle = read("engine/pkg/ui/distoss/assets/bundle.js")
+    create = api.split("func (a *apiV2Server) meshdbCreateDatabase", 1)[1].split(
+      "func (a *apiV2Server) meshdbCreateTable", 1
+    )[0]
+    self.assertIn("internalDB.Txn", create)
+    self.assertIn("REVOKE CONNECT ON DATABASE", create)
+    self.assertIn("REVOKE CREATE ON SCHEMA", create)
+    self.assertIn("GRANT CREATE ON SCHEMA", create)
+    self.assertIn("quotedActor", create)
+    self.assertIn("user: username.RootUserName()", create)
+    self.assertIn('"r1-meshdb/database-tables/", a.meshdbListDatabaseTables, true, regularRole', routes)
+    self.assertIn("/api/v2/r1-meshdb/database-tables/?database=${encodeURIComponent(database)}", bundle)
+    self.assertNotIn("/api/v2/databases/${encodeURIComponent(database)}/tables/", bundle)
+
+    permissions = api.split("func (a *apiV2Server) meshdbReadPermissions", 1)[1].split(
+      "func valueOrEmpty", 1
+    )[0]
+    self.assertIn("SHOW GRANTS FOR %s, public", permissions)
+    self.assertIn("schema_name NOT IN", permissions)
+    access = api.split("func (a *apiV2Server) meshdbChangeAccess", 1)[1]
+    self.assertIn("GRANT CONNECT ON DATABASE %s TO %s", access)
+    self.assertIn("CREATE ON SCHEMA %s.public %s %s", access)
+
+    self.assertNotIn("CREATE USER %s WITH PASSWORD $1", api)
+
+    self.assertIn("WHERE has_database_privilege(database_name, 'CONNECT')", api)
+    self.assertNotIn("pg_catalog.has_database_privilege(database_name, 'CONNECT')", api)
+
   def test_release_version_resolution_is_strict_and_monotonic(self):
     resolver = load_script("scripts/resolve-release-version.py")
     resolved = resolver.resolve_release_version(
@@ -484,7 +587,7 @@ func value() string {
       f'baseline_repository != "{source_url}.git"',
       read("scripts/verify-provenance.py"),
     )
-    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/7")
+    self.assertEqual(json.loads(read("security/openvex.json"))["@id"], f"{source_url}/security/vex/8")
     self.assertEqual(
       json.loads(read("source/ratio1-engine-overrides.json"))["dependencySnapshot"]
       ["sourceBaseline"]["repository"],
@@ -871,6 +974,17 @@ func value() string {
     self.assertNotIn("perl -0pi", dockerfile)
     self.assertIn("GOPROXY=off", dockerfile)
     self.assertIn("snapshot.debian.org/archive/debian/20260812T000000Z", dockerfile)
+    self.assertIn("snapshot.debian.org/archive/debian-security/20260924T000000Z", dockerfile)
+    self.assertIn("libpcre2-8-0=10.42-1+deb12u1", dockerfile)
+    self.assertIn("libpcre2-8-0=10.42-1+deb12u1", read("source/runtime-packages.txt"))
+    self.assertIn(
+      "libpcre2-8-0\t10.42-1+deb12u1\tpcre2\t10.42-1+deb12u1",
+      read("source/runtime-package-sources.tsv"),
+    )
+    self.assertEqual(
+      json.loads(read("source/provenance.json"))["buildInputs"]["runtimeDebianSnapshot"],
+      "20260924T000000Z",
+    )
     self.assertIn("autoconf=2.71-3", dockerfile)
     self.assertIn("bash=5.2.15-2+b13", dockerfile)
     self.assertIn("scripts/build-engine.sh", dockerfile)
@@ -965,6 +1079,10 @@ func value() string {
       "/api/v2/login/",
       "X-Cockroach-API-Session",
       "/api/v2/sql/",
+      "/api/v2/r1-meshdb/databases/",
+      "/api/v2/r1-meshdb/database-tables/",
+      "/api/v2/r1-meshdb/access/",
+      "/api/v2/r1-meshdb/permissions/",
     ):
       self.assertIn(console_contract, secure_smoke)
     self.assertEqual(read(".github/workflows/ci.yml").count("path: source-snapshot"), 2)
@@ -1573,6 +1691,47 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
       stdout=subprocess.PIPE,
       text=True,
     )
+
+  def test_grpc_xds_vex_rejects_a_compiled_xds_server(self):
+    cve = "CVE-2026-84445"
+    statements = [
+      statement for statement in json.loads(read("security/openvex.json"))["statements"]
+      if statement["vulnerability"]["@id"].endswith(cve)
+    ]
+    self.assertEqual(len(statements), 1)
+    self.assertEqual(statements[0]["status"], "not_affected")
+    self.assertEqual(statements[0]["justification"], "vulnerable_code_not_present")
+    self.assertEqual(
+      statements[0]["products"],
+      [
+        {"@id": "pkg:golang/google.golang.org/grpc@v1.82.1"},
+        {"@id": "pkg:golang/google.golang.org/grpc@v1.83.0"},
+      ],
+    )
+
+    verifier = load_script("scripts/verify-security-vex.py")
+    verifier.verify_grpc_xds_absence()
+    with tempfile.TemporaryDirectory() as directory:
+      engine_files = Path(directory) / "runtime-files.txt"
+      cloud_packages = Path(directory) / "cloudflared-compiled-packages.txt"
+      original_engine = verifier.RUNTIME_FILES
+      original_cloud = verifier.CLOUDFLARED_PACKAGES
+      try:
+        verifier.RUNTIME_FILES = engine_files
+        verifier.CLOUDFLARED_PACKAGES = cloud_packages
+        engine_files.write_text("vendor/google.golang.org/grpc/internal/xds/xds.go\n")
+        cloud_packages.write_text("google.golang.org/grpc/internal/xds\n")
+        verifier.verify_grpc_xds_absence()
+        engine_files.write_text("vendor/google.golang.org/grpc/xds/server.go\n")
+        with self.assertRaises(SystemExit):
+          verifier.verify_grpc_xds_absence()
+        engine_files.write_text("vendor/google.golang.org/grpc/internal/xds/xds.go\n")
+        cloud_packages.write_text("google.golang.org/grpc/xds\n")
+        with self.assertRaises(SystemExit):
+          verifier.verify_grpc_xds_absence()
+      finally:
+        verifier.RUNTIME_FILES = original_engine
+        verifier.CLOUDFLARED_PACKAGES = original_cloud
 
   def test_x_crypto_ssh_vex_excludes_the_server_authentication_path(self):
     cve = "CVE-2026-56854"

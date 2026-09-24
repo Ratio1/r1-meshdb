@@ -4,11 +4,32 @@ This file records every deliberate difference between upstream CockroachDB
 v23.1.28 commit `76e598c9b1c100fd9280b979140b5e377c330a20` and this distribution.
 Every released file is covered by `source/manifest.sha256`.
 
-R1 MeshDB v1.0.2 includes a first-party, dependency-free browser console at
+R1 MeshDB v1.0.3 includes a first-party, dependency-free browser console at
 `engine/pkg/ui/distoss/assets/bundle.js`, with its icon at
 `engine/pkg/ui/distoss/assets/favicon.svg`. The console uses the retained
 authenticated v2 login and SQL APIs to show cluster identity, list user tables,
-and run SQL. `engine/pkg/ui/ui.go` links these assets from the console page.
+run SQL with bounded scrolling and client-side pagination, switch databases,
+and manage databases, users, and allowlisted database/table access, including
+multi-database grants from one database-scope operation. The
+Tables view lists objects first and provides an on-demand, allowlisted table-creation wizard for
+safe common column types, defaults, nullability, and primary keys. The
+admin-only Users & access view reports direct, public, and inherited role
+grants and supports confirmed user deletion. The management actions use
+task tabs and explicit database selection controls. They run through
+authenticated `engine/pkg/server/api_v2_r1_meshdb.go` endpoints because the generic SQL API
+intentionally rejects DDL and transaction-control statements. `engine/pkg/ui/ui.go`
+links these assets from the console page. The retained upstream
+`engine/pkg/server/api_v2.go` registers the authenticated management routes
+with regular-user or admin role requirements.
+User creation encodes the password as a SQL literal because this engine's
+prepared-statement audit events record placeholder values; the `CREATE USER`
+formatter redacts password literals in those events.
+Wizard-created databases revoke default public `CONNECT` and public-schema
+`CREATE` in the creation transaction, then restore schema `CREATE` to the
+database owner. Editor database grants restore schema
+creation for that user, while table grants include database `CONNECT`.
+Permissions include public grants, and the table picker uses a query parameter
+to support quoted database names outside the upstream path-route pattern.
 
 The release also includes reviewed `not_affected` OpenVEX decisions for
 util-linux findings. The minimal scratch runtime retains only non-setuid
@@ -120,7 +141,7 @@ upstream commit as `Build Commit ID` and requires all of:
 
 ```text
 Distribution:     OSS
-Build Tag:        v1.0.2
+Build Tag:        v1.0.3
 Build Type:       release
 ```
 
@@ -242,6 +263,9 @@ operation is no longer supported.
   tunnel RPC tests run during the image build.
 - Resolves Debian packages from a dated snapshot and pins direct package
   versions.
+- Pins the runtime root filesystem to the 2026-09-24 snapshot and installs
+  Debian's fixed `libpcre2-8-0=10.42-1+deb12u1` package; the matching `pcre2`
+  source package remains part of the corresponding-source archive.
 - Accompanies retained Debian object code with exact binary-to-source mappings,
   `.dsc` files, and source archives from that snapshot, both inside the image
   and as a checksum-backed release asset.

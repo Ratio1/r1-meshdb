@@ -122,6 +122,13 @@
       "reason": "Route corruption escalation to the R1 MeshDB maintainers."
     },
     {
+      "path": "engine/pkg/server/api_v2.go",
+      "upstreamSha256": "abdd01ce3e5d7b705549865273fdc8e54d6f0c484153001aad2c4181677161b6",
+      "distributedSha256": "83ea6aa11f6fbbc6fe853a5968297f9047f8428e0ed5ee16b15ed7836295c9ff",
+      "changeClass": "browser-console-management",
+      "reason": "Register authenticated R1 MeshDB console management routes with explicit regular-user and admin role requirements."
+    },
+    {
       "path": "engine/pkg/server/api_v2_error.go",
       "upstreamSha256": "2c64ffca31ff1ac1ea40003a171ccd3de8b2ee570e5ad74902c37648584c732d",
       "distributedSha256": "557b048fdc22162e52870f9f1726645079f6b1295601291ecaa7cfdcd3e515cc",
@@ -236,14 +243,19 @@
   ],
   "ratio1AddedFiles": [
     {
+      "path": "engine/pkg/server/api_v2_r1_meshdb.go",
+      "sha256": "4dcae9a710af77db464b9fcc78b329d1b4d8611551b2920a1bea9b283ab85786",
+      "reason": "Authenticated, allowlisted management and admin-only user-permission endpoints for filtered database discovery, private database creation, safe tables, creating and deleting users, inspecting direct, role, and public grants across database contexts, and atomically granting or revoking focused database/table access without exposing arbitrary DDL or privilege SQL through the browser."
+    },
+    {
       "path": "engine/pkg/storage/pebble_iterator_r1_test.go",
       "sha256": "3a9ede812d155ffa4b442a42eebfccc60c61179c68af8325bea9d2a6e1316348",
       "reason": "Regression coverage that signals direct and wrapped Pebble corruption markers while rejecting matching text and nil errors."
     },
     {
       "path": "engine/pkg/ui/distoss/assets/bundle.js",
-      "sha256": "943c18a71d962e3a8a5eb8bb7d3c37e005869378a8d38d6955a05ec114c654a8",
-      "reason": "Dependency-free first-party browser console for authenticated cluster overview, table discovery, and SQL execution."
+      "sha256": "0dda5a7f22440fb9ff98286d6f407423212424ec11226962a72b224d17dc5607",
+      "reason": "Dependency-free first-party browser console with a table inventory, on-demand table creation, scrollable paginated SQL results, CONNECT-filtered database switching, tabbed database/user/access management with explicit multi-database selection and confirmed deletion, an admin-only direct/role/public grants view, and responsive controls."
     },
     {
       "path": "engine/pkg/ui/distoss/assets/favicon.svg",

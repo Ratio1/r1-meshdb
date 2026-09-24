@@ -19461,7 +19461,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/server/api_v2.go",
-      "sha256": "abdd01ce3e5d7b705549865273fdc8e54d6f0c484153001aad2c4181677161b6",
+      "sha256": "83ea6aa11f6fbbc6fe853a5968297f9047f8428e0ed5ee16b15ed7836295c9ff",
       "spdx": "Apache-2.0"
     },
     {
@@ -19474,6 +19474,12 @@
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/server/api_v2_error.go",
       "sha256": "557b048fdc22162e52870f9f1726645079f6b1295601291ecaa7cfdcd3e515cc",
+      "spdx": "Apache-2.0"
+    },
+    {
+      "basis": "Apache-2.0 source header",
+      "path": "engine/pkg/server/api_v2_r1_meshdb.go",
+      "sha256": "4dcae9a710af77db464b9fcc78b329d1b4d8611551b2920a1bea9b283ab85786",
       "spdx": "Apache-2.0"
     },
     {
@@ -32061,7 +32067,7 @@
     {
       "basis": "Apache-2.0 source header",
       "path": "engine/pkg/ui/distoss/assets/bundle.js",
-      "sha256": "943c18a71d962e3a8a5eb8bb7d3c37e005869378a8d38d6955a05ec114c654a8",
+      "sha256": "0dda5a7f22440fb9ff98286d6f407423212424ec11226962a72b224d17dc5607",
       "spdx": "Apache-2.0"
     },
     {
