@@ -21,6 +21,9 @@ intentionally rejects DDL and transaction-control statements. `engine/pkg/ui/ui.
 links these assets from the console page. The retained upstream
 `engine/pkg/server/api_v2.go` registers the authenticated management routes
 with regular-user or admin role requirements.
+User creation encodes the password as a SQL literal because this engine's
+prepared-statement audit events record placeholder values; the `CREATE USER`
+formatter redacts password literals in those events.
 Wizard-created databases revoke default public `CONNECT` and public-schema
 `CREATE` in the creation transaction, then restore schema `CREATE` to the
 database owner. Editor database grants restore schema

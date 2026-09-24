@@ -17,6 +17,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/security/username"
 	"github.com/cockroachdb/cockroach/pkg/server/serverpb"
 	"github.com/cockroachdb/cockroach/pkg/sql/isql"
+	"github.com/cockroachdb/cockroach/pkg/sql/lexbase"
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgerror"
 	"github.com/cockroachdb/cockroach/pkg/sql/sem/tree"
@@ -649,10 +650,11 @@ func (a *apiV2Server) meshdbCreateUser(w http.ResponseWriter, r *http.Request) {
 	ctx := a.sqlServer.AnnotateCtx(r.Context())
 	actor := userFromHTTPAuthInfoContext(ctx)
 	userName := user.Normalized()
-	query := fmt.Sprintf("CREATE USER %s WITH PASSWORD $1", tree.NameStringP(&userName))
+	// CREATE USER audit events log placeholder values, including password parameters.
+	query := fmt.Sprintf("CREATE USER %s WITH PASSWORD %s", tree.NameStringP(&userName), lexbase.EscapeSQLString(req.Password))
 	if _, err := a.sqlServer.internalExecutor.ExecEx(
 		ctx, "r1-meshdb-create-user", nil,
-		sessiondata.InternalExecutorOverride{User: actor}, query, req.Password,
+		sessiondata.InternalExecutorOverride{User: actor}, query,
 	); err != nil {
 		meshDBExecutionError(ctx, w, err)
 		return

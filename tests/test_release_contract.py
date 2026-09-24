@@ -86,7 +86,8 @@ class ReleaseContractTests(unittest.TestCase):
     for marker in (
       'preset must be viewer or editor',
       'action must be grant or revoke',
-      'CREATE USER %s WITH PASSWORD $1',
+      'CREATE USER %s WITH PASSWORD %s',
+      'lexbase.EscapeSQLString(req.Password)',
       'DROP USER %s',
       'cannot delete the current user',
       'cannot delete a protected user',
@@ -147,6 +148,8 @@ class ReleaseContractTests(unittest.TestCase):
     access = api.split("func (a *apiV2Server) meshdbChangeAccess", 1)[1]
     self.assertIn("GRANT CONNECT ON DATABASE %s TO %s", access)
     self.assertIn("CREATE ON SCHEMA %s.public %s %s", access)
+
+    self.assertNotIn("CREATE USER %s WITH PASSWORD $1", api)
 
     self.assertIn("WHERE has_database_privilege(database_name, 'CONNECT')", api)
     self.assertNotIn("pg_catalog.has_database_privilege(database_name, 'CONNECT')", api)
