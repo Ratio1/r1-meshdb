@@ -122,6 +122,13 @@
       "reason": "Route corruption escalation to the R1 MeshDB maintainers."
     },
     {
+      "path": "engine/pkg/server/api_v2.go",
+      "upstreamSha256": "abdd01ce3e5d7b705549865273fdc8e54d6f0c484153001aad2c4181677161b6",
+      "distributedSha256": "d13c398edd050d849933ffaed23b6e5bee7aa664a2210631a529a299486b6aa5",
+      "changeClass": "browser-console-management",
+      "reason": "Register authenticated R1 MeshDB console management routes with explicit regular-user and admin role requirements."
+    },
+    {
       "path": "engine/pkg/server/api_v2_error.go",
       "upstreamSha256": "2c64ffca31ff1ac1ea40003a171ccd3de8b2ee570e5ad74902c37648584c732d",
       "distributedSha256": "557b048fdc22162e52870f9f1726645079f6b1295601291ecaa7cfdcd3e515cc",

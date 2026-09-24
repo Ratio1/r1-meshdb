@@ -18,7 +18,9 @@ grants and supports confirmed user deletion. The management actions use
 task tabs and explicit database selection controls. They run through
 authenticated `engine/pkg/server/api_v2_r1_meshdb.go` endpoints because the generic SQL API
 intentionally rejects DDL and transaction-control statements. `engine/pkg/ui/ui.go`
-links these assets from the console page.
+links these assets from the console page. The retained upstream
+`engine/pkg/server/api_v2.go` registers the authenticated management routes
+with regular-user or admin role requirements.
 
 The release also includes reviewed `not_affected` OpenVEX decisions for
 util-linux findings. The minimal scratch runtime retains only non-setuid

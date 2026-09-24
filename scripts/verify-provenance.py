@@ -37,6 +37,7 @@ EXPECTED_MODIFIED_FILES = {
   "engine/pkg/kv/kvserver/replica_consistency.go",
   "engine/pkg/kv/kvserver/replica_corruption.go",
   "engine/pkg/kv/kvclient/kvcoord/txn_coord_sender.go",
+  "engine/pkg/server/api_v2.go",
   "engine/pkg/server/api_v2_error.go",
   "engine/pkg/server/diagnostics/diagnostics.go",
   "engine/pkg/server/server.go",
@@ -466,6 +467,7 @@ def check_engine_overrides(upstream_commit: str, patch_record: str, upstream_roo
     change_class = record.get("changeClass")
     if change_class not in {
       "comments-only",
+      "browser-console-management",
       "go-toolchain-compatibility",
       "product-identity-and-privacy",
       "runtime-recovery-signal",

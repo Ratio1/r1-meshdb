@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0, included in the file
 // licenses/APL.txt.
 
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
+
 // TODO(ricky): re-enable.
 //-go:generate swagger generate spec -w . -o ../../docs/generated/swagger/spec.json --scan-models
 
