@@ -1070,13 +1070,24 @@ func value() string {
     self.assertIn("testbed/run-real-cloudflare-cluster.sh", read(".github/workflows/release.yml"))
     self.assertIn("scripts/runtime-supervision-smoke.sh", read(".github/workflows/ci.yml"))
     self.assertIn("scripts/runtime-supervision-smoke.sh", read(".github/workflows/release.yml"))
-    self.assertFalse((ROOT / "scripts/secure-single-node-smoke.sh").exists())
-    for path in (
-      ".github/workflows/ci.yml",
-      ".github/workflows/release.yml",
-      "scripts/validate-runtime-change.sh",
+    self.assertIn("scripts/secure-single-node-smoke.sh", read(".github/workflows/ci.yml"))
+    self.assertIn("scripts/secure-single-node-smoke.sh", read(".github/workflows/release.yml"))
+    self.assertIn("scripts/secure-single-node-smoke.sh", read("scripts/validate-runtime-change.sh"))
+    secure_smoke = read("scripts/secure-single-node-smoke.sh")
+    for console_contract in (
+      "/bundle.js",
+      "data-r1-meshdb-console",
+      "/api/v2/login/",
+      "X-Cockroach-API-Session",
+      "/api/v2/sql/",
+      "/api/v2/r1-meshdb/capabilities/",
+      "/api/v2/r1-meshdb/databases/",
+      "/api/v2/r1-meshdb/database-tables/",
+      "/api/v2/r1-meshdb/access/",
+      "/api/v2/r1-meshdb/permissions/",
     ):
-      self.assertNotIn("secure-single-node-smoke.sh", read(path))
+      self.assertIn(console_contract, secure_smoke)
+    self.assertIn('[[ "${admin_membership_count}" != "1" ]]', secure_smoke)
     self.assertEqual(read(".github/workflows/ci.yml").count("path: source-snapshot"), 2)
     for secret in ("CF_ACCOUNT_ID", "CF_ZONE_ID", "CF_API_TOKEN", "CF_BASE_DOMAIN"):
       self.assertIn("${{ secrets." + secret + " }}", read(".github/workflows/release.yml"))
