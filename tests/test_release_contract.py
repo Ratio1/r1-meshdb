@@ -1937,6 +1937,9 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
   def test_configured_user_gets_admin_on_fresh_and_recovered_bootstrap(self):
     entrypoint = read("entrypoint.sh")
     self.assertEqual(entrypoint.count("GRANT admin TO ${CRDB_USER};"), 2)
+    recovery = read("scripts/store-recovery-regression.sh")
+    self.assertIn("ensuring configured administrator privileges", recovery)
+    self.assertIn('grep -Fxq "GRANT admin TO app_user;"', recovery)
     fresh = read("scripts/entrypoint-multinode-smoke.sh")
     self.assertIn("select crdb_internal.is_admin();", fresh)
     self.assertIn('[[ "${admin_status}" == "t" ]]', fresh)
