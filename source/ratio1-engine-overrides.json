@@ -136,6 +136,13 @@
       "reason": "Identify runtime diagnostic logs as R1 MeshDB logs."
     },
     {
+      "path": "engine/pkg/server/api_v2_sql_schema.go",
+      "upstreamSha256": "1f7fbc4f76e1872be89c9ed37b4f59f0cc6da3a7f1b0cbffbb2ac272b1994094",
+      "distributedSha256": "d9213a0ddfa527f781e7439dac601260a4a028cb5cc7a12f4e985df0176278cf",
+      "changeClass": "browser-console-management",
+      "reason": "Use numbered SQL placeholders for paginated user listings and close the result iterator so the authenticated dashboard and generic v2 users endpoint return results reliably."
+    },
+    {
       "path": "engine/pkg/server/diagnostics/diagnostics.go",
       "upstreamSha256": "1b6f40daca97fa4f0e47b89339f898f34ec7d1056df975ea9beebde889b5e250",
       "distributedSha256": "00d9ed829a4793cb2395b46553befa29531c297077e885bc2a88fc1cd87428e1",
@@ -254,8 +261,8 @@
     },
     {
       "path": "engine/pkg/ui/distoss/assets/bundle.js",
-      "sha256": "0dda5a7f22440fb9ff98286d6f407423212424ec11226962a72b224d17dc5607",
-      "reason": "Dependency-free first-party browser console with a table inventory, on-demand table creation, scrollable paginated SQL results, CONNECT-filtered database switching, tabbed database/user/access management with explicit multi-database selection and confirmed deletion, an admin-only direct/role/public grants view, and responsive controls."
+      "sha256": "f50d6fa37731e0c0c5f6a05b3d9d6f0e20fa15f1fd37a3f2a2060cb95723a795",
+      "reason": "Dependency-free first-party browser console with table inventory, on-demand table creation, scrollable paginated SQL results, CONNECT-filtered database switching, tabbed database/user/access management, and responsive controls. It normalizes the v2 user-object response, retains SQL drafts on navigation, fixes compact layout spacing, and communicates local health and list bounds accurately."
     },
     {
       "path": "engine/pkg/ui/distoss/assets/favicon.svg",

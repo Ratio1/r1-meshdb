@@ -154,6 +154,18 @@ class ReleaseContractTests(unittest.TestCase):
     self.assertIn("WHERE has_database_privilege(database_name, 'CONNECT')", api)
     self.assertNotIn("pg_catalog.has_database_privilege(database_name, 'CONNECT')", api)
 
+  def test_console_audit_regressions(self):
+    users_api = read("engine/pkg/server/api_v2_sql_schema.go")
+    bundle = read("engine/pkg/ui/distoss/assets/bundle.js")
+    self.assertIn('query += " LIMIT $1"', users_api)
+    self.assertIn('query += " OFFSET $2"', users_api)
+    self.assertIn("return user.username;", bundle)
+    self.assertIn("limit=1&offset=${offset}", bundle)
+    self.assertIn("grid-template-rows: max-content minmax(0, 1fr)", bundle)
+    self.assertIn("state.queryDraft = event.currentTarget.value", bundle)
+    self.assertIn("requestRevision !== state.tableRequestRevision", bundle)
+    self.assertNotIn("ORDER BY table_schema, table_name LIMIT 500", bundle)
+
   def test_release_version_resolution_is_strict_and_monotonic(self):
     resolver = load_script("scripts/resolve-release-version.py")
     resolved = resolver.resolve_release_version(

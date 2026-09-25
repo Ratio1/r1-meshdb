@@ -39,6 +39,7 @@ EXPECTED_MODIFIED_FILES = {
   "engine/pkg/kv/kvclient/kvcoord/txn_coord_sender.go",
   "engine/pkg/server/api_v2.go",
   "engine/pkg/server/api_v2_error.go",
+  "engine/pkg/server/api_v2_sql_schema.go",
   "engine/pkg/server/diagnostics/diagnostics.go",
   "engine/pkg/server/server.go",
   "engine/pkg/settings/cluster/cluster_settings.go",

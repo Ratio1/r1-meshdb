@@ -294,6 +294,7 @@ assert_console_contract() {
   local root_status bundle_status anonymous_status login_status session sql_status capabilities_status
   local create_status tables_status admin_login_status admin_session user_status grant_status
   local permissions_status reader_login_status reader_session databases_status
+  local users_first_status users_second_status
   port="$(docker_cmd port "${name}" 8080/tcp | sed -n 's/.*://p')"
   if [[ ! "${port}" =~ ^[1-9][0-9]*$ ]]; then
     echo "console port is not published on loopback" >&2
@@ -458,6 +459,28 @@ PY
   rm -f "${tmp}/console-user-request.json"
   if [[ "${user_status}" != "201" ]]; then
     echo "console user creation failed" >&2
+    exit 1
+  fi
+  users_first_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${admin_session}" | \
+    curl --config - "${curl_args[@]}" --output "${tmp}/console-users-first.json" \
+      --write-out '%{http_code}' "${base_url}/api/v2/r1-meshdb/users/?limit=1&offset=0")"
+  users_second_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${admin_session}" | \
+    curl --config - "${curl_args[@]}" --output "${tmp}/console-users-second.json" \
+      --write-out '%{http_code}' "${base_url}/api/v2/r1-meshdb/users/?limit=1&offset=1")"
+  if [[ "${users_first_status}" != "200" || "${users_second_status}" != "200" ]] || \
+      ! python3 - "${tmp}/console-users-first.json" "${tmp}/console-users-second.json" <<'PY'
+import json
+import pathlib
+import sys
+
+first, second = (json.loads(pathlib.Path(path).read_text(encoding="utf-8")) for path in sys.argv[1:])
+names = [page.get("users", [{}])[0].get("username") for page in (first, second)]
+raise SystemExit(0 if all(isinstance(name, str) and name for name in names)
+                 and names[0] != names[1] and first.get("next") == 1
+                 and second.get("next") == 2 else 1)
+PY
+  then
+    echo "console paginated user listing failed" >&2
     exit 1
   fi
   grant_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${admin_session}" | \
