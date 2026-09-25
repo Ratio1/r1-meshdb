@@ -268,6 +268,12 @@ if [[ "${role_option_count}" != "1" ]]; then
   exit 1
 fi
 
+admin_status="$(docker exec -e PGPASSWORD=entrypoint_multinode_secret "${node3}" \
+  timeout --kill-after=2s 20s /cockroach/cockroach sql \
+  --url 'postgresql://app_user@roach3:26257/appdb?sslmode=require' --format=csv \
+  -e 'select crdb_internal.is_admin();' | tail -n 1 | tr -d '\r')"
+[[ "${admin_status}" == "t" ]] || { echo "configured user is not an admin through node 3" >&2; exit 1; }
+
 replication_ready=false
 for _ in $(seq 1 300); do
   incomplete_baseline_voter_sets="$(docker exec "${node1}" \

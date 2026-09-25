@@ -1931,6 +1931,16 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
       read("tests/runtime-supervision/cloudflared-test-stub.sh"),
     )
 
+  def test_configured_user_gets_admin_on_fresh_and_recovered_bootstrap(self):
+    entrypoint = read("entrypoint.sh")
+    self.assertEqual(entrypoint.count("GRANT admin TO ${CRDB_USER};"), 2)
+    fresh = read("scripts/entrypoint-multinode-smoke.sh")
+    self.assertIn("select crdb_internal.is_admin();", fresh)
+    self.assertIn('[[ "${admin_status}" == "t" ]]', fresh)
+    rolling = read("testbed/run-rolling-upgrade.sh")
+    self.assertIn("select crdb_internal.is_admin();", rolling)
+    self.assertIn('[[ "${admin_status}" == "t" ]]', rolling)
+
   def test_process_environment_scans_tolerate_process_exit(self):
     guarded_read = 'if ! values="$(tr "\\000" "\\n" 2>/dev/null < "$environment")"; then'
     for path in (
