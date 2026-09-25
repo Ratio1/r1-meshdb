@@ -1,4 +1,4 @@
-# R1 MeshDB v1.0.3
+# R1 MeshDB v1.0.4
 
 R1 MeshDB is an independently maintained Ratio1 distribution of a
 source-derived OSS runtime closure from CockroachDB v23.1.28. It packages the
@@ -11,7 +11,7 @@ copyright notices are retained under `engine/`.
 
 ## Version
 
-The current R1 MeshDB product version is `1.0.3`. [`VERSION`](VERSION) is the
+The current R1 MeshDB product version is `1.0.4`. [`VERSION`](VERSION) is the
 single source of truth: the build validates it, installs it in the image at
 `/usr/share/r1-meshdb/VERSION`, and records it in generated SPDX and CycloneDX
 SBOM application metadata. A merged `VERSION` change automatically starts the
@@ -60,7 +60,7 @@ The console uses these authenticated, same-origin endpoints. The management
 endpoints cover operations that the generic SQL endpoint intentionally rejects:
 
 - `GET /api/v2/r1-meshdb/version/` returns
-  `{ "version": "1.0.3" }`, reading the installed R1 MeshDB image version
+  `{ "version": "1.0.4" }`, reading the installed R1 MeshDB image version
   from `/usr/share/r1-meshdb/VERSION`.
 - `GET /api/v2/r1-meshdb/capabilities/` reports whether the session can view
   access administration or create databases.
@@ -92,6 +92,10 @@ typed-name confirmation before deleting an account. The API
 enforces the same boundary, so hiding the navigation item is not the security
 control. Ordinary SQL users can still use the console and receive normal SQL
 privilege errors when they select or modify objects they cannot access.
+The configured `CRDB_USER` is granted the cluster-wide `admin` role during
+bootstrap, including when an existing cluster restarts on this image. Protect
+and rotate `CRDB_PASSWORD` as an administrator credential; create separate
+least-privilege users for applications.
 
 Creating a user and applying its initial access are separate operations. If
 the user is created but the access grant fails, the console reports that
@@ -161,7 +165,7 @@ Repository and package promotion controls are documented in
 ```bash
 scripts/verify-image.sh \
   ghcr.io/ratio1/r1-meshdb@sha256:<digest> \
-  v1.0.3
+  v1.0.4
 ```
 
 ## Support
@@ -182,7 +186,7 @@ and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Citation
 
-The R1 MeshDB entry below cites this source snapshot. Its immutable `v1.0.3`
+The R1 MeshDB entry below cites this source snapshot. Its immutable `v1.0.4`
 tag will make the citation reproducible once the release is published.
 
 ```bibtex
@@ -195,10 +199,10 @@ tag will make the citation reproducible once the release is published.
   note    = {Tag v23.1.28; commit 76e598c9b1c100fd9280b979140b5e377c330a20}
 }
 
-@software{ratio1_meshdb_1_0_3,
+@software{ratio1_meshdb_1_0_4,
   author  = {{Ratio1}},
   title   = {{R1 MeshDB}},
-  version = {1.0.3},
+  version = {1.0.4},
   url     = {https://github.com/Ratio1/r1-meshdb},
   note    = {Source-derived Ratio1 distribution based on CockroachDB v23.1.28}
 }

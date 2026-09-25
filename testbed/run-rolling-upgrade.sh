@@ -308,6 +308,12 @@ role_count="$(docker exec "${nodes[0]}" timeout --kill-after=2s 30s /cockroach/c
   | tail -n 1 | tr -d '\r')"
 [[ "${role_count}" == "1" ]] || { echo "operator privileges were lost during upgrade" >&2; exit 1; }
 
+admin_status="$(docker exec --env "PGPASSWORD=${db_password}" "${nodes[0]}" \
+  timeout --kill-after=2s 30s /cockroach/cockroach sql \
+  --url 'postgresql://app_user@roach1:26257/appdb?sslmode=require' --format=csv \
+  -e 'select crdb_internal.is_admin();' | tail -n 1 | tr -d '\r')"
+[[ "${admin_status}" == "t" ]] || { echo "configured user did not gain admin role during upgrade" >&2; exit 1; }
+
 for store in "${stores[@]}"; do
   docker run --rm --volume "${store}:/store:ro" --entrypoint /bin/bash "${candidate_image}" \
     -c '[[ ! -e /store/.deeploy-recovery-v1/state && ! -e /store/.deeploy-recovery-v1/exhausted ]]' || {

@@ -1340,18 +1340,20 @@ ALTER RANGE default CONFIGURE ZONE USING
   num_voters = ${CRDB_NUM_VOTERS};
 SQL
   if [[ "${CRDB_RECOVERY_ACTIVE}" == "true" ]]; then
-    log "fresh-store recovery reached the surviving cluster; ensuring existing database operator privileges"
+    log "fresh-store recovery reached the surviving cluster; ensuring configured administrator privileges"
     cat >> "${bootstrap_sql}" <<SQL
 ALTER USER ${CRDB_USER} WITH CREATEDB CREATEROLE CREATELOGIN;
+GRANT admin TO ${CRDB_USER};
 GRANT ALL ON DATABASE ${CRDB_DATABASE} TO ${CRDB_USER} WITH GRANT OPTION;
 SQL
   else
     password_literal="$(sql_quote_literal "${CRDB_PASSWORD}")"
-    log "ensuring R1 MeshDB database and database operator exist"
+    log "ensuring R1 MeshDB database and configured administrator exist"
     cat >> "${bootstrap_sql}" <<SQL
 CREATE DATABASE IF NOT EXISTS ${CRDB_DATABASE};
 CREATE USER IF NOT EXISTS ${CRDB_USER} WITH PASSWORD ${password_literal};
 ALTER USER ${CRDB_USER} WITH PASSWORD ${password_literal} CREATEDB CREATEROLE CREATELOGIN;
+GRANT admin TO ${CRDB_USER};
 GRANT ALL ON DATABASE ${CRDB_DATABASE} TO ${CRDB_USER} WITH GRANT OPTION;
 SQL
   fi

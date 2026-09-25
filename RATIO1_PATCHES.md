@@ -31,6 +31,11 @@ creation for that user, while table grants include database `CONNECT`.
 Permissions include public grants, and the table picker uses a query parameter
 to support quoted database names outside the upstream path-route pattern.
 
+R1 MeshDB v1.0.4 grants the configured `CRDB_USER` cluster-wide `admin`
+membership during bootstrap on both new and existing clusters. This aligns
+the practical default dashboard login with its admin-only management controls;
+the configured password must be protected as an administrator credential.
+
 The release also includes reviewed `not_affected` OpenVEX decisions for
 util-linux findings. The minimal scratch runtime retains only non-setuid
 `setsid` from v2.38.1 and contains no `mount`, `umount`, `nsenter`, `libmount`,
@@ -141,7 +146,7 @@ upstream commit as `Build Commit ID` and requires all of:
 
 ```text
 Distribution:     OSS
-Build Tag:        v1.0.3
+Build Tag:        v1.0.4
 Build Type:       release
 ```
 
