@@ -9,6 +9,7 @@
   if (!root) return;
 
   const storageKey = 'r1-meshdb-console-session-v1';
+  const defaultQuery = 'SELECT current_timestamp AS now;';
   const state = {
     session: '',
     username: '',
@@ -24,6 +25,7 @@
     },
     databases: [],
     tableResult: null,
+    tableRequestRevision: 0,
     tablePage: 0,
     tablePageSize: 25,
     tableCreate: {
@@ -35,6 +37,7 @@
       ],
     },
     queryResult: null,
+    queryDraft: defaultQuery,
     queryPage: 0,
     queryPageSize: 25,
     manage: {
@@ -351,7 +354,7 @@
     }
     @keyframes mesh-spin { to { transform: rotate(360deg); } }
     @media (max-width: 860px) {
-      .mesh-layout { grid-template-columns: minmax(0, 1fr); }
+      .mesh-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: max-content minmax(0, 1fr); }
       .mesh-sidebar { position: sticky; top: 58px; z-index: 8; min-width: 0; border-right: 0; border-bottom: 1px solid #d4dcde; padding: 0 12px; }
       .mesh-nav-label { display: none; }
       .mesh-nav { display: flex; gap: 8px; overflow-x: auto; }
@@ -457,15 +460,30 @@
   async function fetchPaged(path, key) {
     const values = [];
     let offset = 0;
+    const separator = path.includes('?') ? '&' : '?';
     for (let page = 0; page < 20; page += 1) {
-      const separator = path.includes('?') ? '&' : '?';
       const payload = await request(`${path}${separator}limit=500&offset=${offset}`);
-      if (Array.isArray(payload && payload[key])) values.push(...payload[key]);
+      const batch = payload && payload[key];
+      if (batch != null && !Array.isArray(batch)) throw new Error(`Invalid ${key} response.`);
+      if (batch) values.push(...batch);
       const next = Number(payload && payload.next);
-      if (!next || next <= offset) break;
+      if (!next) return values;
+      if (!Number.isSafeInteger(next) || next <= offset) throw new Error(`Invalid ${key} pagination.`);
       offset = next;
     }
+    const probe = await request(`${path}${separator}limit=1&offset=${offset}`);
+    const extra = probe && probe[key];
+    if (extra != null && !Array.isArray(extra)) throw new Error(`Invalid ${key} response.`);
+    if (extra && extra.length) throw new Error(`Too many ${key} to display. The list exceeds 10,000 entries.`);
     return values;
+  }
+
+  async function fetchUsers() {
+    const users = await fetchPaged('/api/v2/r1-meshdb/users/', 'users');
+    return users.map((user) => {
+      if (!user || typeof user.username !== 'string') throw new Error('Invalid users response.');
+      return user.username;
+    });
   }
 
   function renderDatabaseSelector(message = '') {
@@ -561,6 +579,8 @@
 
   function renderLogin(message = '') {
     state.view = 'overview';
+    state.queryDraft = defaultQuery;
+    state.queryResult = null;
     root.innerHTML = `
       <div class="mesh-app mesh-login" data-r1-meshdb-console="login">
         <header class="mesh-login-brand">
@@ -840,7 +860,7 @@
       const imageVersion = valueText(imageVersionResponse && imageVersionResponse.version || 'Unavailable');
       page.innerHTML = pageHeader('Overview', state.database, '<button class="mesh-button secondary" id="mesh-refresh" type="button">Refresh</button>') + `
         <div class="mesh-stats">
-          <div class="mesh-stat"><div class="mesh-stat-label">Status</div><div class="mesh-stat-value">Healthy</div></div>
+          <div class="mesh-stat"><div class="mesh-stat-label">Local node</div><div class="mesh-stat-value">Responding</div></div>
           <div class="mesh-stat"><div class="mesh-stat-label">Database</div><div class="mesh-stat-value mesh-code">${htmlEscape(state.database)}</div></div>
           <div class="mesh-stat"><div class="mesh-stat-label">User</div><div class="mesh-stat-value mesh-code">${htmlEscape(state.username)}</div></div>
           <div class="mesh-stat"><div class="mesh-stat-label">Tables</div><div class="mesh-stat-value">${htmlEscape(valueText(tableRow.table_count || 0))}</div></div>
@@ -869,18 +889,19 @@
     const page = document.getElementById('mesh-page');
     if (!page) return false;
     const requestState = databaseRequestState();
+    const requestRevision = ++state.tableRequestRevision;
     setActiveView('tables');
     page.innerHTML = pageHeader('Tables', state.database, '<button class="mesh-button secondary" id="mesh-refresh-tables" type="button">Refresh</button>') + loadingPanel('Loading tables...');
     document.getElementById('mesh-refresh-tables').addEventListener('click', () => { void loadTables(); });
     try {
-      const result = await executeSql("SELECT table_schema AS schema, table_name AS table FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema NOT IN ('pg_catalog', 'information_schema', 'crdb_internal') ORDER BY table_schema, table_name LIMIT 500");
-      if (!isCurrentDatabase(requestState) || state.view !== 'tables') return false;
+      const result = await executeSql("SELECT table_schema AS schema, table_name AS table FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema NOT IN ('pg_catalog', 'information_schema', 'crdb_internal') ORDER BY table_schema, table_name");
+      if (!isCurrentDatabase(requestState) || state.view !== 'tables' || requestRevision !== state.tableRequestRevision) return false;
       state.tableResult = result;
       state.tablePage = 0;
       renderTablesResult();
       return true;
     } catch (error) {
-      if (!state.session || !isCurrentDatabase(requestState) || state.view !== 'tables') return false;
+      if (!state.session || !isCurrentDatabase(requestState) || state.view !== 'tables' || requestRevision !== state.tableRequestRevision) return false;
       const notice = refreshNotice ? `${refreshNotice} ` : '';
       page.innerHTML = pageHeader('Tables', state.database, '<button class="mesh-button secondary" id="mesh-refresh-tables" type="button">Retry</button>') + `<div class="mesh-error">${htmlEscape(`${notice}${readableError(error)}`)}</div>`;
       document.getElementById('mesh-refresh-tables').addEventListener('click', () => { void loadTables(); });
@@ -1155,7 +1176,7 @@
     page.innerHTML = pageHeader('Manage', 'Create resources and control focused database or table access.') + loadingPanel('Loading users and databases...');
     try {
       const usersRequest = state.capabilities.canViewAccess
-        ? fetchPaged('/api/v2/r1-meshdb/users/', 'users')
+        ? fetchUsers()
         : Promise.resolve([]);
       const [databases, users] = await Promise.all([
         fetchPaged('/api/v2/r1-meshdb/databases/', 'databases'),
@@ -1188,7 +1209,7 @@
     setActiveView('users');
     page.innerHTML = pageHeader('Users & access', 'Review database and table permissions for every SQL user.') + loadingPanel('Loading users and permissions...');
     try {
-      state.manage.users = await fetchPaged('/api/v2/r1-meshdb/users/', 'users');
+      state.manage.users = await fetchUsers();
       if (!isCurrentDatabase(requestState) || state.view !== 'users' || requestRevision !== state.manage.usersRequestRevision) return;
       if (!state.manage.selectedPermissionUser || !state.manage.users.includes(state.manage.selectedPermissionUser)) {
         state.manage.selectedPermissionUser = state.manage.users[0] || '';
@@ -1784,7 +1805,7 @@
           message += ` User created, but access was not applied: ${readableError(error)}`;
         }
       }
-      state.manage.users = await fetchPaged('/api/v2/r1-meshdb/users/', 'users');
+      state.manage.users = await fetchUsers();
       state.manage.selectedUser = response.username || access.username;
       state.manage.selectedPermissionUser = response.username || access.username;
       renderManagePage();
@@ -1808,7 +1829,7 @@
         <div class="mesh-panel-body">
           <div class="mesh-error" id="mesh-sql-error" hidden></div>
           <label class="mesh-field" for="mesh-query"><span>Statement</span></label>
-          <textarea class="mesh-textarea" id="mesh-query" spellcheck="false">SELECT current_timestamp AS now;</textarea>
+          <textarea class="mesh-textarea" id="mesh-query" spellcheck="false">${htmlEscape(state.queryDraft)}</textarea>
           <div class="mesh-sql-actions">
             <span class="mesh-query-meta" id="mesh-query-meta">Ready</span>
             <button class="mesh-button" id="mesh-run-query" type="button">Run query</button>
@@ -1821,6 +1842,9 @@
       </section>
     `;
     document.getElementById('mesh-run-query').addEventListener('click', runQuery);
+    document.getElementById('mesh-query').addEventListener('input', (event) => {
+      state.queryDraft = event.currentTarget.value;
+    });
     document.getElementById('mesh-query').focus();
   }
 

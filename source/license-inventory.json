@@ -19497,7 +19497,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/server/api_v2_sql_schema.go",
-      "sha256": "1f7fbc4f76e1872be89c9ed37b4f59f0cc6da3a7f1b0cbffbb2ac272b1994094",
+      "sha256": "d9213a0ddfa527f781e7439dac601260a4a028cb5cc7a12f4e985df0176278cf",
       "spdx": "Apache-2.0"
     },
     {
@@ -32067,7 +32067,7 @@
     {
       "basis": "Apache-2.0 source header",
       "path": "engine/pkg/ui/distoss/assets/bundle.js",
-      "sha256": "0dda5a7f22440fb9ff98286d6f407423212424ec11226962a72b224d17dc5607",
+      "sha256": "f50d6fa37731e0c0c5f6a05b3d9d6f0e20fa15f1fd37a3f2a2060cb95723a795",
       "spdx": "Apache-2.0"
     },
     {

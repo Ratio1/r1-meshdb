@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0, included in the file
 // licenses/APL.txt.
+// Modified by Ratio1 in 2026; see RATIO1_PATCHES.md.
 
 package server
 
@@ -68,10 +69,10 @@ func (a *apiV2Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	query := `SELECT username FROM system.users WHERE "isRole" = false ORDER BY username`
 	qargs := []interface{}{}
 	if limit > 0 {
-		query += " LIMIT $"
+		query += " LIMIT $1"
 		qargs = append(qargs, limit)
 		if offset > 0 {
-			query += " OFFSET $"
+			query += " OFFSET $2"
 			qargs = append(qargs, offset)
 		}
 	}
@@ -84,6 +85,7 @@ func (a *apiV2Server) listUsers(w http.ResponseWriter, r *http.Request) {
 		apiV2InternalError(ctx, err, w)
 		return
 	}
+	defer func() { _ = it.Close() }()
 
 	var resp usersResponse
 	var ok bool

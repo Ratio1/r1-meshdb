@@ -21,6 +21,9 @@ intentionally rejects DDL and transaction-control statements. `engine/pkg/ui/ui.
 links these assets from the console page. The retained upstream
 `engine/pkg/server/api_v2.go` registers the authenticated management routes
 with regular-user or admin role requirements.
+`engine/pkg/server/api_v2_sql_schema.go` fixes the shared v2 users-list query
+to use numbered limit/offset placeholders and close its result iterator. This
+allows paginated user requests from the console and other v2 clients.
 User creation encodes the password as a SQL literal because this engine's
 prepared-statement audit events record placeholder values; the `CREATE USER`
 formatter redacts password literals in those events.
@@ -146,7 +149,7 @@ upstream commit as `Build Commit ID` and requires all of:
 
 ```text
 Distribution:     OSS
-Build Tag:        v1.0.5
+Build Tag:        v1.0.6
 Build Type:       release
 ```
 
