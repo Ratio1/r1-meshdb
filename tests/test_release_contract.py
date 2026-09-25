@@ -1072,6 +1072,7 @@ func value() string {
     self.assertIn("scripts/runtime-supervision-smoke.sh", read(".github/workflows/release.yml"))
     self.assertIn("scripts/secure-single-node-smoke.sh", read(".github/workflows/ci.yml"))
     self.assertIn("scripts/secure-single-node-smoke.sh", read(".github/workflows/release.yml"))
+    self.assertIn("scripts/secure-single-node-smoke.sh", read("scripts/validate-runtime-change.sh"))
     secure_smoke = read("scripts/secure-single-node-smoke.sh")
     for console_contract in (
       "/bundle.js",
@@ -1079,12 +1080,14 @@ func value() string {
       "/api/v2/login/",
       "X-Cockroach-API-Session",
       "/api/v2/sql/",
+      "/api/v2/r1-meshdb/capabilities/",
       "/api/v2/r1-meshdb/databases/",
       "/api/v2/r1-meshdb/database-tables/",
       "/api/v2/r1-meshdb/access/",
       "/api/v2/r1-meshdb/permissions/",
     ):
       self.assertIn(console_contract, secure_smoke)
+    self.assertIn('[[ "${admin_membership_count}" != "1" ]]', secure_smoke)
     self.assertEqual(read(".github/workflows/ci.yml").count("path: source-snapshot"), 2)
     for secret in ("CF_ACCOUNT_ID", "CF_ZONE_ID", "CF_API_TOKEN", "CF_BASE_DOMAIN"):
       self.assertIn("${{ secrets." + secret + " }}", read(".github/workflows/release.yml"))
@@ -1934,6 +1937,9 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
   def test_configured_user_gets_admin_on_fresh_and_recovered_bootstrap(self):
     entrypoint = read("entrypoint.sh")
     self.assertEqual(entrypoint.count("GRANT admin TO ${CRDB_USER};"), 2)
+    recovery = read("scripts/store-recovery-regression.sh")
+    self.assertIn("ensuring configured administrator privileges", recovery)
+    self.assertIn('grep -Fxq "GRANT admin TO app_user;"', recovery)
     fresh = read("scripts/entrypoint-multinode-smoke.sh")
     self.assertIn("select crdb_internal.is_admin();", fresh)
     self.assertIn('[[ "${admin_status}" == "t" ]]', fresh)

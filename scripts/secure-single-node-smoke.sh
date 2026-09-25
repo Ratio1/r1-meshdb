@@ -137,7 +137,7 @@ root_sql() {
     --certs-dir=/cockroach/certs --host=roach1:26257 "$@"
 }
 
-assert_operator_privileges() {
+assert_configured_admin_privileges() {
   local role_option_count grant_option_count admin_membership_count system_grant_count
   role_option_count="$(root_sql --format=csv \
     -e "select count(*) from [show users] where username = 'app_user' and options like '%CREATEDB%' and options like '%CREATEROLE%' and options like '%CREATELOGIN%';" \
@@ -158,8 +158,8 @@ assert_operator_privileges() {
   admin_membership_count="$(root_sql --format=csv \
     -e "select count(*) from [show grants on role admin] where member = 'app_user';" \
     | tail -n 1 | tr -d '\r')"
-  if [[ "${admin_membership_count}" != "0" ]]; then
-    echo "app_user unexpectedly belongs to admin" >&2
+  if [[ "${admin_membership_count}" != "1" ]]; then
+    echo "app_user is missing admin membership" >&2
     exit 1
   fi
 
@@ -213,16 +213,9 @@ SQL
 
   negative_sql="${tmp}/operator-negative.sql"
   cat > "${negative_sql}" <<'SQL'
-ALTER USER root WITH PASSWORD 'must_not_apply';
-SQL
-  chmod 600 "${negative_sql}"
-  if app_sql < "${negative_sql}" >/dev/null 2>&1; then
-    echo "app_user unexpectedly altered root" >&2
-    exit 1
-  fi
-  cat > "${negative_sql}" <<'SQL'
 ALTER ROLE admin WITH CREATEROLE;
 SQL
+  chmod 600 "${negative_sql}"
   if app_sql < "${negative_sql}" >/dev/null 2>&1; then
     echo "app_user unexpectedly altered admin" >&2
     exit 1
@@ -237,7 +230,7 @@ SQL
   rm -f "${negative_sql}"
 
   local secret_index=0
-  for secret_canary in app_secret_123 operator_child_secret meshdb_smoke_secret meshdb_reader_secret must_not_apply fake-token; do
+  for secret_canary in app_secret_123 operator_child_secret meshdb_smoke_secret meshdb_reader_secret fake-token; do
     secret_index=$((secret_index + 1))
     if docker_cmd logs "${name}" 2>&1 | grep -Fq "${secret_canary}"; then
       echo "secret canary ${secret_index} leaked into container logs" >&2
@@ -298,7 +291,7 @@ wait_for_sql() {
 assert_console_contract() {
   local -a curl_args
   local port base_url root_file bundle_file login_file sql_file
-  local root_status bundle_status anonymous_status login_status session sql_status
+  local root_status bundle_status anonymous_status login_status session sql_status capabilities_status
   local create_status tables_status admin_login_status admin_session user_status grant_status
   local permissions_status reader_login_status reader_session databases_status
   port="$(docker_cmd port "${name}" 8080/tcp | sed -n 's/.*://p')"
@@ -383,6 +376,24 @@ raise SystemExit(0 if row == {"username": "app_user", "database_name": "appdb"} 
 PY
   then
     echo "console authenticated SQL request failed" >&2
+    exit 1
+  fi
+
+  capabilities_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${session}" | \
+    curl --config - "${curl_args[@]}" --output "${tmp}/console-capabilities.json" \
+      --write-out '%{http_code}' "${base_url}/api/v2/r1-meshdb/capabilities/")"
+  if [[ "${capabilities_status}" != "200" ]] || ! python3 - "${tmp}/console-capabilities.json" <<'PY'
+import json
+import pathlib
+import sys
+
+capabilities = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+raise SystemExit(0 if all(capabilities.get(key) is True for key in (
+  "can_view_access", "can_create_user", "can_create_database"
+)) else 1)
+PY
+  then
+    echo "configured administrator lacks console management capabilities" >&2
     exit 1
   fi
 
@@ -561,13 +572,13 @@ if [[ "${persisted_note}" != "secure" ]]; then
   exit 1
 fi
 assert_console_contract
-assert_operator_privileges
+assert_configured_admin_privileges
 
 if [[ "${initial_image}" != "${image}" ]]; then
   stop_container
   start_container
   wait_for_sql
-  assert_operator_privileges
+  assert_configured_admin_privileges
 fi
 
 for reserved_user in Root ADMIN node public; do

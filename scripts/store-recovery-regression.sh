@@ -972,18 +972,19 @@ create_case "${node1_restart_case}" "${node1_store}" 3 1 \
 run_case "${node1_restart_case}"
 assert_exit "${node1_restart_case}" 45
 assert_log "${node1_restart_case}" "skipping cluster initialization for a fresh-store recovery"
-assert_log "${node1_restart_case}" "fresh-store recovery reached the surviving cluster; ensuring existing database operator privileges"
+assert_log "${node1_restart_case}" "fresh-store recovery reached the surviving cluster; ensuring configured administrator privileges"
 if [[ -e "${node1_init_capture}" ]]; then
   echo "recovered coordinator invoked cockroach init" >&2
   exit 1
 fi
 if [[ ! -e "${node1_sql_capture}" ]]; then
-  echo "recovered coordinator did not repair database operator privileges" >&2
+  echo "recovered coordinator did not repair configured administrator privileges" >&2
   exit 1
 fi
 node1_sql_input="$(docker run --rm -v "${tmp}/capture:/capture:ro" --entrypoint /bin/sh "${image}" \
   -c 'cat /capture/recovered-node1-bootstrap.sql')"
 grep -Fxq "ALTER USER app_user WITH CREATEDB CREATEROLE CREATELOGIN;" <<< "${node1_sql_input}"
+grep -Fxq "GRANT admin TO app_user;" <<< "${node1_sql_input}"
 grep -Fxq "GRANT ALL ON DATABASE appdb TO app_user WITH GRANT OPTION;" <<< "${node1_sql_input}"
 if grep -qE "PASSWORD|CREATE (DATABASE|USER)" <<< "${node1_sql_input}"; then
   echo "fresh-store recovery attempted to create identities or change credentials" >&2
