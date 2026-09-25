@@ -149,7 +149,7 @@ upstream commit as `Build Commit ID` and requires all of:
 
 ```text
 Distribution:     OSS
-Build Tag:        v1.0.5
+Build Tag:        v1.0.6
 Build Type:       release
 ```
 
