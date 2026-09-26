@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 APPLICATION_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-APPLICATION_PURL = f"pkg:generic/r1-meshdb@{APPLICATION_VERSION}"
+APPLICATION_PURL = f"pkg:generic/r1db@{APPLICATION_VERSION}"
 
 
 def custom_license_id(record: dict) -> str:
@@ -199,7 +199,7 @@ def deb_purl(name: str, version: str) -> str:
 
 def runtime_fixture(format_name: str) -> dict:
   if format_name == "spdx":
-    document = spdx_document("r1-meshdb:fixture")
+    document = spdx_document("r1db:fixture")
     for index, (name, version) in enumerate(runtime_packages()):
       document["packages"].append(
         spdx_package(f"SPDXRef-deb-{index}", name, version, deb_purl(name, version))
@@ -316,10 +316,10 @@ class SbomContractTests(unittest.TestCase):
       )
       self.assertEqual(application.get("licenseDeclared"), "Apache-2.0")
       self.assertEqual(application.get("licenseConcluded"), "Apache-2.0")
-      self.assertEqual(application.get("name"), "R1 MeshDB")
+      self.assertEqual(application.get("name"), "R1DB")
       self.assertEqual(application.get("versionInfo"), APPLICATION_VERSION)
       self.assertFalse(any(
-        item.get("licenseId") == "LicenseRef-R1-MeshDB-Third-Party"
+        item.get("licenseId") == "LicenseRef-R1DB-Third-Party"
         for item in document.get("hasExtractedLicensingInfos", [])
       ))
 
@@ -329,7 +329,7 @@ class SbomContractTests(unittest.TestCase):
       next(
         item for item in aggregate["packages"]
         if item.get("SPDXID") == application["SPDXID"]
-      )["licenseDeclared"] = "Apache-2.0 AND LicenseRef-R1-MeshDB-Third-Party"
+      )["licenseDeclared"] = "Apache-2.0 AND LicenseRef-R1DB-Third-Party"
       self.assert_rejected(aggregate, path, verify_args)
 
   def assert_rejected(self, document: dict, path: Path, verify_args: list[str] | None = None) -> None:
@@ -514,7 +514,7 @@ class SbomContractTests(unittest.TestCase):
           next(
             item for item in wrong_application["externalRefs"]
             if item.get("referenceType") == "purl"
-          )["referenceLocator"] = "pkg:generic/r1-meshdb@0.0"
+          )["referenceLocator"] = "pkg:generic/r1db@0.0"
           duplicate = copy.deepcopy(complete)
           duplicate_module = copy.deepcopy(module)
           duplicate_module["SPDXID"] = "SPDXRef-vendor-duplicate"
@@ -572,7 +572,7 @@ class SbomContractTests(unittest.TestCase):
           next(
             item for item in wrong_application_purl["components"]
             if item["bom-ref"] == application["bom-ref"]
-          )["purl"] = "pkg:generic/r1-meshdb@0.0"
+          )["purl"] = "pkg:generic/r1db@0.0"
           duplicate = copy.deepcopy(complete)
           duplicate_module = copy.deepcopy(module)
           duplicate_module["bom-ref"] += "&duplicate=true"

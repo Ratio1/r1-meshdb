@@ -72,7 +72,7 @@ jobs:
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             --pattern image-reference.txt --dir artifacts
           image_ref="$(cat artifacts/image-reference.txt)"
-          [[ "$image_ref" =~ ^ghcr\.io/ratio1/r1-meshdb@sha256:[0-9a-f]{64}$ ]]
+          [[ "$image_ref" =~ ^ghcr\.io/ratio1/r1db@sha256:[0-9a-f]{64}$ ]]
           printf 'image_ref=%s\n' "$image_ref" >> "$GITHUB_OUTPUT"
 
       - name: Install Cosign
@@ -125,7 +125,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: r1-meshdb-security-${{ github.run_id }}
+          name: r1db-security-${{ github.run_id }}
           path: |
             artifacts/trivy-raw.json
             artifacts/trivy-vex.json

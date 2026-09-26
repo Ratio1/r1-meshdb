@@ -18,12 +18,12 @@ from urllib.parse import quote, unquote
 ROOT = Path(__file__).resolve().parents[1]
 PROVENANCE = ROOT / "source/provenance.json"
 LICENSE_INVENTORY = ROOT / "source/license-inventory.json"
-APPLICATION_NAME = "R1 MeshDB"
+APPLICATION_NAME = "R1DB"
 APPLICATION_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 if not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", APPLICATION_VERSION):
   raise RuntimeError("VERSION must use canonical MAJOR.MINOR.PATCH")
-APPLICATION_PURL = f"pkg:generic/r1-meshdb@{APPLICATION_VERSION}"
-APPLICATION_SOURCE = "https://github.com/Ratio1/r1-meshdb"
+APPLICATION_PURL = f"pkg:generic/r1db@{APPLICATION_VERSION}"
+APPLICATION_SOURCE = "https://github.com/Ratio1/r1db"
 APPLICATION_LICENSE = "Apache-2.0"
 AGGREGATE_LICENSE_REF = "LicenseRef-Aggregate-License-Text"
 RUNTIME_BINARY_PATHS = ("/cockroach/cockroach", "/usr/local/bin/cloudflared")
@@ -134,8 +134,8 @@ def normalized_purl(value: str) -> str:
 
 def is_application_purl(value: str) -> bool:
   normalized = normalized_purl(value)
-  return normalized == "pkg:generic/r1-meshdb" or normalized.startswith(
-    "pkg:generic/r1-meshdb@"
+  return normalized == "pkg:generic/r1db" or normalized.startswith(
+    "pkg:generic/r1db@"
   )
 
 
@@ -198,14 +198,14 @@ def augment_spdx(document: dict, components: list[dict]) -> None:
     )
   ]
   if conflicting_applications:
-    raise SystemExit("SPDX application identity conflicts with the versioned R1 MeshDB PURL")
+    raise SystemExit("SPDX application identity conflicts with the versioned R1DB PURL")
   if len(applications) > 1:
     raise SystemExit("SPDX application identity is duplicated")
   if applications:
     application = applications[0]
   else:
     application = {
-      "SPDXID": "SPDXRef-Package-r1-meshdb",
+      "SPDXID": "SPDXRef-Package-r1db",
       "name": APPLICATION_NAME,
       "versionInfo": APPLICATION_VERSION,
       "supplier": "Organization: Ratio1",
@@ -219,7 +219,7 @@ def augment_spdx(document: dict, components: list[dict]) -> None:
         "referenceType": "purl",
         "referenceLocator": APPLICATION_PURL,
       }],
-      "summary": "R1 MeshDB decentralized distributed database application",
+      "summary": "R1DB decentralized distributed database application",
     }
     packages.append(application)
     by_purl[APPLICATION_PURL].append(application)
@@ -270,7 +270,7 @@ def augment_spdx(document: dict, components: list[dict]) -> None:
               "referenceType": "purl",
               "referenceLocator": source_purl,
             }],
-            "summary": "Exact Debian corresponding-source package accompanying the R1 MeshDB runtime image",
+            "summary": "Exact Debian corresponding-source package accompanying the R1DB runtime image",
           }
           packages.append(source_package)
           by_purl[normalized_purl(source_purl)].append(source_package)
@@ -478,7 +478,7 @@ def augment_cyclonedx(document: dict, components: list[dict]) -> None:
     )
   ]
   if conflicting_applications:
-    raise SystemExit("CycloneDX application identity conflicts with the versioned R1 MeshDB PURL")
+    raise SystemExit("CycloneDX application identity conflicts with the versioned R1DB PURL")
   if len(applications) > 1:
     raise SystemExit("CycloneDX application identity is duplicated")
   if applications:
@@ -542,7 +542,7 @@ def augment_cyclonedx(document: dict, components: list[dict]) -> None:
             }],
             "properties": [{
               "name": "io.ratio1.debian.corresponding-source",
-              "value": "included at /usr/share/src/r1-meshdb/debian",
+              "value": "included at /usr/share/src/r1db/debian",
             }],
           }
           output_components.append(source_component)

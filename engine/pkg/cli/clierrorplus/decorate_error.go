@@ -109,7 +109,7 @@ func MaybeDecorateError(
 			// Avoid errors.Wrapf here so that we have more control over the
 			// formatting of the message with error text.
 			const format = "server closed the connection.\n" +
-				"Is this an R1 MeshDB node?\n%v"
+				"Is this an R1DB node?\n%v"
 			return errors.Errorf(format, err)
 		}
 
@@ -245,7 +245,7 @@ func MaybeDecorateError(
 		if strings.Contains(err.Error(), "pq: unknown authentication response: 7") {
 			return fmt.Errorf(
 				"server requires GSSAPI authentication for this user.\n" +
-					"The R1 MeshDB CLI does not support GSSAPI authentication; use 'psql' instead")
+					"The R1DB CLI does not support GSSAPI authentication; use 'psql' instead")
 		}
 
 		// Are we trying to re-initialize an initialized cluster?

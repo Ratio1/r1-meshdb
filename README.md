@@ -1,6 +1,6 @@
-# R1 MeshDB v1.0.6
+# R1DB v1.0.7
 
-R1 MeshDB is an independently maintained Ratio1 distribution of a
+R1DB is an independently maintained Ratio1 distribution of a
 source-derived OSS runtime closure from CockroachDB v23.1.28. It packages the
 OSS database engine with the runtime entrypoint used by the Ratio1 Deeploy
 service.
@@ -11,9 +11,9 @@ copyright notices are retained under `engine/`.
 
 ## Version
 
-The current R1 MeshDB product version is `1.0.6`. [`VERSION`](VERSION) is the
+The current R1DB product version is `1.0.7`. [`VERSION`](VERSION) is the
 single source of truth: the build validates it, installs it in the image at
-`/usr/share/r1-meshdb/VERSION`, and records it in generated SPDX and CycloneDX
+`/usr/share/r1db/VERSION`, and records it in generated SPDX and CycloneDX
 SBOM application metadata. A merged `VERSION` change automatically starts the
 signed release workflow; the file must contain canonical `MAJOR.MINOR.PATCH`.
 
@@ -22,7 +22,7 @@ signed release workflow; the file must contain canonical `MAJOR.MINOR.PATCH`.
 The release image is published as:
 
 ```text
-ghcr.io/ratio1/r1-meshdb
+ghcr.io/ratio1/r1db
 ```
 
 Release workflows publish an immutable version tag and update `latest` only
@@ -59,31 +59,31 @@ tasks into tabs; database grants use explicit multi-selection controls.
 The console uses these authenticated, same-origin endpoints. The management
 endpoints cover operations that the generic SQL endpoint intentionally rejects:
 
-- `GET /api/v2/r1-meshdb/version/` returns
-  `{ "version": "1.0.6" }`, reading the installed R1 MeshDB image version
-  from `/usr/share/r1-meshdb/VERSION`.
-- `GET /api/v2/r1-meshdb/capabilities/` reports whether the session can view
+- `GET /api/v2/r1db/version/` returns
+  `{ "version": "1.0.7" }`, reading the installed R1DB image version
+  from `/usr/share/r1db/VERSION`.
+- `GET /api/v2/r1db/capabilities/` reports whether the session can view
   access administration or create databases.
-- `GET /api/v2/r1-meshdb/databases/` lists databases where the session has
-  `CONNECT`; `POST /api/v2/r1-meshdb/databases/` creates `{ "name": "appdb" }`
+- `GET /api/v2/r1db/databases/` lists databases where the session has
+  `CONNECT`; `POST /api/v2/r1db/databases/` creates `{ "name": "appdb" }`
   with public database `CONNECT` and public-schema `CREATE` revoked atomically.
   The database creator retains schema `CREATE`.
-- `GET /api/v2/r1-meshdb/database-tables/?database=appdb` lists tables using a
+- `GET /api/v2/r1db/database-tables/?database=appdb` lists tables using a
   query parameter so valid database names do not depend on URL path patterns.
-- `POST /api/v2/r1-meshdb/tables/` with a database, schema, table name, and
+- `POST /api/v2/r1db/tables/` with a database, schema, table name, and
   allowlisted column definitions. The endpoint enforces the caller's CREATE
   privilege on the selected database.
-- `GET /api/v2/r1-meshdb/users/` lists users. `POST` creates a user with
+- `GET /api/v2/r1db/users/` lists users. `POST` creates a user with
   `{ "username": "app", "password": "..." }`. `DELETE` accepts
   `{ "username": "app" }` and returns `{ "username": "app" }` after dropping
   the user. The admin-only endpoint rejects the current or protected account;
   the database also rejects deletion while grants, ownership, or dependent jobs
   remain.
-- `GET` or `POST /api/v2/r1-meshdb/access/` for a user, database, and optional
+- `GET` or `POST /api/v2/r1db/access/` for a user, database, and optional
   table. POST requests may send a `databases` array to apply one database-scope
   grant or revoke to multiple databases in one operation. Access changes accept
   only `viewer` or `editor` presets and `grant` or `revoke` actions.
-- `GET /api/v2/r1-meshdb/permissions/?username=app` returns paginated
+- `GET /api/v2/r1db/permissions/?username=app` returns paginated
   database, schema, and table grants and labels each source as direct, public,
   or a role. System-schema objects are excluded.
 
@@ -131,9 +131,9 @@ Cloudflare source commit whose archive checksum, source metadata, compiled
 package closure, binary hash, licenses, notices, and patent texts are enforced.
 
 ```bash
-docker build -t r1-meshdb:local .
+docker build -t r1db:local .
 docker run --rm --entrypoint /cockroach/cockroach \
-  r1-meshdb:local version
+  r1db:local version
 ```
 
 Run source and release-contract checks with:
@@ -164,8 +164,8 @@ Repository and package promotion controls are documented in
 
 ```bash
 scripts/verify-image.sh \
-  ghcr.io/ratio1/r1-meshdb@sha256:<digest> \
-  v1.0.6
+  ghcr.io/ratio1/r1db@sha256:<digest> \
+  v1.0.7
 ```
 
 ## Support
@@ -186,7 +186,7 @@ and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Citation
 
-The R1 MeshDB entry below cites this source snapshot. Its immutable `v1.0.6`
+The R1DB entry below cites this source snapshot. Its immutable `v1.0.7`
 tag will make the citation reproducible once the release is published.
 
 ```bibtex
@@ -201,9 +201,9 @@ tag will make the citation reproducible once the release is published.
 
 @software{ratio1_meshdb_1_0_6,
   author  = {{Ratio1}},
-  title   = {{R1 MeshDB}},
-  version = {1.0.6},
-  url     = {https://github.com/Ratio1/r1-meshdb},
+  title   = {{R1DB}},
+  version = {1.0.7},
+  url     = {https://github.com/Ratio1/r1db},
   note    = {Source-derived Ratio1 distribution based on CockroachDB v23.1.28}
 }
 ```

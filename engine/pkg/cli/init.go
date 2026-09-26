@@ -29,7 +29,7 @@ var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "initialize a cluster",
 	Long: `
-Perform one-time-only initialization of an R1 MeshDB cluster.
+Perform one-time-only initialization of an R1DB cluster.
 
 After starting one or more nodes with --join flags, run the init
 command on one node (passing the same --host and certificate flags

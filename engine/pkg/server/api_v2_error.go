@@ -21,7 +21,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var errAPIInternalErrorString = "An internal server error has occurred. Please check your R1 MeshDB logs for more details."
+var errAPIInternalErrorString = "An internal server error has occurred. Please check your R1DB logs for more details."
 
 var errAPIInternalError = status.Errorf(
 	codes.Internal,

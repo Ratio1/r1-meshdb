@@ -206,7 +206,7 @@ func PanicAsError(depth int, r interface{}) error {
 
 // Crash reporting URL.
 //
-// R1 MeshDB has no default crash-reporting endpoint. Operators can set a
+// R1DB has no default crash-reporting endpoint. Operators can set a
 // Sentry-compatible endpoint explicitly with COCKROACH_CRASH_REPORTS.
 //
 // TODO(knz): We could envision auto-selecting this alternate URL

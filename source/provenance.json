@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "project": "R1 MeshDB",
+  "project": "R1DB",
   "nativeTreeHashAlgorithm": "sha256 over sorted entries: type-byte, NUL, relative UTF-8 path, NUL, file SHA-256 bytes or symlink target, NUL",
   "upstream": {
     "name": "CockroachDB",
@@ -85,7 +85,7 @@
     "sourceUrl": "https://github.com/Ratio1/deeploy-cockroachdb-service.git",
     "commit": "89f1760c29b8d37bdac3ac4f274797e261db2811",
     "baseEntrypointSha256": "0e70768bf4f4125f2e171cf544ca1304ac0a83774e97c115b2efbaa0de3a4698",
-    "entrypointSha256": "16d3f20326012a58bf2f4b3684933565445fabaa0a5bc8fffd1d602d5ecc409d",
+    "entrypointSha256": "32bd6b3a6e71b20396de23606926c06fa2563106fd2119864a56b5d4c069459f",
     "runtimePackages": "source/runtime-packages.txt"
   },
   "buildInputs": {

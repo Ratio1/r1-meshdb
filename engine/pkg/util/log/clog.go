@@ -429,12 +429,12 @@ This node experienced a fatal error (printed above), and as a result the
 process is terminating.
 
 Fatal errors can occur due to faulty hardware (disks, memory, clocks) or a
-problem in R1 MeshDB. With your help, the Ratio1 maintainers can determine the
-root cause, recommend next steps, and improve R1 MeshDB based on your report.
+problem in R1DB. With your help, the Ratio1 maintainers can determine the
+root cause, recommend next steps, and improve R1DB based on your report.
 
 Please submit a crash report by following the instructions here:
 
-    https://github.com/Ratio1/r1-meshdb/issues/new/choose
+    https://github.com/Ratio1/r1db/issues/new/choose
 
 Do not include credentials, private SQL data, or other secrets in reports.
 

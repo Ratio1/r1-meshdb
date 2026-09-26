@@ -2925,7 +2925,7 @@ var varGen = map[string]sessionVar{
 // We want test coverage for this on and off so make it metamorphic.
 var copyFastPathDefault bool = util.ConstantWithMetamorphicTestBool("copy-fast-path-enabled-default", true)
 
-const compatErrMsg = "this parameter is currently recognized only for compatibility and has no effect in R1 MeshDB."
+const compatErrMsg = "this parameter is currently recognized only for compatibility and has no effect in R1DB."
 
 func init() {
 	// SetWithPlanner must be initialized in init() to avoid a circular

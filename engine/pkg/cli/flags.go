@@ -1245,7 +1245,7 @@ func extraServerFlagInit(cmd *cobra.Command) error {
 	}
 	serverCfg.LocalityAddresses = localityAdvertiseHosts
 
-	// R1 MeshDB does not enable upstream diagnostics reporting by default.
+	// R1DB does not enable upstream diagnostics reporting by default.
 	serverCfg.StartDiagnosticsReporting = false
 
 	return nil

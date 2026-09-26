@@ -17,13 +17,13 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APPLICATION_NAME = "R1 MeshDB"
+APPLICATION_NAME = "R1DB"
 APPLICATION_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 if not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", APPLICATION_VERSION):
   raise RuntimeError("VERSION must use canonical MAJOR.MINOR.PATCH")
-APPLICATION_PURL = f"pkg:generic/r1-meshdb@{APPLICATION_VERSION}"
+APPLICATION_PURL = f"pkg:generic/r1db@{APPLICATION_VERSION}"
 APPLICATION_SUPPLIER = "Organization: Ratio1"
-APPLICATION_SOURCE = "https://github.com/Ratio1/r1-meshdb"
+APPLICATION_SOURCE = "https://github.com/Ratio1/r1db"
 APPLICATION_LICENSE = "Apache-2.0"
 AGGREGATE_LICENSE_REF = "LicenseRef-Aggregate-License-Text"
 EXPECTED_VENDOR_MODULE_COUNT = 211
@@ -46,8 +46,8 @@ def normalized_purl(value: str) -> str:
 
 def is_application_purl(value: str) -> bool:
   normalized = normalized_purl(value)
-  return normalized == "pkg:generic/r1-meshdb" or normalized.startswith(
-    "pkg:generic/r1-meshdb@"
+  return normalized == "pkg:generic/r1db" or normalized.startswith(
+    "pkg:generic/r1db@"
   )
 
 
@@ -298,7 +298,7 @@ def verify_spdx(document: dict) -> dict:
     )
   ]
   if conflicting_applications:
-    fail("SPDX application identity conflicts with the versioned R1 MeshDB PURL")
+    fail("SPDX application identity conflicts with the versioned R1DB PURL")
   application = applications[0]
   if (
     application.get("name") != APPLICATION_NAME
@@ -387,7 +387,7 @@ def verify_cyclonedx(document: dict) -> dict:
     )
   ]
   if conflicting_applications:
-    fail("CycloneDX application identity conflicts with the versioned R1 MeshDB PURL")
+    fail("CycloneDX application identity conflicts with the versioned R1DB PURL")
   application = applications[0]
   suppliers = application.get("supplier", {})
   licenses = cdx_license_values(application)

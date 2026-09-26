@@ -71,7 +71,7 @@ jobs:
           load: true
           push: false
           platforms: linux/amd64
-          tags: r1-meshdb:ci
+          tags: r1db:ci
           build-args: |
             BUILD_DATE=2024-10-01T22:15:37Z
             RATIO1_REVISION=${{ github.sha }}
@@ -85,11 +85,11 @@ jobs:
       - name: Verify OSS binary and image contract
         run: |
           set -euo pipefail
-          container_id="$(docker create r1-meshdb:ci)"
+          container_id="$(docker create r1db:ci)"
           trap 'docker rm "$container_id" >/dev/null 2>&1 || true' EXIT
           docker cp "$container_id:/cockroach/cockroach" ./cockroach
           docker cp "$container_id:/usr/local/bin/cloudflared" ./cloudflared
-          docker cp "$container_id:/usr/share/r1-meshdb/VERSION" ./image-version.txt
+          docker cp "$container_id:/usr/share/r1db/VERSION" ./image-version.txt
           cmp VERSION image-version.txt
           chmod 755 ./cockroach
           chmod 755 ./cloudflared
@@ -97,54 +97,54 @@ jobs:
           go version -m ./cloudflared > cloudflared.buildinfo.txt
           ./cockroach version | grep -F 'Distribution:     OSS'
           ./cockroach version | grep -F 'Build Tag:        ${{ steps.version.outputs.build_tag }}'
-          docker run --rm --entrypoint /usr/bin/test r1-meshdb:ci \
+          docker run --rm --entrypoint /usr/bin/test r1db:ci \
             -x /usr/local/bin/deeploy-crdb-entrypoint
           docker run --rm --entrypoint /usr/local/bin/cloudflared \
-            r1-meshdb:ci --version
-          docker run --rm --entrypoint /bin/bash r1-meshdb:ci -ec \
-            'cd /usr/share/src/r1-meshdb/debian && sha256sum -c SHA256SUMS'
-          docker image inspect r1-meshdb:ci \
+            r1db:ci --version
+          docker run --rm --entrypoint /bin/bash r1db:ci -ec \
+            'cd /usr/share/src/r1db/debian && sha256sum -c SHA256SUMS'
+          docker image inspect r1db:ci \
             --format '{{json .Config.Labels}}' \
-            | grep -F 'https://github.com/Ratio1/r1-meshdb'
+            | grep -F 'https://github.com/Ratio1/r1db'
 
       - name: Run the bounded local three-node testbed
         run: |
-          R1_MESHDB_REQUIRE_DIGEST=false \
+          R1DB_REQUIRE_DIGEST=false \
             timeout --signal=TERM --kill-after=60s 20m \
-            testbed/run-local-cluster.sh r1-meshdb:ci
+            testbed/run-local-cluster.sh r1db:ci
 
       - name: Prove the browser console asset and authenticated API
-        run: scripts/secure-single-node-smoke.sh r1-meshdb:ci
+        run: scripts/secure-single-node-smoke.sh r1db:ci
 
       - name: Prove persisted rolling upgrade and rollback compatibility
         run: |
-          R1_MESHDB_REQUIRE_DIGEST=false \
-          R1_MESHDB_EVIDENCE_DIR="$PWD/artifacts/rolling-upgrade" \
+          R1DB_REQUIRE_DIGEST=false \
+          R1DB_EVIDENCE_DIR="$PWD/artifacts/rolling-upgrade" \
             timeout --signal=TERM --kill-after=120s 35m \
-            testbed/run-rolling-upgrade.sh r1-meshdb:ci
+            testbed/run-rolling-upgrade.sh r1db:ci
 
       - name: Prove runtime supervision and corrupt-store recovery
         run: |
           timeout --signal=TERM --kill-after=120s 45m \
-            scripts/runtime-supervision-smoke.sh r1-meshdb:ci fixed
+            scripts/runtime-supervision-smoke.sh r1db:ci fixed
 
       - name: Generate image SPDX SBOM
         uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
         with:
-          image: r1-meshdb:ci
+          image: r1db:ci
           format: spdx-json
           syft-version: v1.51.0
           upload-artifact: false
-          output-file: r1-meshdb-image.spdx.json
+          output-file: r1db-image.spdx.json
 
       - name: Generate image CycloneDX SBOM
         uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
         with:
-          image: r1-meshdb:ci
+          image: r1db:ci
           format: cyclonedx-json
           syft-version: v1.51.0
           upload-artifact: false
-          output-file: r1-meshdb-image.cdx.json
+          output-file: r1db-image.cdx.json
 
       - name: Generate source SPDX SBOM
         uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
@@ -153,7 +153,7 @@ jobs:
           format: spdx-json
           syft-version: v1.51.0
           upload-artifact: false
-          output-file: r1-meshdb-source.spdx.json
+          output-file: r1db-source.spdx.json
 
       - name: Generate source CycloneDX SBOM
         uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84
@@ -162,14 +162,14 @@ jobs:
           format: cyclonedx-json
           syft-version: v1.51.0
           upload-artifact: false
-          output-file: r1-meshdb-source.cdx.json
+          output-file: r1db-source.cdx.json
 
       - name: Verify SBOM schemas and component coverage
         env:
           JSONSCHEMA_VERSION: 4.25.1
         run: |
           set -euo pipefail
-          for sbom in r1-meshdb-*.json; do
+          for sbom in r1db-*.json; do
             python3 scripts/augment-sbom.py "$sbom"
           done
           docker run --rm \
@@ -177,23 +177,23 @@ jobs:
             --volume "$PWD:/workspace:ro" \
             --workdir /workspace \
             python:3.13.7-slim@sha256:5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689 \
-            sh -ec 'python -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: -r source/sbom-validation-requirements.txt >/dev/null && python -c '\''import importlib.metadata, os; assert importlib.metadata.version("jsonschema") == os.environ["JSONSCHEMA_VERSION"]'\'' && python scripts/validate-sbom-schema.py r1-meshdb-*.json'
+            sh -ec 'python -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: -r source/sbom-validation-requirements.txt >/dev/null && python -c '\''import importlib.metadata, os; assert importlib.metadata.version("jsonschema") == os.environ["JSONSCHEMA_VERSION"]'\'' && python scripts/validate-sbom-schema.py r1db-*.json'
           python3 scripts/verify-sbom.py --require-runtime \
             --go-buildinfo cockroach.buildinfo.txt \
             --go-buildinfo cloudflared.buildinfo.txt \
-            r1-meshdb-image.spdx.json
+            r1db-image.spdx.json
           python3 scripts/verify-sbom.py --require-runtime \
             --go-buildinfo cockroach.buildinfo.txt \
             --go-buildinfo cloudflared.buildinfo.txt \
-            r1-meshdb-image.cdx.json
-          python3 scripts/verify-sbom.py r1-meshdb-source.spdx.json
-          python3 scripts/verify-sbom.py r1-meshdb-source.cdx.json
+            r1db-image.cdx.json
+          python3 scripts/verify-sbom.py r1db-source.spdx.json
+          python3 scripts/verify-sbom.py r1db-source.cdx.json
 
       - name: Record raw candidate findings
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           version: v0.73.0
-          image-ref: r1-meshdb:ci
+          image-ref: r1db:ci
           format: json
           output: trivy-raw.json
           severity: CRITICAL,HIGH
@@ -205,7 +205,7 @@ jobs:
           TRIVY_VEX: security/openvex.json
         with:
           version: v0.73.0
-          image-ref: r1-meshdb:ci
+          image-ref: r1db:ci
           format: table
           severity: CRITICAL,HIGH
           exit-code: '1'
@@ -214,12 +214,12 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: r1-meshdb-ci-${{ github.run_id }}
+          name: r1db-ci-${{ github.run_id }}
           path: |
-            r1-meshdb-image.spdx.json
-            r1-meshdb-image.cdx.json
-            r1-meshdb-source.spdx.json
-            r1-meshdb-source.cdx.json
+            r1db-image.spdx.json
+            r1db-image.cdx.json
+            r1db-source.spdx.json
+            r1db-source.cdx.json
             cockroach.buildinfo.txt
             cloudflared.buildinfo.txt
             trivy-raw.json

@@ -238,7 +238,7 @@ SQL
     fi
     if docker_cmd exec -e "SECRET_CANARY=${secret_canary}" "${name}" sh -c \
       'grep -R -Fq -- "$SECRET_CANARY" /cockroach/cockroach-data/logs 2>/dev/null'; then
-      echo "secret canary ${secret_index} leaked into R1 MeshDB logs" >&2
+      echo "secret canary ${secret_index} leaked into R1DB logs" >&2
       exit 1
     fi
     if docker_cmd exec -e "SECRET_CANARY=${secret_canary}" "${name}" sh -c \
@@ -316,8 +316,8 @@ assert_console_contract() {
 
   root_status="$(curl "${curl_args[@]}" --output "${root_file}" \
     --write-out '%{http_code}' "${base_url}/")"
-  if [[ "${root_status}" != "200" ]] || ! grep -Fq '<title>R1 MeshDB Console</title>' "${root_file}"; then
-    echo "console root did not return the R1 MeshDB page" >&2
+  if [[ "${root_status}" != "200" ]] || ! grep -Fq '<title>R1DB Console</title>' "${root_file}"; then
+    echo "console root did not return the R1DB page" >&2
     exit 1
   fi
 
@@ -325,7 +325,7 @@ assert_console_contract() {
     --write-out '%{http_code}' "${base_url}/bundle.js")"
   if [[ "${bundle_status}" != "200" ]] || \
       [[ "$(wc -c < "${bundle_file}")" -le 10000 ]] || \
-      ! grep -Fq 'data-r1-meshdb-console' "${bundle_file}"; then
+      ! grep -Fq 'data-r1db-console' "${bundle_file}"; then
     echo "console bundle is missing or not renderable" >&2
     exit 1
   fi
@@ -382,7 +382,7 @@ PY
 
   capabilities_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${session}" | \
     curl --config - "${curl_args[@]}" --output "${tmp}/console-capabilities.json" \
-      --write-out '%{http_code}' "${base_url}/api/v2/r1-meshdb/capabilities/")"
+      --write-out '%{http_code}' "${base_url}/api/v2/r1db/capabilities/")"
   if [[ "${capabilities_status}" != "200" ]] || ! python3 - "${tmp}/console-capabilities.json" <<'PY'
 import json
 import pathlib
@@ -401,7 +401,7 @@ PY
   create_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${session}" | \
     curl --config - "${curl_args[@]}" --output "${tmp}/console-create-database.json" \
       --write-out '%{http_code}' --header 'Content-Type: application/json' \
-      --data '{"name":"console-smoke-db"}' "${base_url}/api/v2/r1-meshdb/databases/")"
+      --data '{"name":"console-smoke-db"}' "${base_url}/api/v2/r1db/databases/")"
   if [[ "${create_status}" != "201" ]]; then
     echo "console database creation failed: $(cat "${tmp}/console-create-database.json")" >&2
     exit 1
@@ -419,7 +419,7 @@ PY
 
   tables_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${session}" | \
     curl --config - "${curl_args[@]}" --output "${tmp}/console-tables.json" \
-      --write-out '%{http_code}' "${base_url}/api/v2/r1-meshdb/database-tables/?database=console-smoke-db")"
+      --write-out '%{http_code}' "${base_url}/api/v2/r1db/database-tables/?database=console-smoke-db")"
   if [[ "${tables_status}" != "200" ]] || ! python3 - "${tmp}/console-tables.json" <<'PY'
 import json
 import pathlib
@@ -455,7 +455,7 @@ PY
     curl --config - "${curl_args[@]}" --output "${tmp}/console-user.json" \
       --write-out '%{http_code}' --header 'Content-Type: application/json' \
       --data-binary "@${tmp}/console-user-request.json" \
-      "${base_url}/api/v2/r1-meshdb/users/")"
+      "${base_url}/api/v2/r1db/users/")"
   rm -f "${tmp}/console-user-request.json"
   if [[ "${user_status}" != "201" ]]; then
     echo "console user creation failed" >&2
@@ -463,10 +463,10 @@ PY
   fi
   users_first_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${admin_session}" | \
     curl --config - "${curl_args[@]}" --output "${tmp}/console-users-first.json" \
-      --write-out '%{http_code}' "${base_url}/api/v2/r1-meshdb/users/?limit=1&offset=0")"
+      --write-out '%{http_code}' "${base_url}/api/v2/r1db/users/?limit=1&offset=0")"
   users_second_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${admin_session}" | \
     curl --config - "${curl_args[@]}" --output "${tmp}/console-users-second.json" \
-      --write-out '%{http_code}' "${base_url}/api/v2/r1-meshdb/users/?limit=1&offset=1")"
+      --write-out '%{http_code}' "${base_url}/api/v2/r1db/users/?limit=1&offset=1")"
   if [[ "${users_first_status}" != "200" || "${users_second_status}" != "200" ]] || \
       ! python3 - "${tmp}/console-users-first.json" "${tmp}/console-users-second.json" <<'PY'
 import json
@@ -487,14 +487,14 @@ PY
     curl --config - "${curl_args[@]}" --output "${tmp}/console-grant.json" \
       --write-out '%{http_code}' --header 'Content-Type: application/json' \
       --data '{"username":"meshdb_smoke_reader","database":"console-smoke-db","scope":"table","table":"public.console_smoke_table","preset":"viewer","action":"grant"}' \
-      "${base_url}/api/v2/r1-meshdb/access/")"
+      "${base_url}/api/v2/r1db/access/")"
   if [[ "${grant_status}" != "200" ]]; then
     echo "console table access grant failed: $(cat "${tmp}/console-grant.json")" >&2
     exit 1
   fi
   permissions_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${admin_session}" | \
     curl --config - "${curl_args[@]}" --output "${tmp}/console-permissions.json" \
-      --write-out '%{http_code}' "${base_url}/api/v2/r1-meshdb/permissions/?username=meshdb_smoke_reader")"
+      --write-out '%{http_code}' "${base_url}/api/v2/r1db/permissions/?username=meshdb_smoke_reader")"
   if [[ "${permissions_status}" != "200" ]] || ! python3 - "${tmp}/console-permissions.json" <<'PY'
 import json
 import pathlib
@@ -527,7 +527,7 @@ PY
   fi
   databases_status="$(printf 'header = "X-Cockroach-API-Session: %s"\n' "${reader_session}" | \
     curl --config - "${curl_args[@]}" --output "${tmp}/console-reader-databases.json" \
-      --write-out '%{http_code}' "${base_url}/api/v2/r1-meshdb/databases/")"
+      --write-out '%{http_code}' "${base_url}/api/v2/r1db/databases/")"
   if [[ "${databases_status}" != "200" ]] || ! python3 - "${tmp}/console-reader-databases.json" <<'PY'
 import json
 import pathlib
@@ -632,7 +632,7 @@ for reserved_user in Root ADMIN node public; do
     exit 1
   fi
   if [[ "${reserved_status}" != "1" || \
-        "${reserved_output}" != *"CRDB_USER must not be a reserved R1 MeshDB identity"* ]]; then
+        "${reserved_output}" != *"CRDB_USER must not be a reserved R1DB identity"* ]]; then
     echo "CRDB_USER=${reserved_user} did not fail through reserved-identity validation" >&2
     exit 1
   fi

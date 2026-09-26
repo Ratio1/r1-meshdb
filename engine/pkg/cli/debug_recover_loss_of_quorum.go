@@ -280,7 +280,7 @@ using the --host flag. This designated node will handle collection of data from
 all surviving nodes.
 
 In the second case data is read directly from local stores on each node.
-R1 MeshDB must not be running on any node. The location of each store must be
+R1DB must not be running on any node. The location of each store must be
 provided using the --store flag. The command must be executed for all surviving
 stores.
 

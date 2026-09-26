@@ -1,6 +1,6 @@
 # Release Process
 
-R1 MeshDB releases are produced only by
+R1DB releases are produced only by
 `.github/workflows/release.yml`. Local builds are development evidence and are
 never production signatures.
 
@@ -55,7 +55,7 @@ approved release artifact. Failed candidate digests may remain addressable in
 GHCR, but they receive no version tag, source release, or `latest` tag.
 If remote cleanup fails, the workflow deletes tunnel tokens but retains the
 non-secret tunnel/DNS identifiers as `cloudflare-cleanup-state.json` in the
-attempt-scoped `r1-meshdb-cloudflare-cleanup-<run ID>-<run attempt>`
+attempt-scoped `r1db-cloudflare-cleanup-<run ID>-<run attempt>`
 artifact for seven days. The Cloudflare cleanup recovery workflow, **Recover
 ephemeral Cloudflare resources**, runs automatically after a failed, cancelled,
 or timed-out release. An operator can also dispatch it from `main` with the
@@ -79,7 +79,7 @@ attests it.
 
 GitHub does not expose a supported API for changing a package's visibility.
 After the source repository is public, a package administrator must open the
-`r1-meshdb` package settings and set **Package visibility** to
+`r1db` package settings and set **Package visibility** to
 **Public**. The first release run is expected to stop at the anonymous-pull
 gate after creating the package. Change visibility in the GitHub UI and manually
 dispatch the workflow again from `main`; no source or OCI version tag has been created at that
@@ -133,8 +133,8 @@ Consumers verify a release with:
 
 ```bash
 scripts/verify-image.sh \
-  ghcr.io/ratio1/r1-meshdb@sha256:<digest> \
-  v1.0.6
+  ghcr.io/ratio1/r1db@sha256:<digest> \
+  v1.0.7
 ```
 
 Do not move an existing version tag. Publish a new patch tag and document

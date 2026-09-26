@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve an immutable R1 MeshDB release identifier from VERSION."""
+"""Resolve an immutable R1DB release identifier from VERSION."""
 
 # Copyright 2026 Ratio1
 # Licensed under the Apache License, Version 2.0. See LICENSE.
