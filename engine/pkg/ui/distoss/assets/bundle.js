@@ -8,7 +8,7 @@
   const root = document.getElementById('react-layout');
   if (!root) return;
 
-  const storageKey = 'r1-meshdb-console-session-v1';
+  const storageKey = 'r1db-console-session-v1';
   const defaultQuery = 'SELECT current_timestamp AS now;';
   const state = {
     session: '',
@@ -479,7 +479,7 @@
   }
 
   async function fetchUsers() {
-    const users = await fetchPaged('/api/v2/r1-meshdb/users/', 'users');
+    const users = await fetchPaged('/api/v2/r1db/users/', 'users');
     return users.map((user) => {
       if (!user || typeof user.username !== 'string') throw new Error('Invalid users response.');
       return user.username;
@@ -502,7 +502,7 @@
 
   async function loadDatabaseOptions() {
     try {
-      state.databases = await fetchPaged('/api/v2/r1-meshdb/databases/', 'databases');
+      state.databases = await fetchPaged('/api/v2/r1db/databases/', 'databases');
       let databaseChanged = false;
       if (!state.databases.includes(state.database) && state.databases.length) {
         state.database = state.databases[0];
@@ -564,7 +564,7 @@
       body: JSON.stringify({
         execute: true,
         database: state.database,
-        application_name: '$ r1-meshdb-console',
+        application_name: '$ r1db-console',
         timeout,
         max_result_size: 4 * 1024 * 1024,
         statements: [{ sql }],
@@ -582,10 +582,10 @@
     state.queryDraft = defaultQuery;
     state.queryResult = null;
     root.innerHTML = `
-      <div class="mesh-app mesh-login" data-r1-meshdb-console="login">
+      <div class="mesh-app mesh-login" data-r1db-console="login">
         <header class="mesh-login-brand">
           <span class="mesh-mark" aria-hidden="true">R1</span>
-          <span>R1 MeshDB</span>
+          <span>R1DB</span>
         </header>
         <main class="mesh-login-main">
           <form class="mesh-login-panel" id="mesh-login-form">
@@ -608,7 +608,7 @@
             <button class="mesh-button full" id="mesh-login-button" type="submit">Sign in</button>
           </form>
         </main>
-        <footer class="mesh-login-footer">R1 MeshDB Console</footer>
+        <footer class="mesh-login-footer">R1DB Console</footer>
       </div>
     `;
     document.getElementById('mesh-login-form').addEventListener('submit', login);
@@ -658,11 +658,11 @@
 
   function renderShell() {
     root.innerHTML = `
-      <div class="mesh-app mesh-shell" data-r1-meshdb-console="authenticated">
+      <div class="mesh-app mesh-shell" data-r1db-console="authenticated">
         <header class="mesh-topbar">
           <div class="mesh-brand">
             <span class="mesh-mark" aria-hidden="true">R1</span>
-            <span class="mesh-brand-name">R1 MeshDB Console</span>
+            <span class="mesh-brand-name">R1DB Console</span>
           </div>
           <div class="mesh-top-actions">
             <label class="mesh-db-switcher" for="mesh-database-select">
@@ -716,7 +716,7 @@
 
   async function loadCapabilities() {
     try {
-      const response = await request('/api/v2/r1-meshdb/capabilities/');
+      const response = await request('/api/v2/r1db/capabilities/');
       state.capabilities = {
         loaded: true,
         canViewAccess: response.can_view_access === true,
@@ -839,7 +839,7 @@
         executeSql('SELECT current_user AS username, current_database() AS database_name, version() AS engine_version'),
         executeSql("SELECT count(*) AS table_count FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema NOT IN ('pg_catalog', 'information_schema', 'crdb_internal')"),
         request('/api/v2/health/'),
-        request('/api/v2/r1-meshdb/version/').catch((error) => {
+        request('/api/v2/r1db/version/').catch((error) => {
           if (!state.session) throw error;
           return { version: '' };
         }),
@@ -1110,7 +1110,7 @@
     if (button) button.disabled = true;
     managementStatus('mesh-create-table-status', 'Creating table...');
     try {
-      const response = await request('/api/v2/r1-meshdb/tables/', {
+      const response = await request('/api/v2/r1db/tables/', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1163,7 +1163,7 @@
   async function ensureManageTables(database) {
     if (!database) return [];
     if (!Object.prototype.hasOwnProperty.call(state.manage.tablesByDatabase, database)) {
-      state.manage.tablesByDatabase[database] = await fetchPaged(`/api/v2/r1-meshdb/database-tables/?database=${encodeURIComponent(database)}`, 'table_names');
+      state.manage.tablesByDatabase[database] = await fetchPaged(`/api/v2/r1db/database-tables/?database=${encodeURIComponent(database)}`, 'table_names');
     }
     return state.manage.tablesByDatabase[database];
   }
@@ -1179,7 +1179,7 @@
         ? fetchUsers()
         : Promise.resolve([]);
       const [databases, users] = await Promise.all([
-        fetchPaged('/api/v2/r1-meshdb/databases/', 'databases'),
+        fetchPaged('/api/v2/r1db/databases/', 'databases'),
         usersRequest,
       ]);
       if (!isCurrentDatabase(requestState) || state.view !== 'manage') return;
@@ -1315,7 +1315,7 @@
     button.disabled = true;
     button.textContent = 'Deleting...';
     try {
-      await request('/api/v2/r1-meshdb/users/', {
+      await request('/api/v2/r1db/users/', {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ username }),
@@ -1359,7 +1359,7 @@
     renderPermissionDetails();
     try {
       state.manage.permissions = await fetchPaged(
-        `/api/v2/r1-meshdb/permissions/?username=${encodeURIComponent(selectedUser)}`,
+        `/api/v2/r1db/permissions/?username=${encodeURIComponent(selectedUser)}`,
         'permissions',
       );
       if (!isCurrentRequest()) return;
@@ -1682,7 +1682,7 @@
     try {
       const params = new URLSearchParams({ username: values.username, database: values.database });
       if (values.scope === 'table') params.set('table', values.table);
-      const response = await request(`/api/v2/r1-meshdb/access/?${params.toString()}`);
+      const response = await request(`/api/v2/r1db/access/?${params.toString()}`);
       if (!isCurrentDatabase(requestState) || state.view !== 'manage' || selectionRevision !== state.manage.accessSelectionRevision || selectionKey !== accessSelectionKey(accessFormValues('grant'))) return;
       const privileges = Array.isArray(response.privileges) ? response.privileges : [];
       box.textContent = privileges.length ? `Current direct grants: ${privileges.join(', ')}` : 'No direct grants found for this selection.';
@@ -1721,7 +1721,7 @@
   }
 
   async function applyAccess(values) {
-    return request('/api/v2/r1-meshdb/access/', {
+    return request('/api/v2/r1db/access/', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(values),
@@ -1735,7 +1735,7 @@
     managementStatus('mesh-create-database-status', '');
     if (button) button.disabled = true;
     try {
-      const response = await request('/api/v2/r1-meshdb/databases/', {
+      const response = await request('/api/v2/r1db/databases/', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ name: String(form.get('name') || '').trim() }),
@@ -1746,7 +1746,7 @@
       state.manage.selectedDatabase = state.database;
       state.manage.selectedTable = '';
       resetTableCreateState();
-      state.manage.databases = await fetchPaged('/api/v2/r1-meshdb/databases/', 'databases');
+      state.manage.databases = await fetchPaged('/api/v2/r1db/databases/', 'databases');
       state.databases = state.manage.databases;
       setStoredSession();
       renderDatabaseSelector();
@@ -1790,7 +1790,7 @@
     managementStatus('mesh-create-user-status', '');
     if (button) button.disabled = true;
     try {
-      const response = await request('/api/v2/r1-meshdb/users/', {
+      const response = await request('/api/v2/r1db/users/', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ username: access.username, password }),

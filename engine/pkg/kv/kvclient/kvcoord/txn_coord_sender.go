@@ -1017,8 +1017,8 @@ func sanityCheckErrWithTxn(
 	)
 	err = errors.WithAssertionFailure(
 		errors.WithIssueLink(err, errors.IssueLink{
-			IssueURL: "https://github.com/Ratio1/r1-meshdb/issues/new",
-			Detail: "you have encountered a known bug in R1 MeshDB; please report it " +
+			IssueURL: "https://github.com/Ratio1/r1db/issues/new",
+			Detail: "you have encountered a known bug in R1DB; please report it " +
 				"to the Ratio1 maintainers and reference upstream issue 103817.",
 		}))
 	log.Warningf(ctx, "%v", err)

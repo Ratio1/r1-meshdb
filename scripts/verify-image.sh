@@ -8,15 +8,15 @@ umask 077
 image_ref="${1:?usage: verify-image.sh <image@sha256:digest> <release-tag>}"
 release_tag="${2:?usage: verify-image.sh <image@sha256:digest> <release-tag>}"
 expected_issuer="https://token.actions.githubusercontent.com"
-expected_identity="https://github.com/Ratio1/r1-meshdb/.github/workflows/release.yml@refs/heads/main"
+expected_identity="https://github.com/Ratio1/r1db/.github/workflows/release.yml@refs/heads/main"
 
-[[ "${image_ref}" =~ ^ghcr\.io/ratio1/r1-meshdb@sha256:[0-9a-f]{64}$ ]] || {
-  printf 'image must be an immutable ghcr.io/ratio1/r1-meshdb digest\n' >&2
+[[ "${image_ref}" =~ ^ghcr\.io/ratio1/r1db@sha256:[0-9a-f]{64}$ ]] || {
+  printf 'image must be an immutable ghcr.io/ratio1/r1db digest\n' >&2
   exit 1
 }
 
 if [[ ! "${release_tag}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-  printf 'invalid R1 MeshDB release tag: %s\n' "${release_tag}" >&2
+  printf 'invalid R1DB release tag: %s\n' "${release_tag}" >&2
   exit 1
 fi
 
@@ -43,17 +43,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-is_draft="$(gh release view "${release_tag}" --repo Ratio1/r1-meshdb \
+is_draft="$(gh release view "${release_tag}" --repo Ratio1/r1db \
   --json isDraft --jq .isDraft)"
 [[ "${is_draft}" == "false" ]] || {
   echo "release is missing or is still a draft: ${release_tag}" >&2
   exit 1
 }
 mkdir "${tmp_dir}/release"
-gh release download "${release_tag}" --repo Ratio1/r1-meshdb \
+gh release download "${release_tag}" --repo Ratio1/r1db \
   --pattern image-reference.txt --dir "${tmp_dir}/release"
-gh release download "${release_tag}" --repo Ratio1/r1-meshdb \
-  --pattern r1-meshdb-debian-corresponding-source.tar.gz --dir "${tmp_dir}/release"
+gh release download "${release_tag}" --repo Ratio1/r1db \
+  --pattern r1db-debian-corresponding-source.tar.gz --dir "${tmp_dir}/release"
 printf '%s\n' "${image_ref}" > "${tmp_dir}/expected-image-reference.txt"
 cmp "${tmp_dir}/expected-image-reference.txt" "${tmp_dir}/release/image-reference.txt"
 
@@ -62,7 +62,7 @@ cmp "${tmp_dir}/expected-image-reference.txt" "${tmp_dir}/release/image-referenc
 # tag's object is the release commit.
 tag_refs="$(GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0 \
   git -C "${tmp_dir}" -c credential.helper= -c http.extraHeader= ls-remote \
-  https://github.com/Ratio1/r1-meshdb.git \
+  https://github.com/Ratio1/r1db.git \
   "refs/tags/${release_tag}" "refs/tags/${release_tag}^{}")"
 tag_commit="$(awk '$2 ~ /\^\{\}$/ { print $1; found=1 } END { if (!found) exit 1 }' \
   <<< "${tag_refs}" 2>/dev/null || awk '$2 !~ /\^\{\}$/ { print $1; exit }' <<< "${tag_refs}")"
@@ -72,13 +72,13 @@ tag_commit="$(awk '$2 ~ /\^\{\}$/ { print $1; found=1 } END { if (!found) exit 1
 }
 
 gh attestation verify "oci://${image_ref}" \
-  --repo Ratio1/r1-meshdb \
+  --repo Ratio1/r1db \
   --cert-identity "${expected_identity}" \
   --source-ref "refs/heads/main" \
   --source-digest "${tag_commit}" \
   --predicate-type 'https://slsa.dev/provenance/v1'
 gh attestation verify "oci://${image_ref}" \
-  --repo Ratio1/r1-meshdb \
+  --repo Ratio1/r1db \
   --cert-identity "${expected_identity}" \
   --source-ref "refs/heads/main" \
   --source-digest "${tag_commit}" \
@@ -91,9 +91,9 @@ DOCKER_CONFIG="${anonymous_config}" docker pull "${image_ref}"
 container_id="$(docker create "${image_ref}")"
 docker cp "${container_id}:/cockroach/cockroach" "${tmp_dir}/cockroach"
 mkdir "${tmp_dir}/image-debian" "${tmp_dir}/release-debian"
-docker cp "${container_id}:/usr/share/src/r1-meshdb/debian/." "${tmp_dir}/image-debian/"
+docker cp "${container_id}:/usr/share/src/r1db/debian/." "${tmp_dir}/image-debian/"
 (cd "${tmp_dir}/image-debian" && sha256sum -c SHA256SUMS)
-tar -xzf "${tmp_dir}/release/r1-meshdb-debian-corresponding-source.tar.gz" \
+tar -xzf "${tmp_dir}/release/r1db-debian-corresponding-source.tar.gz" \
   --strip-components=1 -C "${tmp_dir}/release-debian"
 diff -qr "${tmp_dir}/image-debian" "${tmp_dir}/release-debian"
 chmod 755 "${tmp_dir}/cockroach"
@@ -130,13 +130,13 @@ import sys
 labels = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 expected = {
   "org.opencontainers.image.licenses": "Apache-2.0",
-  "org.opencontainers.image.source": "https://github.com/Ratio1/r1-meshdb",
+  "org.opencontainers.image.source": "https://github.com/Ratio1/r1db",
   "org.opencontainers.image.version": sys.argv[2],
   "org.opencontainers.image.revision": sys.argv[3],
-  "io.ratio1.r1-meshdb.distribution": "OSS",
+  "io.ratio1.r1db.distribution": "OSS",
 }
 for key, value in expected.items():
   if labels.get(key) != value:
     raise SystemExit(f"image label mismatch: {key}")
 PY
-printf 'verified signed R1 MeshDB image: %s\n' "${image_ref}"
+printf 'verified signed R1DB image: %s\n' "${image_ref}"

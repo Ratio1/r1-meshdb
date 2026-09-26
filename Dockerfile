@@ -49,7 +49,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 \
 
 FROM golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 AS engine-builder
 
-ARG RATIO1_VERSION=v1.0.6
+ARG RATIO1_VERSION=v1.0.7
 ARG SOURCE_DATE_EPOCH=1727820937
 ARG BUILD_JOBS=4
 
@@ -152,18 +152,18 @@ RUN printf '%s\n' \
 
 COPY --chmod=755 scripts/assemble-runtime-rootfs.sh /usr/local/bin/assemble-runtime-rootfs
 COPY --chmod=755 scripts/collect-debian-corresponding-source.sh /usr/local/bin/collect-debian-corresponding-source
-COPY source/runtime-packages.txt /usr/share/r1-meshdb/runtime-packages.txt
-COPY source/runtime-package-sources.tsv /usr/share/r1-meshdb/runtime-package-sources.tsv
+COPY source/runtime-packages.txt /usr/share/r1db/runtime-packages.txt
+COPY source/runtime-package-sources.tsv /usr/share/r1db/runtime-package-sources.tsv
 
 RUN --mount=from=engine-builder,source=/out/cockroach,target=/candidate-cockroach,ro \
   assemble-runtime-rootfs \
     /minimal-rootfs \
     /candidate-cockroach \
-    /usr/share/r1-meshdb/runtime-packages.txt \
-    /usr/share/r1-meshdb/runtime-package-sources.tsv \
+    /usr/share/r1db/runtime-packages.txt \
+    /usr/share/r1db/runtime-package-sources.tsv \
   && collect-debian-corresponding-source \
-    /minimal-rootfs/usr/share/doc/r1-meshdb/runtime-package-sources.tsv \
-    /minimal-rootfs/usr/share/src/r1-meshdb/debian \
+    /minimal-rootfs/usr/share/doc/r1db/runtime-package-sources.tsv \
+    /minimal-rootfs/usr/share/src/r1db/debian \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
@@ -171,32 +171,32 @@ FROM scratch
 
 ARG BUILD_DATE=""
 ARG RATIO1_REVISION="unknown"
-ARG RATIO1_VERSION="v1.0.6"
+ARG RATIO1_VERSION="v1.0.7"
 
-LABEL org.opencontainers.image.title="R1 MeshDB" \
+LABEL org.opencontainers.image.title="R1DB" \
       org.opencontainers.image.description="Distributed SQL database runtime for Ratio1 edge nodes" \
-      org.opencontainers.image.url="https://github.com/Ratio1/r1-meshdb" \
-      org.opencontainers.image.source="https://github.com/Ratio1/r1-meshdb" \
-      org.opencontainers.image.documentation="https://github.com/Ratio1/r1-meshdb/blob/main/README.md" \
+      org.opencontainers.image.url="https://github.com/Ratio1/r1db" \
+      org.opencontainers.image.source="https://github.com/Ratio1/r1db" \
+      org.opencontainers.image.documentation="https://github.com/Ratio1/r1db/blob/main/README.md" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${RATIO1_REVISION}" \
       org.opencontainers.image.version="${RATIO1_VERSION}" \
       org.opencontainers.image.vendor="Ratio1" \
-      io.ratio1.r1-meshdb.upstream.version="v23.1.28" \
-      io.ratio1.r1-meshdb.upstream.revision="76e598c9b1c100fd9280b979140b5e377c330a20" \
-      io.ratio1.r1-meshdb.distribution="OSS"
+      io.ratio1.r1db.upstream.version="v23.1.28" \
+      io.ratio1.r1db.upstream.revision="76e598c9b1c100fd9280b979140b5e377c330a20" \
+      io.ratio1.r1db.distribution="OSS"
 
 COPY --from=runtime-rootfs-builder /minimal-rootfs/ /
 COPY --chmod=755 --from=cloudflared-builder /out/cloudflared /usr/local/bin/cloudflared
 COPY --chmod=755 --from=cloudflared-builder /out/r1-atomic-replace /usr/local/bin/r1-atomic-replace
 COPY --chmod=755 --from=engine-builder /out/cockroach /cockroach/cockroach
-COPY --from=engine-builder /out/R1_MESHDB_VERSION /usr/share/r1-meshdb/VERSION
-COPY --from=engine-builder /out/lib/ /usr/local/lib/r1-meshdb/
-COPY --from=engine-builder /out/licenses/ /usr/share/doc/r1-meshdb/
+COPY --from=engine-builder /out/R1DB_VERSION /usr/share/r1db/VERSION
+COPY --from=engine-builder /out/lib/ /usr/local/lib/r1db/
+COPY --from=engine-builder /out/licenses/ /usr/share/doc/r1db/
 COPY --chmod=755 entrypoint.sh /usr/local/bin/deeploy-crdb-entrypoint
 
-ENV LD_LIBRARY_PATH=/usr/local/lib/r1-meshdb
+ENV LD_LIBRARY_PATH=/usr/local/lib/r1db
 
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["/usr/local/bin/deeploy-crdb-entrypoint"]

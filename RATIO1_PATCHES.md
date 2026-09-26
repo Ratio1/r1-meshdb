@@ -4,7 +4,7 @@ This file records every deliberate difference between upstream CockroachDB
 v23.1.28 commit `76e598c9b1c100fd9280b979140b5e377c330a20` and this distribution.
 Every released file is covered by `source/manifest.sha256`.
 
-R1 MeshDB v1.0.3 includes a first-party, dependency-free browser console at
+R1DB v1.0.3 includes a first-party, dependency-free browser console at
 `engine/pkg/ui/distoss/assets/bundle.js`, with its icon at
 `engine/pkg/ui/distoss/assets/favicon.svg`. The console uses the retained
 authenticated v2 login and SQL APIs to show cluster identity, list user tables,
@@ -16,7 +16,7 @@ safe common column types, defaults, nullability, and primary keys. The
 admin-only Users & access view reports direct, public, and inherited role
 grants and supports confirmed user deletion. The management actions use
 task tabs and explicit database selection controls. They run through
-authenticated `engine/pkg/server/api_v2_r1_meshdb.go` endpoints because the generic SQL API
+authenticated `engine/pkg/server/api_v2_r1db.go` endpoints because the generic SQL API
 intentionally rejects DDL and transaction-control statements. `engine/pkg/ui/ui.go`
 links these assets from the console page. The retained upstream
 `engine/pkg/server/api_v2.go` registers the authenticated management routes
@@ -34,7 +34,7 @@ creation for that user, while table grants include database `CONNECT`.
 Permissions include public grants, and the table picker uses a query parameter
 to support quoted database names outside the upstream path-route pattern.
 
-R1 MeshDB v1.0.4 grants the configured `CRDB_USER` cluster-wide `admin`
+R1DB v1.0.4 grants the configured `CRDB_USER` cluster-wide `admin`
 membership during bootstrap on both new and existing clusters. This aligns
 the practical default dashboard login with its admin-only management controls;
 the configured password must be protected as an administrator credential.
@@ -66,7 +66,7 @@ or store-format behavior.
   the public image build never regenerates or mutates source. The temporary full
   checkout is validation input only and is never archived or distributed.
 
-### R1 MeshDB identity, support, and privacy defaults
+### R1DB identity, support, and privacy defaults
 
 Ratio1 changed product-facing strings, issue/support routing, compatibility
 documentation, and telemetry defaults in these retained upstream files:
@@ -103,7 +103,7 @@ documentation, and telemetry defaults in these retained upstream files:
 - `engine/pkg/util/tracing/tracer.go`
 
 The compiled CLI, console, build metadata, logs, SQL build-info row, and
-OpenTelemetry service name now identify R1 MeshDB. Fatal errors and issue URLs
+OpenTelemetry service name now identify R1DB. Fatal errors and issue URLs
 route to Ratio1. Compatibility links are pinned explicitly to upstream v23.1
 instead of deriving a nonexistent CockroachDB v1.0 documentation path.
 
@@ -149,7 +149,7 @@ upstream commit as `Build Commit ID` and requires all of:
 
 ```text
 Distribution:     OSS
-Build Tag:        v1.0.6
+Build Tag:        v1.0.7
 Build Type:       release
 ```
 

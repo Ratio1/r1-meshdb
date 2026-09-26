@@ -112,7 +112,7 @@ func (b Info) Short() string {
 	if b.CgoTargetTriple != "" {
 		plat = b.CgoTargetTriple
 	}
-	return fmt.Sprintf("R1 MeshDB %s %s (%s, built %s, %s)",
+	return fmt.Sprintf("R1DB %s %s (%s, built %s, %s)",
 		b.Distribution, b.Tag, plat, b.Time, b.GoVersion)
 }
 
@@ -185,10 +185,10 @@ func TestingOverrideVersion(v string) func() {
 	return func() { binaryVersion = prevBinaryVersion }
 }
 
-// MakeIssueURL produces a URL for reporting an R1 MeshDB compatibility issue.
+// MakeIssueURL produces a URL for reporting an R1DB compatibility issue.
 func MakeIssueURL(issue int) string {
 	return fmt.Sprintf(
-		"https://github.com/Ratio1/r1-meshdb/issues/new?title=Upstream%%20compatibility%%20issue%%20%d",
+		"https://github.com/Ratio1/r1db/issues/new?title=Upstream%%20compatibility%%20issue%%20%d",
 		issue,
 	)
 }

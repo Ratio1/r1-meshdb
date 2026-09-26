@@ -2,7 +2,7 @@
 
 ## Supported Releases
 
-Ratio1 supports only the newest published R1 MeshDB patch release.
+Ratio1 supports only the newest published R1DB patch release.
 The underlying CockroachDB v23.1 line is no longer supported upstream, so
 Ratio1 independently assesses and backports applicable fixes. Support for this
 engine line is transitional and does not promise indefinite maintenance or
@@ -81,7 +81,7 @@ patched source, and boundary regressions are hash-pinned in
 `CVE-2026-84304` / `GHSA-vp52-pcj8-j9qc` permits unauthenticated HTTP/2 DATA
 frame fragmentation to retain excessive heap objects in gRPC-Go servers. The
 database engine embeds gRPC v1.82.1 and Cloudflared embeds v1.83.0, so both are
-treated as affected. R1 MeshDB backports the official v1.83.1 receive-buffer
+treated as affected. R1DB backports the official v1.83.1 receive-buffer
 compaction fix from commit `8cfeca0e1ee5ea0980dcc320e20240fa1079ec77` to both
 source trees. Engine preimage, result, and regression hashes are enforced by
 `source/ratio1-engine-overrides.json`; Cloudflared patch, preimage, result, and

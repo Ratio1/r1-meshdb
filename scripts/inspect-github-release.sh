@@ -9,7 +9,7 @@ release_tag="${1:?usage: inspect-github-release.sh <release-tag>}"
 : "${GH_TOKEN:?GH_TOKEN is required}"
 
 if [[ ! "${release_tag}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-  echo "invalid R1 MeshDB release tag: ${release_tag}" >&2
+  echo "invalid R1DB release tag: ${release_tag}" >&2
   exit 2
 fi
 
@@ -32,7 +32,7 @@ trap cleanup EXIT
 
 response="${tmp}/response.json"
 status="$({
-  printf 'url = "https://api.github.com/repos/Ratio1/r1-meshdb/releases/tags/%s"\n' "${release_tag}"
+  printf 'url = "https://api.github.com/repos/Ratio1/r1db/releases/tags/%s"\n' "${release_tag}"
   printf 'header = "Authorization: Bearer %s"\n' "${GH_TOKEN}"
   printf 'header = "Accept: application/vnd.github+json"\n'
   printf 'header = "X-GitHub-Api-Version: 2022-11-28"\n'

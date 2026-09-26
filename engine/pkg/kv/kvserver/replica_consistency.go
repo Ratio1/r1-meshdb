@@ -750,7 +750,7 @@ func (r *Replica) computeChecksumPostApply(
 
 This node is terminating because a replica inconsistency was detected between %s
 and its other replicas: %v. Please check your cluster-wide log files for more
-information and contact the R1 MeshDB maintainers. It is not necessarily safe
+information and contact the R1DB maintainers. It is not necessarily safe
 to replace this node; cluster data may still be at risk of corruption.
 
 A checkpoints directory to aid (expert) debugging should be present in:

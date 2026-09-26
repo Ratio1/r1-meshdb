@@ -96,7 +96,7 @@ var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "start a node in a multi-node cluster",
 	Long: `
-Start an R1 MeshDB node, which will export data from one or more
+Start an R1DB node, which will export data from one or more
 storage devices, specified via --store flags.
 
 Specify the --join flag to point to another node or nodes that are
@@ -116,7 +116,7 @@ var startSingleNodeCmd = &cobra.Command{
 	Use:   "start-single-node",
 	Short: "start a single-node cluster",
 	Long: `
-Start an R1 MeshDB node, which will export data from one or more
+Start an R1DB node, which will export data from one or more
 storage devices, specified via --store flags.
 The cluster will also be automatically initialized with
 replication disabled (replication factor = 1).
@@ -1164,7 +1164,7 @@ func reportServerInfo(
 ) error {
 	var buf redact.StringBuilder
 	info := build.GetInfo()
-	buf.Printf("R1 MeshDB %s starting at %s (took %0.1fs)\n", serverType, timeutil.Now(), timeutil.Since(startTime).Seconds())
+	buf.Printf("R1DB %s starting at %s (took %0.1fs)\n", serverType, timeutil.Now(), timeutil.Since(startTime).Seconds())
 	buf.Printf("build:\t%s %s @ %s (%s)\n",
 		redact.Safe(info.Distribution), redact.Safe(info.Tag), redact.Safe(info.Time), redact.Safe(info.GoVersion))
 	buf.Printf("webui:\t%s\n", log.SafeManaged(serverCfg.AdminURL()))
@@ -1277,7 +1277,7 @@ func hintServerCmdFlags(ctx context.Context, cmd *cobra.Command) {
 	if !sqlAddrSpecified {
 		log.Ops.Shoutf(ctx, severity.WARNING,
 			"Running a server without --sql-addr, with a combined RPC/SQL listener, is deprecated.\n"+
-				"This feature will be removed in a later version of R1 MeshDB.")
+				"This feature will be removed in a later version of R1DB.")
 	}
 
 	changed := func(flagName string) bool {

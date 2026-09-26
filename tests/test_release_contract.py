@@ -31,7 +31,7 @@ def source_baseline(repository: Path, commit: str, content: bytes) -> dict:
   artifact.parent.mkdir(parents=True, exist_ok=True)
   artifact.write_bytes(content)
   return {
-    "repository": "https://github.com/Ratio1/r1-meshdb.git",
+    "repository": "https://github.com/Ratio1/r1db.git",
     "commit": commit,
     "path": "engine/vendor/modules.txt",
     "artifact": "source/engine-v23.1.28-vendor-modules.baseline.txt",
@@ -43,17 +43,17 @@ class ReleaseContractTests(unittest.TestCase):
 
   def test_console_has_a_renderable_first_party_asset(self):
     bundle_path = ROOT / "engine/pkg/ui/distoss/assets/bundle.js"
-    self.assertTrue(bundle_path.is_file(), "R1 MeshDB console bundle is missing")
+    self.assertTrue(bundle_path.is_file(), "R1DB console bundle is missing")
     bundle = bundle_path.read_text(encoding="utf-8")
     self.assertGreater(len(bundle), 10_000)
-    self.assertIn("data-r1-meshdb-console", bundle)
+    self.assertIn("data-r1db-console", bundle)
     self.assertIn("/api/v2/login/", bundle)
     self.assertIn("/api/v2/sql/", bundle)
     self.assertNotRegex(bundle, r"https?://")
 
   def test_console_management_contract_is_first_party_and_allowlisted(self):
     bundle = read("engine/pkg/ui/distoss/assets/bundle.js")
-    api = read("engine/pkg/server/api_v2_r1_meshdb.go")
+    api = read("engine/pkg/server/api_v2_r1db.go")
     routes = read("engine/pkg/server/api_v2.go")
     for marker in (
       "mesh-database-select",
@@ -63,14 +63,14 @@ class ReleaseContractTests(unittest.TestCase):
       "data-mesh-pagination",
       "data-view=\"users\"",
       "Image",
-      "/api/v2/r1-meshdb/capabilities/",
-      "/api/v2/r1-meshdb/databases/",
-      "/api/v2/r1-meshdb/database-tables/",
-      "/api/v2/r1-meshdb/version/",
-      "/api/v2/r1-meshdb/tables/",
-      "/api/v2/r1-meshdb/users/",
-      "/api/v2/r1-meshdb/access/",
-      "/api/v2/r1-meshdb/permissions/",
+      "/api/v2/r1db/capabilities/",
+      "/api/v2/r1db/databases/",
+      "/api/v2/r1db/database-tables/",
+      "/api/v2/r1db/version/",
+      "/api/v2/r1db/tables/",
+      "/api/v2/r1db/users/",
+      "/api/v2/r1db/access/",
+      "/api/v2/r1db/permissions/",
       "mesh-create-user-grant",
       "mesh-permission-user",
       "mesh-delete-username",
@@ -111,20 +111,20 @@ class ReleaseContractTests(unittest.TestCase):
     ):
       self.assertIn(marker, api)
     for marker in (
-      '"r1-meshdb/capabilities/"',
-      '"r1-meshdb/databases/"',
-      '"r1-meshdb/database-tables/"',
-      '"r1-meshdb/version/"',
-      '"r1-meshdb/tables/"',
-      '"r1-meshdb/users/"',
-      '"r1-meshdb/access/"',
-      '"r1-meshdb/permissions/"',
+      '"r1db/capabilities/"',
+      '"r1db/databases/"',
+      '"r1db/database-tables/"',
+      '"r1db/version/"',
+      '"r1db/tables/"',
+      '"r1db/users/"',
+      '"r1db/access/"',
+      '"r1db/permissions/"',
     ):
       self.assertIn(marker, routes)
     self.assertNotIn("GRANT %s ON", api)
 
   def test_console_database_privacy_and_name_safe_table_listing(self):
-    api = read("engine/pkg/server/api_v2_r1_meshdb.go")
+    api = read("engine/pkg/server/api_v2_r1db.go")
     routes = read("engine/pkg/server/api_v2.go")
     bundle = read("engine/pkg/ui/distoss/assets/bundle.js")
     create = api.split("func (a *apiV2Server) meshdbCreateDatabase", 1)[1].split(
@@ -136,8 +136,8 @@ class ReleaseContractTests(unittest.TestCase):
     self.assertIn("GRANT CREATE ON SCHEMA", create)
     self.assertIn("quotedActor", create)
     self.assertIn("user: username.RootUserName()", create)
-    self.assertIn('"r1-meshdb/database-tables/", a.meshdbListDatabaseTables, true, regularRole', routes)
-    self.assertIn("/api/v2/r1-meshdb/database-tables/?database=${encodeURIComponent(database)}", bundle)
+    self.assertIn('"r1db/database-tables/", a.meshdbListDatabaseTables, true, regularRole', routes)
+    self.assertIn("/api/v2/r1db/database-tables/?database=${encodeURIComponent(database)}", bundle)
     self.assertNotIn("/api/v2/databases/${encodeURIComponent(database)}/tables/", bundle)
 
     permissions = api.split("func (a *apiV2Server) meshdbReadPermissions", 1)[1].split(
@@ -441,7 +441,7 @@ func value() string {
     dockerfile = read("Dockerfile")
     self.assertIn("generate-vendor-license-manifest.py --check", dockerfile)
     self.assertIn("--copy-to /out/licenses/engine/vendor", dockerfile)
-    self.assertIn("/usr/share/doc/r1-meshdb/", dockerfile)
+    self.assertIn("/usr/share/doc/r1db/", dockerfile)
 
   def test_debian_corresponding_source_accompanies_runtime_object_code(self):
     dockerfile = read("Dockerfile")
@@ -452,7 +452,7 @@ func value() string {
     for required in (
       "deb-src [check-valid-until=no]",
       "collect-debian-corresponding-source",
-      "/usr/share/src/r1-meshdb/debian",
+      "/usr/share/src/r1db/debian",
     ):
       self.assertIn(required, dockerfile)
     self.assertIn("runtime-package-sources.tsv", assembler)
@@ -460,10 +460,10 @@ func value() string {
     self.assertIn("Source: %s (%s)", assembler)
     self.assertIn("apt-get -o Acquire::Check-Valid-Until=false source --download-only", collector)
     self.assertIn("sha256sum -c SHA256SUMS", collector)
-    self.assertIn("r1-meshdb-debian-corresponding-source.tar.gz", release)
+    self.assertIn("r1db-debian-corresponding-source.tar.gz", release)
     self.assertGreaterEqual(release.count("source/runtime-package-sources.tsv"), 3)
     self.assertIn("docker cp", release)
-    self.assertIn("--entrypoint /bin/bash r1-meshdb:ci", ci)
+    self.assertIn("--entrypoint /bin/bash r1db:ci", ci)
     self.assertNotIn("--entrypoint /usr/bin/bash", ci)
 
   def test_root_license_is_apache_2(self):
@@ -496,19 +496,19 @@ func value() string {
     self.assertIn("95 notice files", notices)
     self.assertIn("one additional MIT license", notices)
     self.assertIn("All 258 current vendored", notices)
-    self.assertIn("r1-meshdb-debian-corresponding-source.tar.gz", notices)
+    self.assertIn("r1db-debian-corresponding-source.tar.gz", notices)
 
     release = read("RELEASE.md")
     self.assertIn("An untagged candidate digest is not a release", release)
     self.assertIn("verify-image.sh", release)
     workflow = read(".github/workflows/release.yml")
     self.assertGreaterEqual(workflow.count("LICENSE-OVERVIEW.md"), 3)
-    self.assertNotIn("LicenseRef-R1-MeshDB-Third-Party", read("scripts/verify-image.sh"))
+    self.assertNotIn("LicenseRef-R1DB-Third-Party", read("scripts/verify-image.sh"))
 
   def test_oci_license_label_uses_standard_application_license(self):
     dockerfile = read("Dockerfile")
     self.assertIn('org.opencontainers.image.licenses="Apache-2.0"', dockerfile)
-    self.assertNotIn("LicenseRef-R1-MeshDB-Third-Party", dockerfile)
+    self.assertNotIn("LicenseRef-R1DB-Third-Party", dockerfile)
     self.assertNotIn("LicenseRef-ThirdParty", dockerfile)
 
   def test_git_does_not_normalize_manifested_source_bytes(self):
@@ -519,17 +519,17 @@ func value() string {
     self.assertRegex(version, r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
     self.assertEqual(read("VERSION"), f"{version}\n")
     build_script = read("scripts/build-engine.sh")
-    self.assertIn("R1_MESHDB_VERSION_FILE", build_script)
-    self.assertIn("R1_MESHDB_VERSION", build_script)
+    self.assertIn("R1DB_VERSION_FILE", build_script)
+    self.assertIn("R1DB_VERSION", build_script)
     self.assertIn('ratio1_version="${ratio1_version:-v${meshdb_version}}"', build_script)
     self.assertIn('"${ratio1_version}" != "v${meshdb_version}"', build_script)
     self.assertIn(
-      "COPY --from=engine-builder /out/R1_MESHDB_VERSION "
-      "/usr/share/r1-meshdb/VERSION",
+      "COPY --from=engine-builder /out/R1DB_VERSION "
+      "/usr/share/r1db/VERSION",
       read("Dockerfile"),
     )
     workflows = read(".github/workflows/ci.yml") + read(".github/workflows/release.yml")
-    self.assertEqual(workflows.count("/usr/share/r1-meshdb/VERSION"), 2)
+    self.assertEqual(workflows.count("/usr/share/r1db/VERSION"), 2)
     self.assertEqual(workflows.count("cmp VERSION"), 2)
     ci = read(".github/workflows/ci.yml")
     release = read(".github/workflows/release.yml")
@@ -558,8 +558,8 @@ func value() string {
       release.index("Build and publish the untagged release candidate"),
     )
 
-  def test_repository_identity_is_r1_meshdb_everywhere(self):
-    repository = "Ratio1/r1-meshdb"
+  def test_repository_identity_is_r1db_everywhere(self):
+    repository = "Ratio1/r1db"
     source_url = f"https://github.com/{repository}"
     old_slug = "r1-" + "distributed-sql"
     old_repository = f"Ratio1/{old_slug}"
@@ -663,9 +663,9 @@ func value() string {
     self.assertIn('-f sha="$GITHUB_SHA"', create)
 
   def test_engine_identity_support_and_telemetry_defaults_are_meshdb_owned(self):
-    self.assertIn('return fmt.Sprintf("R1 MeshDB %s %s', read("engine/pkg/build/info.go"))
-    self.assertIn('"Name":         "R1 MeshDB"', read("engine/pkg/sql/crdb_internal.go"))
-    self.assertIn('semconv.ServiceNameKey.String("R1 MeshDB")', read("engine/pkg/util/tracing/tracer.go"))
+    self.assertIn('return fmt.Sprintf("R1DB %s %s', read("engine/pkg/build/info.go"))
+    self.assertIn('"Name":         "R1DB"', read("engine/pkg/sql/crdb_internal.go"))
+    self.assertIn('semconv.ServiceNameKey.String("R1DB")', read("engine/pkg/util/tracing/tracer.go"))
     diagnostics = read("engine/pkg/server/diagnostics/diagnostics.go")
     self.assertIn("const defaultUpdatesURL = ``", diagnostics)
     self.assertIn("const defaultReportingURL = ``", diagnostics)
@@ -1066,7 +1066,7 @@ func value() string {
     self.assertIn('[[ "$(git rev-parse origin/main)" == "$GITHUB_SHA" ]]', workflow_text)
     self.assertIn("platforms: linux/amd64", workflow_text)
     self.assertIn("image-reference.txt", read(".github/workflows/security.yml"))
-    self.assertNotIn("r1-meshdb:latest", read(".github/workflows/security.yml"))
+    self.assertNotIn("r1db:latest", read(".github/workflows/security.yml"))
     verifier = read("scripts/verify-image.sh")
     self.assertIn('DOCKER_CONFIG="${anonymous_config}" docker pull', verifier)
     self.assertNotIn("docker logout ghcr.io", verifier)
@@ -1088,15 +1088,15 @@ func value() string {
     secure_smoke = read("scripts/secure-single-node-smoke.sh")
     for console_contract in (
       "/bundle.js",
-      "data-r1-meshdb-console",
+      "data-r1db-console",
       "/api/v2/login/",
       "X-Cockroach-API-Session",
       "/api/v2/sql/",
-      "/api/v2/r1-meshdb/capabilities/",
-      "/api/v2/r1-meshdb/databases/",
-      "/api/v2/r1-meshdb/database-tables/",
-      "/api/v2/r1-meshdb/access/",
-      "/api/v2/r1-meshdb/permissions/",
+      "/api/v2/r1db/capabilities/",
+      "/api/v2/r1db/databases/",
+      "/api/v2/r1db/database-tables/",
+      "/api/v2/r1db/access/",
+      "/api/v2/r1db/permissions/",
     ):
       self.assertIn(console_contract, secure_smoke)
     self.assertIn('[[ "${admin_membership_count}" != "1" ]]', secure_smoke)
@@ -1192,7 +1192,7 @@ func value() string {
     self.assertNotIn("\n  push:", promotion)
     self.assertIn("if: github.ref == 'refs/heads/main'", promotion)
     self.assertIn("environment: release", promotion)
-    self.assertIn("group: r1-meshdb-stable-promotion", promotion)
+    self.assertIn("group: r1db-stable-promotion", promotion)
     self.assertIn("cancel-in-progress: false", promotion)
     self.assertIn("attestations: read", promotion)
     self.assertIn("contents: read", promotion)
@@ -1207,7 +1207,7 @@ func value() string {
     self.assertIn('scripts/verify-image.sh "$IMAGE_REF" "$RELEASE_TAG"', promotion)
     self.assertIn("imagetools create --prefer-index=false", promotion)
     self.assertIn('scripts/inspect-ghcr-tag.sh "$stable_ref"', promotion)
-    self.assertNotIn("r1-meshdb:latest", promotion)
+    self.assertNotIn("r1db:latest", promotion)
     self.assertLess(
       promotion.index('scripts/verify-image.sh "$IMAGE_REF" "$RELEASE_TAG"'),
       promotion.index("imagetools create --prefer-index=false"),
@@ -1288,7 +1288,7 @@ printf '%s' "${FAKE_REGISTRY_STATUS}"
       }
       command = [
         "bash", "scripts/inspect-ghcr-tag.sh",
-        "ghcr.io/ratio1/r1-meshdb:v1.0.0",
+        "ghcr.io/ratio1/r1db:v1.0.0",
       ]
       for status, expected_code, expected_output in (
         ("200", 0, digest),
@@ -1320,7 +1320,7 @@ printf '%s' "${FAKE_REGISTRY_STATUS}"
       self.assertNotEqual(result.returncode, 0)
 
       stable_result = subprocess.run(
-        ["bash", "scripts/inspect-ghcr-tag.sh", "ghcr.io/ratio1/r1-meshdb:stable"],
+        ["bash", "scripts/inspect-ghcr-tag.sh", "ghcr.io/ratio1/r1db:stable"],
         cwd=ROOT,
         env={**environment, "FAKE_REGISTRY_STATUS": "200"},
         text=True,
@@ -1331,7 +1331,7 @@ printf '%s' "${FAKE_REGISTRY_STATUS}"
       self.assertEqual(stable_result.stdout.strip(), digest)
 
       latest_result = subprocess.run(
-        ["bash", "scripts/inspect-ghcr-tag.sh", "ghcr.io/ratio1/r1-meshdb:latest"],
+        ["bash", "scripts/inspect-ghcr-tag.sh", "ghcr.io/ratio1/r1db:latest"],
         cwd=ROOT,
         env={**environment, "FAKE_REGISTRY_STATUS": "200"},
         text=True,
@@ -1471,7 +1471,7 @@ printf '%s' "${FAKE_GITHUB_STATUS}"
       supervision,
     )
     self.assertIn(
-      'assert_failed_cleanly "${resistant_timeout_case}" "initializing R1 MeshDB cluster if needed" 137 30',
+      'assert_failed_cleanly "${resistant_timeout_case}" "initializing R1DB cluster if needed" 137 30',
       supervision,
     )
     self.assertNotIn(

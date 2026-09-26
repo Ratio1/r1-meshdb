@@ -54,7 +54,7 @@ EXPECTED_MODIFIED_FILES = {
 }
 EXPECTED_REMOVED_FILES = {"engine/pkg/util/ctxutil/context_abi_pre1_20.go"}
 EXPECTED_ADDED_FILES = {
-  "engine/pkg/server/api_v2_r1_meshdb.go",
+  "engine/pkg/server/api_v2_r1db.go",
   "engine/pkg/storage/pebble_iterator_r1_test.go",
   "engine/pkg/ui/distoss/assets/bundle.js",
   "engine/pkg/ui/distoss/assets/favicon.svg",
@@ -395,7 +395,7 @@ def check_source_dependency_baseline(baseline: dict, upstream_root: Path | None)
   baseline_source_path = baseline.get("path", "")
   baseline_artifact = baseline.get("artifact", "")
   baseline_sha256 = baseline.get("vendorModulesSha256", "")
-  if baseline_repository != "https://github.com/Ratio1/r1-meshdb.git":
+  if baseline_repository != "https://github.com/Ratio1/r1db.git":
     fail("source dependency baseline repository is invalid")
   if not re.fullmatch(r"[0-9a-f]{40}", baseline_commit):
     fail("source dependency baseline commit is invalid")

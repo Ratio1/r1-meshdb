@@ -10,7 +10,7 @@ on:
         type: string
 
 concurrency:
-  group: r1-meshdb-stable-promotion
+  group: r1db-stable-promotion
   cancel-in-progress: false
 
 permissions:
@@ -70,11 +70,11 @@ jobs:
           gh release download "$release_tag" --repo "$GITHUB_REPOSITORY" \
             --pattern image-reference.txt --dir "$release_dir"
           image_ref="$(tr -d '\r\n' < "$release_dir/image-reference.txt")"
-          [[ "$image_ref" =~ ^ghcr\.io/ratio1/r1-meshdb@sha256:[0-9a-f]{64}$ ]]
+          [[ "$image_ref" =~ ^ghcr\.io/ratio1/r1db@sha256:[0-9a-f]{64}$ ]]
           printf '%s\n' "$image_ref" | cmp - "$release_dir/image-reference.txt"
 
           digest="${image_ref##*@}"
-          version_ref="ghcr.io/ratio1/r1-meshdb:${release_tag}"
+          version_ref="ghcr.io/ratio1/r1db:${release_tag}"
           [[ "$(scripts/inspect-ghcr-tag.sh "$version_ref")" == "$digest" ]]
           {
             printf 'image_ref=%s\n' "$image_ref"
@@ -115,7 +115,7 @@ jobs:
         run: |
           set -euo pipefail
           digest="${IMAGE_REF##*@}"
-          stable_ref="ghcr.io/ratio1/r1-meshdb:stable"
+          stable_ref="ghcr.io/ratio1/r1db:stable"
           previous="$(scripts/inspect-ghcr-tag.sh "$stable_ref")"
           if [[ "$previous" != "$digest" ]]; then
             docker buildx imagetools create --prefer-index=false --tag "$stable_ref" "$IMAGE_REF"

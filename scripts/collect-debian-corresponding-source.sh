@@ -45,12 +45,12 @@ tail -n +2 "${mapping}" \
 )
 
 cat > "${destination}/README" <<'EOF'
-This directory accompanies the R1 MeshDB object-code image with the exact
+This directory accompanies the R1DB object-code image with the exact
 Debian source packages for every Debian binary package retained in the minimal
 runtime. runtime-package-sources.tsv maps binary package versions to source
 package versions. SHA256SUMS authenticates every downloaded source artifact.
 The files were downloaded from the Debian snapshot repositories pinned in the
-R1 MeshDB Dockerfile.
+R1DB Dockerfile.
 EOF
 
 echo "collected $(find "${destination}/packages" -type f | wc -l) Debian corresponding-source files"

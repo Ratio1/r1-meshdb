@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-R1 MeshDB includes third-party source and binaries. Each component
+R1DB includes third-party source and binaries. Each component
 retains its original copyright and license. The SPDX and CycloneDX release
 SBOMs are the machine-readable component inventory; this file points to the
 corresponding full notice/license texts shipped in the source and image.
@@ -21,7 +21,7 @@ corresponding full notice/license texts shipped in the source and image.
 - All 258 current vendored license, notice, patent, and attribution files are
   retained under `engine/vendor/`, hash-pinned by
   `source/vendor-license-manifest.json`, and copied into the runtime image at
-  `/usr/share/doc/r1-meshdb/engine/vendor/`.
+  `/usr/share/doc/r1db/engine/vendor/`.
 - `source/license-inventory.json` affirmatively maps every retained engine file
   to an SPDX identifier or a hash-qualified `LicenseRef` and its preserved
   license basis. `github.com/mattn/go-localereader@v0.0.1` has no standalone
@@ -113,14 +113,14 @@ yaml.v3 combined `LICENSE` contains both grants.
 The final image is based on a pinned Debian Bookworm Slim image and installs a
 small set of Debian packages. Binary-to-source package/version mappings are
 retained in source at `source/runtime-package-sources.tsv` and in the image at
-`/usr/share/doc/r1-meshdb/runtime-package-sources.tsv`. Debian
+`/usr/share/doc/r1db/runtime-package-sources.tsv`. Debian
 copyright files remain in `/usr/share/doc`.
 
 The exact `.dsc` and source archives downloaded from the Dockerfile's pinned
 Debian snapshot accompany the object code inside the same image at
-`/usr/share/src/r1-meshdb/debian/`. That directory includes its mapping,
+`/usr/share/src/r1db/debian/`. That directory includes its mapping,
 `SHA256SUMS`, and a README. The release workflow also publishes a byte-identical
-compressed copy as `r1-meshdb-debian-corresponding-source.tar.gz`, so recipients
+compressed copy as `r1db-debian-corresponding-source.tar.gz`, so recipients
 do not need a live Debian mirror to obtain the corresponding source.
 
 Report a missing or inaccurate notice through the process in `SECURITY.md`.

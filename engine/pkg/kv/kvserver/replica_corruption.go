@@ -58,7 +58,7 @@ func (r *Replica) setCorruptRaftMuLocked(
 	preventStartupMsg := fmt.Sprintf(`ATTENTION:
 
 this node is terminating because replica %s detected an inconsistent state.
-Please contact the R1 MeshDB maintainers. It is not necessarily safe
+Please contact the R1DB maintainers. It is not necessarily safe
 to replace this node; cluster data may still be at risk of corruption.
 
 A file preventing this node from restarting was placed at:

@@ -13917,7 +13917,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/build/info.go",
-      "sha256": "24b986ff7493343f7e56c8ea19db00a40772a9a414dde62300159b232a8bc357",
+      "sha256": "7b4595aa5b743c7eb93e693770da6484dd29cfe8388107d3b34f9c9f2c453f5f",
       "spdx": "Apache-2.0"
     },
     {
@@ -13953,7 +13953,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/cli.go",
-      "sha256": "2f9070f35feecc91b6ee816a0238aa5b929f3fbe035a10f7fd844224027a730a",
+      "sha256": "d07ec51fe7e19ff8840c17e385bf4e1d8c5f547d0ea8aef94725136c153ca98e",
       "spdx": "Apache-2.0"
     },
     {
@@ -14037,7 +14037,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/clierrorplus/decorate_error.go",
-      "sha256": "d013bdfbbffe950e6b877a38255d8ef39e53d296c18a545a2d097df13852cb8e",
+      "sha256": "4ef5aa0c9ed662b43f63a396b37016491fc11a8060951cfaed7b853a2ec49588",
       "spdx": "Apache-2.0"
     },
     {
@@ -14073,7 +14073,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/cliflags/flags.go",
-      "sha256": "b50ce53f23a601cc304e88d856643bf07d9f3399cb6e7d6c83b8496f7f9934f1",
+      "sha256": "6b007e93ebc7d11ffcc5a334d64b8d4093058044d47ee646078951f4456dca75",
       "spdx": "Apache-2.0"
     },
     {
@@ -14085,7 +14085,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/clisqlcfg/context.go",
-      "sha256": "342212e7960abe9f2f80fd5a4b338cb1174e55395ecfa3953cbf8dad83a63721",
+      "sha256": "6bbd8db1b3f90d81e27b67d8a7855fa836678ff612de93d3447955f2247a637b",
       "spdx": "Apache-2.0"
     },
     {
@@ -14109,7 +14109,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/clisqlclient/conn.go",
-      "sha256": "6dc40da9971843e4b3b86e7fd74154f2f4f3b981e9a9ab596581eb79b86c048c",
+      "sha256": "fc923cb3b200415b3627e8c1d7ff1d8591e090d06b9d319953c030d85bcd305b",
       "spdx": "Apache-2.0"
     },
     {
@@ -14295,7 +14295,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/clisqlshell/sql.go",
-      "sha256": "bf49b650c26d2895b0c8e1682565f526eb655711fe27e8ac5c5bd45ca34d3e75",
+      "sha256": "ca39ddb6723f082da34a82a8c6e90336eb2d62cf5bf9c7af22dc42a0d8dc7c6c",
       "spdx": "Apache-2.0"
     },
     {
@@ -14373,7 +14373,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/debug_recover_loss_of_quorum.go",
-      "sha256": "e0654af2f86810e52078b6a91aff91a32c2aaa353ce58527f95724ca8d301dfd",
+      "sha256": "6558123d7663281430d6863b1e98916ab721a25768ce7fbecb36580a7a882472",
       "spdx": "Apache-2.0"
     },
     {
@@ -14415,7 +14415,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/demo.go",
-      "sha256": "d0f84833b344446a29c7b63122b55bd3f0e33f82e9aed42ddce9fa7c8b2a574e",
+      "sha256": "c9d7b677fddb65e31935302757d785dbf508a0c0b7fb968ad68eb405c1a6d9df",
       "spdx": "Apache-2.0"
     },
     {
@@ -14487,7 +14487,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/examples.go",
-      "sha256": "7adc580de7af11d501b053685179113f41764ebf28efa2242ce2d278f8b85837",
+      "sha256": "115430e13e9f84827db8f5f5bec91895e49bc9bfb482e603d531c7818dc3c5cc",
       "spdx": "Apache-2.0"
     },
     {
@@ -14511,7 +14511,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/flags.go",
-      "sha256": "d968164a311c4107bac419fe288b17fa57f1e30d7aa16834caf5d97ee2f9c549",
+      "sha256": "f6045e0a684a01f77d91cfb407ca85c8512ce76c3b7349d44cd7344bc7ae57e4",
       "spdx": "Apache-2.0"
     },
     {
@@ -14523,7 +14523,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/gen.go",
-      "sha256": "3fc425f062896d4b649c27faf2e326efd8e1c72fe62d6bc77050a0ed6d92b7da",
+      "sha256": "6fd864643eacd2306a184dabfd66d5d68479894e324dd83d50bc493f8f15223a",
       "spdx": "Apache-2.0"
     },
     {
@@ -14535,13 +14535,13 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/import.go",
-      "sha256": "ee5690dfc7b501615e96537e0f451b5e1267b5812c16d6c02c9995188c1d8c50",
+      "sha256": "83a91ff7e978f6e2914624ea40271fda9ed854c002fd006e4fa3dc2ee976bf75",
       "spdx": "Apache-2.0"
     },
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/init.go",
-      "sha256": "cacbb313b4b41c642a5be2cf0002dd86c756774c252043b57210db831e496484",
+      "sha256": "0a63725b06d55c2b9f43ff1d0f20c9864fea24db0358a5a64a3005f21795436f",
       "spdx": "Apache-2.0"
     },
     {
@@ -14613,7 +14613,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/sql_shell_cmd.go",
-      "sha256": "53b0ddc8423794663cdba61cc590444e2a9a22a2e4257b2c649bb429983871a1",
+      "sha256": "1528cec9754eab6d9e9782f15f1cea295a316458a13b2b82b656829109506bca",
       "spdx": "Apache-2.0"
     },
     {
@@ -14625,7 +14625,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/cli/start.go",
-      "sha256": "e5ba022b8f47ae2e7356460bab056a8f29cb01640e4a6aacf7798d30adb2852b",
+      "sha256": "fd58f5b6db36b45f85c924d79c873a3821bea80176820921e38f5c47bd20e2f5",
       "spdx": "Apache-2.0"
     },
     {
@@ -16305,7 +16305,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/kv/kvclient/kvcoord/txn_coord_sender.go",
-      "sha256": "9981def051864f5cf577917ccd7719e5cfa5243b873e16fb638b1cd1f9cd77f3",
+      "sha256": "95d697f6a45442aee5398ad1ea32a980e9d94b3f4a36727e195287063ec73156",
       "spdx": "Apache-2.0"
     },
     {
@@ -17949,13 +17949,13 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/kv/kvserver/replica_consistency.go",
-      "sha256": "c8041605c94cad485ed779d37a8686e4b8faab0213b5df3c7a673f00d823b6f1",
+      "sha256": "d2daf9cfb1c57436b78ef372862d77c1963624dab67f391cd151074da04eae5f",
       "spdx": "Apache-2.0"
     },
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/kv/kvserver/replica_corruption.go",
-      "sha256": "34fdfbc4a3c4cb71c0227f2aa57bacd7d095f9b9cc6acd794046275f2ba8ab81",
+      "sha256": "67f83ac72ff301a17faaca9e32c569e84df35f6191d2da7cf1524175763db2ac",
       "spdx": "Apache-2.0"
     },
     {
@@ -19461,7 +19461,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/server/api_v2.go",
-      "sha256": "83ea6aa11f6fbbc6fe853a5968297f9047f8428e0ed5ee16b15ed7836295c9ff",
+      "sha256": "29d904881e80a415f8c95e1790584bcf81c9be31753b35c0e5a4a45d0698a8a2",
       "spdx": "Apache-2.0"
     },
     {
@@ -19473,13 +19473,13 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/server/api_v2_error.go",
-      "sha256": "557b048fdc22162e52870f9f1726645079f6b1295601291ecaa7cfdcd3e515cc",
+      "sha256": "fd8dd7b47799c57568ffa4ce7b7342cfde3d512935dadd85015f3563b6ca8df6",
       "spdx": "Apache-2.0"
     },
     {
       "basis": "Apache-2.0 source header",
-      "path": "engine/pkg/server/api_v2_r1_meshdb.go",
-      "sha256": "4dcae9a710af77db464b9fcc78b329d1b4d8611551b2920a1bea9b283ab85786",
+      "path": "engine/pkg/server/api_v2_r1db.go",
+      "sha256": "94e984a4f56a660be8c1c00fcfad5508b3ea52252ec55fe7771d6299b7a4e91e",
       "spdx": "Apache-2.0"
     },
     {
@@ -19965,7 +19965,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/server/server.go",
-      "sha256": "233e7abb8f9cb2d754f14cc2d357b598fe83ac9529ddaaa56513bedd026ae5d0",
+      "sha256": "217c2b95176c9c2cc4521784aad48c213841c6af4cecacd8777bed26f132c535",
       "spdx": "Apache-2.0"
     },
     {
@@ -23481,7 +23481,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/sql/crdb_internal.go",
-      "sha256": "5ce67bff0547f511299e09173611197d0c680f697d45d11fa9c43561f2c64871",
+      "sha256": "642efca8459387ea8897b9ecfad87557439c5684f936ca8e4831ad7cff79d7b3",
       "spdx": "Apache-2.0"
     },
     {
@@ -31347,7 +31347,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/sql/vars.go",
-      "sha256": "af95f13a604172835849319f44b11e5aa07998122e4d3ddd9f1a95a7b392bab3",
+      "sha256": "009fa62522b2bf598c89a784265d006fb6b8fd60fe10010a7bd2b8da3699b45b",
       "spdx": "Apache-2.0"
     },
     {
@@ -32067,7 +32067,7 @@
     {
       "basis": "Apache-2.0 source header",
       "path": "engine/pkg/ui/distoss/assets/bundle.js",
-      "sha256": "f50d6fa37731e0c0c5f6a05b3d9d6f0e20fa15f1fd37a3f2a2060cb95723a795",
+      "sha256": "24d3993a3dbb3cdf49bb330e97273735821b51b1226dd9a59202038617462e45",
       "spdx": "Apache-2.0"
     },
     {
@@ -32085,7 +32085,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/ui/ui.go",
-      "sha256": "808a36cb077d04db57e71e3b0116e9f50013279dfee1441695732afe7d55e1fa",
+      "sha256": "c8f0a7a7e4e1b05f628fd97463397555ee7e88e9b38fd8714d7bf992501d0db9",
       "spdx": "Apache-2.0"
     },
     {
@@ -33213,7 +33213,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/util/log/clog.go",
-      "sha256": "a0bb9be9c2ef1c557d6e5755ca4b6ba9853169ea9ccfaf689410fd4fa3eaed1c",
+      "sha256": "2757cbd416b04a561323939b16a95304553a15e8b0d14fd3599991546954386f",
       "spdx": "Apache-2.0"
     },
     {
@@ -33513,7 +33513,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/util/log/logcrash/crash_reporting.go",
-      "sha256": "2273df27055c74e2c191cce56a4aa04eb5e097dc7a0f91669c3e95267748a741",
+      "sha256": "3f9236552711fd4279275a0ff607ec8742439c3c8499a4497a66e07e8d384db3",
       "spdx": "Apache-2.0"
     },
     {
@@ -34377,7 +34377,7 @@
     {
       "basis": "BSL change license effective 2026-04-01; engine/licenses/BSL.txt",
       "path": "engine/pkg/util/tracing/tracer.go",
-      "sha256": "a9536fba93fd23f37a6f003723399857529d53b79bbf34a649b04f030f8e5cad",
+      "sha256": "6b7e556dd473ea169981e08907ebaf22facc99abc529e35e5bbe555b70e20279",
       "spdx": "Apache-2.0"
     },
     {

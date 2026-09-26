@@ -13,7 +13,7 @@ import unittest
 from scripts.cloudflare_cleanup_recovery import RecoveryError, resolve_cleanup_run
 
 
-REPOSITORY = "Ratio1/r1-meshdb"
+REPOSITORY = "Ratio1/r1db"
 RUN_ID = 12345
 ATTEMPT = 2
 STEP_NAME = "Run unchanged candidate through real ephemeral Cloudflare tunnels"
@@ -64,10 +64,10 @@ class CloudflareCleanupRecoveryTests(unittest.TestCase):
     )
     self.assertEqual(result["runId"], RUN_ID)
     self.assertEqual(result["runAttempt"], ATTEMPT)
-    self.assertEqual(result["prefix"], "r1-meshdb-ci-12345-2")
+    self.assertEqual(result["prefix"], "r1db-ci-12345-2")
     self.assertEqual(
       result["artifactPattern"],
-      "r1-meshdb-cloudflare-cleanup-12345-2",
+      "r1db-cloudflare-cleanup-12345-2",
     )
     self.assertTrue(result["cleanupNeeded"])
 
@@ -172,7 +172,7 @@ class CloudflareCleanupRecoveryTests(unittest.TestCase):
       )
       self.assertEqual(outputs["run_id"], str(RUN_ID))
       self.assertEqual(outputs["run_attempt"], str(ATTEMPT))
-      self.assertEqual(outputs["prefix"], "r1-meshdb-ci-12345-2")
+      self.assertEqual(outputs["prefix"], "r1db-ci-12345-2")
       self.assertEqual(outputs["cleanup_needed"], "true")
 
 

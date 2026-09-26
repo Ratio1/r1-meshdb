@@ -229,7 +229,7 @@ CREATE TABLE crdb_internal.node_build_info (
 
 		info := build.GetInfo()
 		for k, v := range map[string]string{
-			"Name":         "R1 MeshDB",
+			"Name":         "R1DB",
 			"ClusterID":    execCfg.NodeInfo.LogicalClusterID().String(),
 			"Organization": execCfg.Organization(),
 			"Build":        info.Short(),
@@ -662,7 +662,7 @@ func crdbInternalTablesDatabaseLookupFunc(
 }
 
 var crdbInternalPgCatalogTableIsImplementedTable = virtualSchemaTable{
-	comment: `which entries of pg_catalog are implemented in this version of R1 MeshDB`,
+	comment: `which entries of pg_catalog are implemented in this version of R1DB`,
 	schema: `
 CREATE TABLE crdb_internal.pg_catalog_table_is_implemented (
   name                     STRING NOT NULL,

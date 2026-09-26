@@ -806,7 +806,7 @@ func (t *Tracer) configure(ctx context.Context, sv *settings.Values, tracingDefa
 
 		opts := []otelsdk.TracerProviderOption{otelsdk.WithSampler(otelsdk.AlwaysSample())}
 		resource, err := resource.New(ctx,
-			resource.WithAttributes(semconv.ServiceNameKey.String("R1 MeshDB")),
+			resource.WithAttributes(semconv.ServiceNameKey.String("R1DB")),
 		)
 		if err == nil {
 			opts = append(opts, otelsdk.WithResource(resource))

@@ -53,7 +53,7 @@ const (
 	// Refer to README.md to understand the general design guidelines for
 	// help texts.
 
-	helpMessageFmt = `You are using 'cockroach sql', R1 MeshDB's compatible SQL client.
+	helpMessageFmt = `You are using 'cockroach sql', R1DB's compatible SQL client.
 General
   \q, quit, exit    exit the shell (Ctrl+C/Ctrl+D also supported).
 

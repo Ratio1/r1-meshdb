@@ -47,7 +47,7 @@ func runTerm(cmd *cobra.Command, args []string) (resErr error) {
 		// Refer to README.md to understand the general design guidelines for
 		// help texts.
 		const welcomeMessage = `#
-# Welcome to the R1 MeshDB SQL shell.
+# Welcome to the R1DB SQL shell.
 # All statements must be terminated by a semicolon.
 # To exit, type: \q.
 #

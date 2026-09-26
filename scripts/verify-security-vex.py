@@ -324,7 +324,7 @@ def main() -> None:
   document = json.loads(VEX.read_text(encoding="utf-8"))
   if document.get("@context") != "https://openvex.dev/ns/v0.2.0":
     fail("unexpected OpenVEX context")
-  if document.get("@id") != "https://github.com/Ratio1/r1-meshdb/security/vex/8":
+  if document.get("@id") != "https://github.com/Ratio1/r1db/security/vex/8":
     fail("unexpected OpenVEX document identity")
   if document.get("version") != 8 or document.get("timestamp") != "2026-09-24T00:00:00Z":
     fail("unexpected OpenVEX document version or timestamp")

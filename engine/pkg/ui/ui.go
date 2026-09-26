@@ -72,7 +72,7 @@ var HaveUI = false
 var indexHTML = []byte(`<!DOCTYPE html>
 <html>
 	<head>
-		<title>R1 MeshDB Console</title>
+		<title>R1DB Console</title>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<link href="favicon.svg" rel="icon" type="image/svg+xml">
@@ -125,7 +125,7 @@ type OIDCUI interface {
 // bareIndexHTML is used in place of indexHTMLTemplate when the binary is built
 // without the web UI.
 var bareIndexHTML = []byte(fmt.Sprintf(`<!DOCTYPE html>
-<title>R1 MeshDB</title>
+<title>R1DB</title>
 Binary built without web UI.
 <hr>
 <em>%s</em>`, build.GetInfo().Short()))

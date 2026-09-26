@@ -28,7 +28,7 @@ import (
 
 const (
 	meshDBMaxManagementRequestBytes = 1 << 20
-	meshDBVersionPath               = "/usr/share/r1-meshdb/VERSION"
+	meshDBVersionPath               = "/usr/share/r1db/VERSION"
 )
 
 // The console uses this small, explicit API for operations that the generic
@@ -406,7 +406,7 @@ func (a *apiV2Server) meshdbCapabilities(w http.ResponseWriter, r *http.Request)
 	ctx := a.sqlServer.AnnotateCtx(r.Context())
 	actor := userFromHTTPAuthInfoContext(ctx)
 	row, err := a.sqlServer.internalExecutor.QueryRowEx(
-		ctx, "r1-meshdb-capabilities", nil,
+		ctx, "r1db-capabilities", nil,
 		sessiondata.InternalExecutorOverride{User: actor},
 		"SELECT crdb_internal.is_admin(), crdb_internal.has_role_option('CREATEDB')",
 	)
@@ -442,12 +442,12 @@ func (a *apiV2Server) meshdbVersion(w http.ResponseWriter, r *http.Request) {
 	ctx := a.sqlServer.AnnotateCtx(r.Context())
 	contents, err := os.ReadFile(meshDBVersionPath)
 	if err != nil {
-		apiV2InternalError(ctx, errors.Wrap(err, "read R1 MeshDB image version"), w)
+		apiV2InternalError(ctx, errors.Wrap(err, "read R1DB image version"), w)
 		return
 	}
 	version := strings.TrimSpace(string(contents))
 	if version == "" {
-		apiV2InternalError(ctx, errors.New("R1 MeshDB image version is empty"), w)
+		apiV2InternalError(ctx, errors.New("R1DB image version is empty"), w)
 		return
 	}
 	writeJSONResponse(ctx, w, http.StatusOK, meshDBVersionResponse{Version: version})
@@ -486,7 +486,7 @@ func (a *apiV2Server) meshdbListDatabases(w http.ResponseWriter, r *http.Request
 	ctx := a.sqlServer.AnnotateCtx(r.Context())
 	actor := userFromHTTPAuthInfoContext(ctx)
 	it, err := a.sqlServer.internalExecutor.QueryIteratorEx(
-		ctx, "r1-meshdb-list-databases", nil,
+		ctx, "r1db-list-databases", nil,
 		sessiondata.InternalExecutorOverride{User: actor},
 		"SELECT database_name FROM [SHOW DATABASES] WHERE has_database_privilege(database_name, 'CONNECT') ORDER BY database_name",
 	)
@@ -581,7 +581,7 @@ func (a *apiV2Server) meshdbCreateDatabase(w http.ResponseWriter, r *http.Reques
 		}
 		for _, statement := range statements {
 			if _, err := txn.ExecEx(
-				ctx, "r1-meshdb-create-private-database", txn.KV(),
+				ctx, "r1db-create-private-database", txn.KV(),
 				sessiondata.InternalExecutorOverride{User: statement.user}, statement.query,
 			); err != nil {
 				return err
@@ -615,7 +615,7 @@ func (a *apiV2Server) meshdbCreateTable(w http.ResponseWriter, r *http.Request) 
 	ctx := a.sqlServer.AnnotateCtx(r.Context())
 	actor := userFromHTTPAuthInfoContext(ctx)
 	if _, err := a.sqlServer.internalExecutor.ExecEx(
-		ctx, "r1-meshdb-create-table", nil,
+		ctx, "r1db-create-table", nil,
 		sessiondata.InternalExecutorOverride{User: actor, Database: database}, query,
 	); err != nil {
 		meshDBExecutionError(ctx, w, err)
@@ -653,7 +653,7 @@ func (a *apiV2Server) meshdbCreateUser(w http.ResponseWriter, r *http.Request) {
 	// CREATE USER audit events log placeholder values, including password parameters.
 	query := fmt.Sprintf("CREATE USER %s WITH PASSWORD %s", tree.NameStringP(&userName), lexbase.EscapeSQLString(req.Password))
 	if _, err := a.sqlServer.internalExecutor.ExecEx(
-		ctx, "r1-meshdb-create-user", nil,
+		ctx, "r1db-create-user", nil,
 		sessiondata.InternalExecutorOverride{User: actor}, query,
 	); err != nil {
 		meshDBExecutionError(ctx, w, err)
@@ -691,7 +691,7 @@ func (a *apiV2Server) meshdbDeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 	query := fmt.Sprintf("DROP USER %s", tree.NameStringP(&userName))
 	if _, err := a.sqlServer.internalExecutor.ExecEx(
-		ctx, "r1-meshdb-delete-user", nil,
+		ctx, "r1db-delete-user", nil,
 		sessiondata.InternalExecutorOverride{User: actor}, query,
 	); err != nil {
 		meshDBExecutionError(ctx, w, err)
@@ -852,7 +852,7 @@ func (a *apiV2Server) meshdbReadPermissions(
 		AND (schema_name IS NULL OR schema_name NOT IN
 		('crdb_internal', 'information_schema', 'pg_catalog', 'pg_extension'))`, tree.NameStringP(&targetName))
 	databaseIterator, err := a.sqlServer.internalExecutor.QueryIteratorEx(
-		ctx, "r1-meshdb-list-grant-databases", nil,
+		ctx, "r1db-list-grant-databases", nil,
 		sessiondata.InternalExecutorOverride{User: actor}, "SHOW DATABASES",
 	)
 	if err != nil {
@@ -881,7 +881,7 @@ func (a *apiV2Server) meshdbReadPermissions(
 	grants := make(map[meshDBPermissionKey]*meshDBPermissionAggregate)
 	for _, database := range databaseNames {
 		it, err := a.sqlServer.internalExecutor.QueryIteratorEx(
-			ctx, "r1-meshdb-show-user-grants", nil,
+			ctx, "r1db-show-user-grants", nil,
 			sessiondata.InternalExecutorOverride{User: actor, Database: database}, query,
 		)
 		if err != nil {
@@ -1011,7 +1011,7 @@ func (a *apiV2Server) meshdbReadGrants(
 	ctx context.Context, actor username.SQLUsername, query string, target username.SQLUsername,
 ) ([]string, error) {
 	it, err := a.sqlServer.internalExecutor.QueryIteratorEx(
-		ctx, "r1-meshdb-show-grants", nil,
+		ctx, "r1db-show-grants", nil,
 		sessiondata.InternalExecutorOverride{User: actor}, query,
 	)
 	if err != nil {
@@ -1105,7 +1105,7 @@ func (a *apiV2Server) meshdbChangeAccess(w http.ResponseWriter, r *http.Request)
 	if err := a.sqlServer.internalDB.Txn(ctx, func(ctx context.Context, txn isql.Txn) error {
 		for _, access := range queries {
 			if _, err := txn.ExecEx(
-				ctx, "r1-meshdb-change-access", txn.KV(),
+				ctx, "r1db-change-access", txn.KV(),
 				sessiondata.InternalExecutorOverride{User: actor, Database: access.database}, access.query,
 			); err != nil {
 				return err
